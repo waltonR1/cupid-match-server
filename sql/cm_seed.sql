@@ -11,8 +11,8 @@ insert into cm_users (id, account_name, avatar_url, preferred_locale, status, cr
 
 
 insert into cm_auth_identities (id, user_id, provider, identifier, password_hash, verified_at, created_at, updated_at) values
-  ('auth-001', 'u-001', 'email', 'lin@example.com', 'mock-sha256:cGFzc3dvcmQxMjM=', '2026-01-18 00:00:00', '2026-01-18 00:00:00', '2026-01-18 00:00:00'),
-  ('auth-002', 'u-001', 'phone', '13333333333', 'mock-sha256:cGFzc3dvcmQxMjM=', '2026-06-01 12:16:53', '2026-06-01 12:16:53', '2026-06-01 12:16:53');
+  ('auth-001', 'u-001', 'email', 'lin@example.com', '$2a$10$Mps2ruiJN2eRgv0u90HSRuwxwvfrR5UIeVhLozyoxMNWm4esUFV6W', '2026-01-18 00:00:00', '2026-01-18 00:00:00', '2026-01-18 00:00:00'),
+  ('auth-002', 'u-001', 'phone', '13333333333', '$2a$10$Mps2ruiJN2eRgv0u90HSRuwxwvfrR5UIeVhLozyoxMNWm4esUFV6W', '2026-06-01 12:16:53', '2026-06-01 12:16:53', '2026-06-01 12:16:53');
 
 
 insert into cm_user_security_settings (id, user_id, mfa_enabled, mfa_method, mfa_identity_id, mfa_enabled_at, last_challenge_at, created_at, updated_at) values
@@ -721,4 +721,3 @@ insert into cm_inbox_messages (id, thread_id, sender_type, sender_user_id, messa
 insert into cm_inbox_reads (id, thread_id, user_id, last_read_at, created_at, updated_at) values
   ('read-001', 'inbox-thread-003', 'u-001', '2026-05-28 07:00:00', '2026-05-28 07:00:00', '2026-05-28 07:00:00'),
   ('read-002', 'inbox-thread-001', 'u-001', '2026-05-28 00:13:32', '2026-05-28 00:13:32', '2026-05-28 00:13:32');
-
