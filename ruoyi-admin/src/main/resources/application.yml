@@ -103,7 +103,7 @@ token:
 
 cupid:
   auth:
-    # Local phase-one verification only. Enable temporarily through a startup argument.
+    # 开发环境验证码调试开关，开启后会将验证码输出到日志，生产环境必须关闭
     verification-code-log-enabled: true
 
 # MyBatis配置
