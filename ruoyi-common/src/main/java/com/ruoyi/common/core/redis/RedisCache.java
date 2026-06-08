@@ -183,6 +183,19 @@ public class RedisCache
     }
 
     /**
+     * 删除Set中的指定成员
+     *
+     * @param key Redis键
+     * @param value 待删除的成员
+     * @return 删除的成员数量
+     */
+    public <T> long deleteCacheSetValue(final String key, final T value)
+    {
+        Long count = redisTemplate.opsForSet().remove(key, value);
+        return count == null ? 0 : count;
+    }
+
+    /**
      * 缓存Map
      *
      * @param key
