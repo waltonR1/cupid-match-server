@@ -129,7 +129,8 @@ ruoyi-admin/src/main/java/com/ruoyi/web/controller/cupid/
 - controller
 - token / user context 初版
 - Redis session 与一次性验证码
-- framework 中的 `CupidAuthService` 负责前台认证流程编排，`CupidTokenService` 统一创建和解析前台 JWT；认证请求从 Redis 会话恢复用户身份，不重复查询用户和认证身份表。
+- framework 中的 `CupidAuthService` 负责前台认证流程编排，system 中的 `ICupidUserService` 统一承接用户、身份、默认账户数据和会员持久化，framework 不直接调用 mapper。
+- `CupidTokenService` 统一创建和解析前台 JWT；认证请求从 Redis 会话恢复用户身份，不重复查询用户和认证身份表。
 - `CupidVerificationCodeService` 及其 Redis 缓存模型位于 framework，与数据库领域和 mapper 解耦。
 - 前台 JWT 使用 Redis session 控制有效期；会话剩余不足 20 分钟时自动续回 `token.expireTime`，与 RuoYi 后台登录态保持一致。
 - 用户状态或密码发生安全性变更时，必须通过 `deleteUserTokens(userId)` 注销该用户全部会话。
