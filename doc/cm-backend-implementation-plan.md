@@ -86,13 +86,13 @@ ruoyi-system/src/main/java/com/ruoyi/cupid/
   support/
 
 ruoyi-admin/src/main/java/com/ruoyi/web/controller/cupid/
-  api/
+  app/
   admin/
 ```
 
 说明：
 
-- `api/` 放前台产品 API。
+- `app/` 放前台产品 API。
 - `admin/` 放后续 RuoYi 后台运营接口。
 - `support/` 放 localized field 聚合、viewer context、access masking、code label resolver 等通用领域帮助类。
 
