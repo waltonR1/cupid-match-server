@@ -9,6 +9,8 @@
 -- 2. Multi-value filter fields use relation tables.
 -- 3. Localized display text uses domain-specific localized tables.
 -- 4. JSON is reserved for legal document sections, inbox action payloads and audit snapshots.
+-- 5. Cupid Match entity primary keys and references use canonical 36-character UUID strings.
+-- 6. Business meaning belongs in tier, slug, type and code columns, never in ID prefixes.
 
 drop table if exists cm_payments;
 drop table if exists cm_orders;
@@ -378,7 +380,7 @@ create table cm_profile_privacy_preferences (
 -- ----------------------------
 
 create table cm_membership_plans (
-  id                            varchar(36)  not null comment 'Membership plan ID',
+  id                            varchar(36)  not null comment 'Membership plan UUID',
   tier                          varchar(20)  not null comment 'free, silver, gold, diamond',
   price_cents                   int          default null comment 'Price in cents',
   currency                      varchar(3)   default null comment 'EUR, USD, CNY',

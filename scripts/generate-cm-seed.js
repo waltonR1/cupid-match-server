@@ -1,9 +1,118 @@
 const fs = require('fs');
 const path = require('path');
+const crypto = require('crypto');
 
 const root = path.resolve(__dirname, '..');
 const db = JSON.parse(fs.readFileSync(path.join(root, 'doc/reference-from-app/mock-server/db.json'), 'utf8'));
 const outPath = path.join(root, 'sql/cm_seed.sql');
+const seedNamespace = '2fca05cb-dad9-4c08-b3d8-6654745ce755';
+const password123Bcrypt = '$2a$10$Mps2ruiJN2eRgv0u90HSRuwxwvfrR5UIeVhLozyoxMNWm4esUFV6W';
+
+function deterministicUuid(namespace, legacyId) {
+  if (!legacyId) return legacyId;
+  const namespaceBytes = Buffer.from(seedNamespace.replace(/-/g, ''), 'hex');
+  const bytes = crypto.createHash('sha1')
+    .update(namespaceBytes)
+    .update(`cupid-match:${namespace}:${legacyId}`)
+    .digest()
+    .subarray(0, 16);
+  bytes[6] = (bytes[6] & 0x0f) | 0x50;
+  bytes[8] = (bytes[8] & 0x3f) | 0x80;
+  const hex = bytes.toString('hex');
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+}
+
+function seedPasswordHash(value) {
+  if (value === 'mock-sha256:cGFzc3dvcmQxMjM=') return password123Bcrypt;
+  return value || null;
+}
+
+const entityDefinitions = {
+  users: {},
+  auth_identities: { userId: 'users' },
+  profiles: {},
+  profile_ownerships: { userId: 'users', profileId: 'profiles', invitedByUserId: 'users' },
+  favorite_profiles: { userId: 'users', profileId: 'profiles' },
+  private_introduction_requests: {
+    requesterUserId: 'users',
+    requesterProfileId: 'profiles',
+    targetProfileId: 'profiles',
+    entitlementBalanceId: 'user_entitlement_balances',
+  },
+  profile_photos: { profileId: 'profiles' },
+  profile_internal_records: { profileId: 'profiles', updatedByUserId: 'users' },
+  profile_verifications: { profileId: 'profiles', verifiedByUserId: 'users' },
+  profile_privacy_preferences: { profileId: 'profiles' },
+  profile_contacts: { profileId: 'profiles' },
+  membership_plans: {},
+  user_memberships: { userId: 'users', planId: 'membership_plans' },
+  user_entitlement_balances: { userId: 'users', membershipId: 'user_memberships' },
+  events: {},
+  event_agenda_items: { eventId: 'events' },
+  event_registrations: { userId: 'users', eventId: 'events' },
+  legal_documents: {},
+  legal_document_contents: { documentId: 'legal_documents' },
+  user_agreement_acceptances: { userId: 'users' },
+  user_preferences: { userId: 'users' },
+  inbox_threads: { userId: 'users' },
+  inbox_messages: { threadId: 'inbox_threads', senderUserId: 'users' },
+  inbox_reads: { threadId: 'inbox_threads', userId: 'users' },
+  user_security_settings: { userId: 'users', mfaIdentityId: 'auth_identities' },
+  user_security_challenges: { userId: 'users', identityId: 'auth_identities' },
+};
+
+for (const [collection, references] of Object.entries(entityDefinitions)) {
+  for (const row of db[collection] || []) {
+    row.id = deterministicUuid(collection, row.id);
+    for (const [field, targetCollection] of Object.entries(references)) {
+      if (row[field]) row[field] = deterministicUuid(targetCollection, row[field]);
+    }
+  }
+}
+
+for (const thread of db.inbox_threads || []) {
+  if (!thread.subjectId) continue;
+  if (thread.subjectType === 'profile') thread.subjectId = deterministicUuid('profiles', thread.subjectId);
+  if (thread.subjectType === 'event') thread.subjectId = deterministicUuid('events', thread.subjectId);
+}
+
+function validateEntityIds() {
+  const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-5[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
+  const idsByCollection = new Map();
+
+  for (const collection of Object.keys(entityDefinitions)) {
+    const ids = new Set();
+    for (const row of db[collection] || []) {
+      if (!uuidPattern.test(row.id)) throw new Error(`${collection} has invalid UUID: ${row.id}`);
+      if (ids.has(row.id)) throw new Error(`${collection} has duplicate UUID: ${row.id}`);
+      ids.add(row.id);
+    }
+    idsByCollection.set(collection, ids);
+  }
+
+  for (const [collection, references] of Object.entries(entityDefinitions)) {
+    for (const row of db[collection] || []) {
+      for (const [field, targetCollection] of Object.entries(references)) {
+        const value = row[field];
+        if (value && !idsByCollection.get(targetCollection)?.has(value)) {
+          throw new Error(`${collection}.${field} references missing ${targetCollection} ID: ${value}`);
+        }
+      }
+    }
+  }
+
+  for (const thread of db.inbox_threads || []) {
+    if (!thread.subjectId) continue;
+    const targetCollection = thread.subjectType === 'profile'
+      ? 'profiles'
+      : thread.subjectType === 'event' ? 'events' : null;
+    if (targetCollection && !idsByCollection.get(targetCollection)?.has(thread.subjectId)) {
+      throw new Error(`inbox_threads.subjectId references missing ${targetCollection} ID: ${thread.subjectId}`);
+    }
+  }
+}
+
+validateEntityIds();
 
 function sqlValue(value) {
   if (value === undefined || value === null) return 'null';
@@ -55,8 +164,9 @@ function pushLocalizedFieldRows(rows, ownerKey, ownerId, fields, prefix, sourceR
     ['zh', 'fr', 'en'].forEach((locale) => {
       const slot = localizedText[locale];
       if (!slot) return;
+      const sequence = `${prefix}-${String(rows.length + 1).padStart(5, '0')}`;
       rows.push({
-        id: `${prefix}-${String(rows.length + 1).padStart(5, '0')}`,
+        id: deterministicUuid(`${prefix}_localized_fields`, sequence),
         [ownerKey]: ownerId,
         field_name: fieldName,
         locale,
@@ -77,8 +187,9 @@ function pushLocalizedItemRows(rows, profile, fieldName, items) {
     ['zh', 'fr', 'en'].forEach((locale) => {
       const slot = localizedText?.[locale];
       if (!slot) return;
+      const sequence = `pli-${String(rows.length + 1).padStart(5, '0')}`;
       rows.push({
-        id: `pli-${String(rows.length + 1).padStart(5, '0')}`,
+        id: deterministicUuid('profile_localized_items', sequence),
         profile_id: profile.id,
         field_name: fieldName,
         item_order: itemIndex,
@@ -98,6 +209,7 @@ const sql = [];
 sql.push('-- ----------------------------');
 sql.push('-- Cupid Match sample seed data');
 sql.push('-- Generated from doc/reference-from-app/mock-server/db.json');
+sql.push('-- Entity IDs are deterministic UUIDv5 values; regenerating the same source keeps them stable.');
 sql.push('-- Run after sql/cm_schema.sql.');
 sql.push('-- ----------------------------\n');
 sql.push('set names utf8mb4;\n');
@@ -119,7 +231,7 @@ sql.push(insertInto('cm_auth_identities', ['id', 'user_id', 'provider', 'identif
     user_id: row.userId,
     provider: row.provider,
     identifier: row.identifier,
-    password_hash: row.passwordHash || null,
+    password_hash: seedPasswordHash(row.passwordHash),
     verified_at: toDateTime(row.verifiedAt),
     created_at: toDateTime(row.createdAt),
     updated_at: toDateTime(row.updatedAt),
@@ -468,8 +580,9 @@ const eventFocusRows = [];
     ['zh', 'fr', 'en'].forEach((locale) => {
       const slot = localizedText?.[locale];
       if (!slot) return;
+      const sequence = `erf-${String(eventFocusRows.length + 1).padStart(5, '0')}`;
       eventFocusRows.push({
-        id: `erf-${String(eventFocusRows.length + 1).padStart(5, '0')}`,
+        id: deterministicUuid('event_relationship_focuses', sequence),
         event_id: event.id,
         focus_order: focusOrder,
         locale,
@@ -590,5 +703,5 @@ sql.push(insertInto('cm_inbox_reads', ['id', 'thread_id', 'user_id', 'last_read_
     updated_at: toDateTime(row.updatedAt),
   }))));
 
-fs.writeFileSync(outPath, sql.filter(Boolean).join('\n'), 'utf8');
+fs.writeFileSync(outPath, `${sql.filter(Boolean).join('\n').trimEnd()}\n`, 'utf8');
 console.log(`Generated ${path.relative(root, outPath)}`);

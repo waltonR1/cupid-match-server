@@ -13,6 +13,8 @@ RuoYi 原生系统表继续作为后台管理、权限、菜单、登录日志�
 - 领域数据结构以 `sql/cm_schema.sql` 为准。
 - 样例数据以 `sql/cm_seed.sql` 为准。
 - 多语言、筛选字段和 JSON 取舍以 `doc/cm-schema-structure-notes.md` 为准。
+- `cm_*` 实体 ID 统一使用 UUID，seed 通过 `scripts/generate-cm-seed.js` 生成稳定 UUIDv5。
+- 业务代码通过 `tier`、`slug`、`type` 等字段查询业务对象，不依赖具体 UUID。
 - 不把前台用户塞进 RuoYi `sys_user`。
 - 不把 RuoYi 后台员工塞进 `cm_users`。
 - 后台员工通过 `cm_staff_members.sys_user_id` 桥接到 RuoYi `sys_user.user_id`。
@@ -102,7 +104,9 @@ ruoyi-admin/src/main/java/com/ruoyi/web/controller/cupid/
 
 - `GET /api/legal/documents/{type}`
 - `POST /api/auth/login`
+- `POST /api/auth/logout`
 - `POST /api/auth/verification-code`
+- `POST /api/auth/register`
 - `POST /api/auth/password-reset-code`
 - `POST /api/auth/password/reset`
 - `GET /api/account/me`
@@ -124,12 +128,16 @@ ruoyi-admin/src/main/java/com/ruoyi/web/controller/cupid/
 - service
 - controller
 - token / user context 初版
+- Redis session 与一次性验证码
 - localized legal document mapper
 
 验收：
 
 - 能用 `lin@example.com / password123` 或 seed 中的账户登录。
 - 登录后能返回 account me。
+- logout 后当前 JWT 立即失效。
+- 注册验证码可创建、过期并一次性消费，注册后默认账户数据完整。
+- 密码重置后旧密码失效，且该用户全部旧 JWT 立即失效。
 - legal terms/privacy 能按 locale 返回。
 
 ## 阶段二：Profile 目录和详情
