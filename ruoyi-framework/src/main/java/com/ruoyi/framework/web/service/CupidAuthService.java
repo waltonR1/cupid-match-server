@@ -49,7 +49,8 @@ public class CupidAuthService
         String normalizedIdentifier = identifier.contains("@")
                 ? normalizeIdentifier("email", identifier)
                 : normalizeIdentifier("phone", identifier);
-        CupidAuthIdentity identity = userService.selectIdentityByIdentifier(normalizedIdentifier);
+        String provider = identifier.contains("@") ? "email" : "phone";
+        CupidAuthIdentity identity = userService.selectIdentityByProviderAndIdentifier(provider, normalizedIdentifier);
         if (identity == null || !SecurityUtils.matchesPassword(password, identity.getPasswordHash()))
         {
             throw new CupidApiException(HttpStatus.UNAUTHORIZED, "invalid_credentials");
@@ -106,11 +107,8 @@ public class CupidAuthService
 
         String userId = IdUtils.fastUUID();
         String identityId = IdUtils.fastUUID();
-        if (!userService.createDefaultAccount(userId, identityId, accountName, preferredLocale,
-                provider, identifier, SecurityUtils.encryptPassword(password)))
-        {
-            throw new CupidApiException(HttpStatus.ERROR, "free_membership_plan_not_found");
-        }
+        userService.createDefaultAccount(userId, identityId, accountName, preferredLocale,
+                provider, identifier, SecurityUtils.encryptPassword(password));
         legalService.acceptActiveDocuments(userId);
 
         CupidUser user = userService.selectUserById(userId);
