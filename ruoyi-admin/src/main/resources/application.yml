@@ -101,6 +101,11 @@ token:
   # 令牌有效期（默认30分钟）
   expireTime: 30
 
+cupid:
+  auth:
+    # Local phase-one verification only. Enable temporarily through a startup argument.
+    verification-code-log-enabled: true
+
 # MyBatis配置
 mybatis:
   # 搜索指定包别名
