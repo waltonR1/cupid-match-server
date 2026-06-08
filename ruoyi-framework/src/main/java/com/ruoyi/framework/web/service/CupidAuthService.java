@@ -11,8 +11,8 @@ import com.ruoyi.common.exception.cupid.CupidApiException;
 import com.ruoyi.cupid.domain.CupidAuthIdentity;
 import com.ruoyi.cupid.domain.CupidUser;
 import com.ruoyi.cupid.domain.CupidUserMembership;
-import com.ruoyi.cupid.mapper.CupidAuthMapper;
 import com.ruoyi.cupid.service.ICupidLegalService;
+import com.ruoyi.cupid.service.ICupidUserService;
 import com.ruoyi.common.utils.SecurityUtils;
 import com.ruoyi.common.utils.StringUtils;
 import com.ruoyi.common.utils.uuid.IdUtils;
@@ -27,7 +27,7 @@ public class CupidAuthService
     private static final Pattern PHONE_PATTERN = Pattern.compile("^\\+?[1-9]\\d{6,14}$");
 
     @Autowired
-    private CupidAuthMapper authMapper;
+    private ICupidUserService userService;
 
     @Autowired
     private ICupidLegalService legalService;
@@ -49,7 +49,7 @@ public class CupidAuthService
         String normalizedIdentifier = identifier.contains("@")
                 ? normalizeIdentifier("email", identifier)
                 : normalizeIdentifier("phone", identifier);
-        CupidAuthIdentity identity = authMapper.selectIdentityByIdentifier(normalizedIdentifier);
+        CupidAuthIdentity identity = userService.selectIdentityByIdentifier(normalizedIdentifier);
         if (identity == null || !SecurityUtils.matchesPassword(password, identity.getPasswordHash()))
         {
             throw new CupidApiException(HttpStatus.UNAUTHORIZED, "invalid_credentials");
@@ -58,7 +58,7 @@ public class CupidAuthService
         CupidUser user = requireActiveUser(identity.getUserId());
         if ("deactivated".equals(user.getStatus()))
         {
-            authMapper.reactivateUser(user.getId());
+            userService.reactivateUser(user.getId());
             user.setStatus("active");
         }
 
@@ -67,7 +67,7 @@ public class CupidAuthService
         Map<String, Object> response = new LinkedHashMap<>();
         response.put("token", tokenService.createToken(identity.getId(), user.getId()));
         response.put("user", toUserDto(user));
-        response.put("membership", toMembershipDto(authMapper.selectActiveMembershipByUserId(user.getId())));
+        response.put("membership", toMembershipDto(userService.selectActiveMembershipByUserId(user.getId())));
         return response;
     }
 
@@ -94,7 +94,7 @@ public class CupidAuthService
         {
             throw new CupidApiException(HttpStatus.BAD_REQUEST, "invalid_account_name");
         }
-        if (authMapper.selectIdentityByProviderAndIdentifier(provider, identifier) != null)
+        if (userService.selectIdentityByProviderAndIdentifier(provider, identifier) != null)
         {
             throw new CupidApiException(HttpStatus.CONFLICT, "account_already_exists");
         }
@@ -106,22 +106,18 @@ public class CupidAuthService
 
         String userId = IdUtils.fastUUID();
         String identityId = IdUtils.fastUUID();
-        authMapper.insertUser(userId, accountName, preferredLocale);
-        authMapper.insertIdentity(identityId, userId, provider, identifier,
-                SecurityUtils.encryptPassword(password));
-        authMapper.insertSecuritySettings(IdUtils.fastUUID(), userId);
-        authMapper.insertPreferences(IdUtils.fastUUID(), userId, provider);
-        if (authMapper.insertFreeMembership(IdUtils.fastUUID(), userId) != 1)
+        if (!userService.createDefaultAccount(userId, identityId, accountName, preferredLocale,
+                provider, identifier, SecurityUtils.encryptPassword(password)))
         {
             throw new CupidApiException(HttpStatus.ERROR, "free_membership_plan_not_found");
         }
         legalService.acceptActiveDocuments(userId);
 
-        CupidUser user = authMapper.selectUserById(userId);
+        CupidUser user = userService.selectUserById(userId);
         Map<String, Object> response = new LinkedHashMap<>();
         response.put("token", tokenService.createToken(identityId, userId));
         response.put("user", toUserDto(user));
-        response.put("membership", toMembershipDto(authMapper.selectActiveMembershipByUserId(userId)));
+        response.put("membership", toMembershipDto(userService.selectActiveMembershipByUserId(userId)));
         return response;
     }
 
@@ -135,7 +131,7 @@ public class CupidAuthService
         }
         validateIdentifier(normalizedProvider, identifier);
 
-        CupidAuthIdentity existing = authMapper.selectIdentityByProviderAndIdentifier(
+        CupidAuthIdentity existing = userService.selectIdentityByProviderAndIdentifier(
                 normalizedProvider, identifier);
         if (CupidVerificationCodeService.PURPOSE_REGISTRATION.equals(purpose) && existing != null)
         {
@@ -163,7 +159,7 @@ public class CupidAuthService
         validateIdentifier(provider, identifier);
         validatePassword(newPassword);
 
-        CupidAuthIdentity identity = authMapper.selectIdentityByProviderAndIdentifier(provider, identifier);
+        CupidAuthIdentity identity = userService.selectIdentityByProviderAndIdentifier(provider, identifier);
         if (identity == null)
         {
             throw new CupidApiException(HttpStatus.NOT_FOUND, "identity_not_found");
@@ -174,7 +170,7 @@ public class CupidAuthService
             throw new CupidApiException(HttpStatus.BAD_REQUEST, "invalid_or_expired_verification_code");
         }
 
-        authMapper.updatePassword(identity.getId(), SecurityUtils.encryptPassword(newPassword));
+        userService.updatePassword(identity.getId(), SecurityUtils.encryptPassword(newPassword));
         tokenService.deleteUserTokens(identity.getUserId());
 
         Map<String, Object> result = new LinkedHashMap<>();
@@ -197,7 +193,7 @@ public class CupidAuthService
 
     private CupidUser requireActiveUser(String userId)
     {
-        CupidUser user = authMapper.selectUserById(userId);
+        CupidUser user = userService.selectUserById(userId);
         if (user == null)
         {
             throw new CupidApiException(HttpStatus.UNAUTHORIZED, "unauthorized");
