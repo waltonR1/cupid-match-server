@@ -13,7 +13,7 @@ RuoYi 原生系统表继续承载后台登录、角色、菜单、权限和系�
 
 发生冲突时按以下优先级处理：
 
-1. `doc/reference-from-app/final-api-contract.md`：接口路径、请求和响应 DTO。
+1. `doc/reference-from-app/final-api-contract.md`：接口路径、请求参数和响应结构。
 2. `sql/cm_schema.sql`：实际表、字段、索引和约束。
 3. `doc/reference-from-app/final-data-flow-contract.md`：跨表读写和业务流程。
 4. `doc/cm-schema-structure-notes.md`：JSON、扁平字段和外接表的设计说明。
@@ -33,7 +33,15 @@ RuoYi 原生系统表继续承载后台登录、角色、菜单、权限和系�
 - system 负责 `cm_` 领域模型、mapper 和数据库事务。
 - framework 不直接注入 mapper，必须通过 system service 访问数据库。
 - mapper 接口与 mapper XML 必须一一对应，不保留未使用查询。
-- DTO 不直接复用数据库 domain；新增业务阶段时在 `com.ruoyi.cupid.dto`、`query`、`support` 中按需创建。
+- Cupid 业务沿用当前 RuoYi 的 `controller -> service -> mapper -> domain` 结构，不另建一套独立领域架构。
+- `final-api-contract.md` 中的 TypeScript DTO 用于约束 JSON 响应形状，不代表 Java 必须为每个 interface 创建同名 DTO 类。
+- 查询条件优先放在对应 domain 的非表查询字段、适用时使用 `BaseEntity.params`，或直接作为 mapper 方法参数；默认不创建 `query` 包。
+- mapper 默认返回 domain 或少量与表结构紧密相关的关联 domain，不为每条 SQL 创建 projection/row 类。
+- service 负责批量查询、跨表聚合、多语言回退、权限判断、字段遮罩和最终响应结构组装。
+- 产品响应默认由 service 使用 `Map<String, Object>` 和集合显式挑选字段，不直接把含数据库或内部字段的 domain 整体序列化给前端。
+- 只有响应结构稳定、类型复杂且会被多个 service/controller 复用时，才增加少量 VO/DTO。
+- 不允许机械复制 `final-api-contract.md` 中的每一个 TypeScript interface，也不允许创建只有空继承关系的 DTO。
+- 通用帮助方法先作为对应 service 的私有方法；确认被多个 service 重复使用后，才提取公共组件，不预建 `support` 层。
 - 写入多个表的业务操作必须由 service 事务包裹。
 - 禁止为兼容旧 mock ID、旧接口或旧字段增加临时兼容分支。
 - 禁止无需求修改 RuoYi 原生认证和后台模块。
@@ -46,14 +54,15 @@ ruoyi-system/src/main/java/com/ruoyi/cupid/
   mapper/
   service/
   service/impl/
-  dto/
-  query/
-  support/
 
 ruoyi-admin/src/main/java/com/ruoyi/web/controller/cupid/
   app/
   admin/
 ```
+
+只有出现经过验证的实际需求时，才允许在上述结构之外增加目录。新增目录前必须说明现有 RuoYi 分层为什么无法清晰承载该职责，并由校验者确认。
+
+以上架构约束适用于阶段二至阶段九，不是 Profile 阶段的临时规则。
 
 ## 3. 执行与校验协议
 
@@ -87,7 +96,7 @@ ruoyi-admin/src/main/java/com/ruoyi/web/controller/cupid/
 Codex 按以下顺序检查：
 
 1. `git diff`：确认修改范围没有越过当前阶段。
-2. 契约：路径、HTTP 方法、参数、DTO 和错误响应是否一致。
+2. 契约：路径、HTTP 方法、参数、JSON 响应结构和错误响应是否一致。
 3. 分层：controller、framework、system、mapper 职责是否正确。
 4. 数据：字段映射、事务、唯一约束、状态流转和权限过滤。
 5. 安全：认证、对象归属、敏感字段、Redis session 和验证码。
@@ -108,6 +117,8 @@ Codex 按以下顺序检查：
 - 不泄露联系方式、密码哈希、内部备注和后台字段。
 - 多表写入具备事务性，失败不留下半成品。
 - mapper 方法、XML statement 和 domain 字段完全对应。
+- 没有无必要的 DTO、query、projection、support 或空接口抽象。
+- service 承担业务聚合，controller 和 mapper 中没有混入响应拼装或权限流程。
 - `mvn -pl ruoyi-admin -am -DskipTests package` 通过。
 - 当前阶段的真实接口冒烟通过。
 - 工作区只包含当前任务相关修改。
@@ -118,7 +129,7 @@ Codex 按以下顺序检查：
 | --- | --- | --- |
 | 阶段一：Legal / Auth / Account Me | 已完成并验收 | 2026-06-08 已通过构建和真实运行冒烟 |
 | 阶段二：Profile 只读目录与详情 | 下一阶段 | 尚未开始 |
-| 阶段三：Account Profile 管理与上传 | 未开始 | 依赖阶段二 DTO 聚合 |
+| 阶段三：Account Profile 管理与上传 | 未开始 | 依赖阶段二 profile 聚合与权限规则 |
 | 阶段四：Account 设置与安全 | 未开始 | 复用阶段一认证能力 |
 | 阶段五：Membership / Entitlement | 未开始 | Profile masking 可先只读取现有会员数据 |
 | 阶段六：Events | 未开始 | 依赖会员判断 |
@@ -166,7 +177,7 @@ Codex 按以下顺序检查：
 
 ### 目标
 
-完成首页精选、自助征婚和家庭征婚的只读浏览，为后续 owner 编辑复用同一套 DTO 聚合和权限遮罩能力。
+完成首页精选、自助征婚和家庭征婚的只读浏览，为后续 owner 编辑复用同一套 service 聚合与权限遮罩能力。
 
 ### 接口
 
@@ -195,25 +206,31 @@ Codex 按以下顺序检查：
 
 ### 实施顺序
 
-1. 定义目录 query、分页 DTO、facet DTO、card DTO 和 detail DTO。
-2. 实现 profile 主表、语言、关系值和本地化字段的批量查询。
-3. 实现单次聚合所需的 photo、verification、internal record 查询。
-4. 建立 locale 回退工具，避免在 controller 或 mapper 中拼 DTO。
-5. 建立 viewer context：guest、free、member、owner、staff。
-6. 建立统一字段访问和 masking 规则。
-7. 实现 self/family 目录，再实现 featured。
-8. 复用聚合器实现 self/family detail。
+1. 按 `cm_profiles` 建立 `CupidProfile` domain，在其中保留必要的非表查询字段和关联结果字段。
+2. 为语言、关系值、本地化字段、照片、认证、隐私设置和内部记录建立必要的关联 domain；不建立 SQL projection 体系。
+3. 在 `CupidProfileMapper` 中实现主表分页和子表批量查询，mapper 参数使用 domain 或明确的普通参数。
+4. 创建 `ICupidProfileService` 与 `CupidProfileServiceImpl`，先完成 self/family 目录的 service 聚合。
+5. 在 service 中处理筛选值规范化、分页、facet、多语言回退、展示字段派生和响应结构。
+6. 完成 featured 查询，复用目录已有 mapper 和 service 私有聚合方法。
+7. 在 service 中建立 guest、free、member、owner、staff 判断和字段 masking。
+8. 复用已有 domain、mapper 和 service 方法完成 self/family detail。
+9. 最后增加 app controller，只负责参数传递、当前用户获取和 `AjaxResult` 包装。
 
 ### 强制规则
 
 - 列表查询禁止逐条查询 localized、photo、favorite 等子表，避免 N+1。
 - `displayName`、`avatarUrl`、`age` 等展示字段由服务聚合，不冗余写回数据库。
+- TypeScript 的 directory item、facets、detail、access 等 interface 不要求逐一生成 Java 类。
+- 目录和详情最终 JSON 可以由 service 使用有序 `Map` 和集合组装，但字段名、可选字段和嵌套结构必须严格符合契约。
+- 如果实际代码证明一个响应模型会被多处稳定复用，可增加一个明确用途的 VO/DTO；不得一次性预生成整个 Profile DTO 家族。
+- query string 的枚举和区间值必须按契约解析，例如 `under25`、`25to29`、`yes/no`，不能自行改成另一种格式。
+- mapper 的批量关联结果必须保留 `profile_id`，确保 service 能按 profile 分组。
 - profile 类型必须与入口匹配；不能通过 self 详情入口读取 family profile。
 - guest/free/member 的字段访问严格按契约处理。
 - owner 能读取自己管理的资料，但 owner 身份必须通过 `cm_profile_ownerships` 校验。
 - `cm_profile_privacy_preferences` 只能进一步隐藏字段，不能放宽系统默认权限。
 - phone、email、wechat 永远不进入公开 profile detail。
-- 内部备注、审核内部字段和 staff 信息不得进入前台 DTO。
+- 内部备注、审核内部字段和 staff 信息不得进入前台响应。
 
 ### 验收矩阵
 
@@ -228,13 +245,13 @@ Codex 按以下顺序检查：
 
 ### 阶段完成后提交建议
 
-将“DTO/查询基础”“目录”“详情与 masking”分开提交，避免一次提交覆盖整个阶段。
+将“domain 与 mapper”“目录 service 与 controller”“详情与 masking”分开提交，避免一次提交覆盖整个阶段。
 
 ## 7. 阶段三：Account Profile 管理与上传
 
 ### 前置条件
 
-阶段二的 detail DTO 聚合与 owner viewer context 已稳定。
+阶段二的 profile 聚合方法与 owner viewer context 已稳定。
 
 ### 接口
 
@@ -261,7 +278,7 @@ Codex 按以下顺序检查：
 ### 实施顺序
 
 1. 先实现 owner profile 列表和详情。
-2. 定义 save payload，区分新建与更新。
+2. controller 接收契约规定的 save payload；只在 Map 已明显影响校验和复用时增加一个保存参数对象。
 3. 在单一事务中同步主表、ownership、contacts、verification 草稿、photos 和 localized 数据。
 4. 实现 privacy preference upsert。
 5. 实现 archive 业务前置检查。
@@ -283,7 +300,7 @@ Codex 按以下顺序检查：
 - 保存失败时所有关联表回滚。
 - 非 owner 无法读取、修改、归档或更新隐私设置。
 - 修改 localized 数组后，旧值按约定删除或保留，不产生重复行。
-- 照片新增、排序、替换和删除后返回 DTO 与数据库一致。
+- 照片新增、排序、替换和删除后返回结构与数据库一致。
 - archive 后公共目录不可见，owner 侧结果符合契约。
 - 上传拒绝非法类型和超限文件。
 
@@ -514,6 +531,11 @@ Codex 按以下顺序检查：
 - 不复刻 mock-server debug routes。
 - 不合并前台用户和 RuoYi 后台用户。
 - 不重写 RuoYi 原生用户、角色和菜单体系。
+- 不把 Cupid 业务改造成独立的 DDD、Clean Architecture 或 `dto/query/projection/support` 分层。
+- 不因为契约存在 TypeScript interface，就在 Java 中机械创建一一对应的类。
+- 不提前创建尚未被 service 使用的 domain、返回模型、接口或通用工具。
+- 不为单条 mapper SQL 创建专用 row/projection 类；确需非表结果时，优先确认能否由已有 domain 字段、关联 domain 或 `Map` 承载。
+- 不把筛选解析、跨表聚合、多语言回退、权限判断和响应拼装放进 controller、query 对象或 mapper。
 - 不为 seed UUID 或旧 `u-001` ID 增加兼容代码。
 - 不在 controller 中写 SQL 聚合、权限规则或事务流程。
 - 不在业务代码中硬编码 `plan-free` UUID 等数据库主键。
@@ -523,9 +545,11 @@ Codex 按以下顺序检查：
 
 下一任务是阶段二的第一个子任务：
 
-1. 对照 `final-api-contract.md` 的 Profile Directory 与 Profile Detail 章节定义 DTO 和 query。
-2. 设计目录所需的批量 mapper 查询，先证明不存在 N+1。
-3. 暂不实现 controller、masking 或详情聚合。
-4. 交付 DTO、query、mapper 设计和对应构建结果，由 Codex 校验后再继续目录 service。
+1. 对照 `cm_schema.sql` 建立 `CupidProfile` 以及目录读取立即需要的关联 domain。
+2. 只实现 self/family 目录立即需要的 `CupidProfileMapper` 接口和 XML；暂不创建详情、favorite、private introduction 等后续模型。
+3. 主表分页后，照片、语言、本地化字段、认证和 featured 数据必须按 profile ID 集合批量读取，并保留可供 service 分组的 `profile_id`。
+4. 查询条件沿用 RuoYi domain/mapper 参数风格，不创建 `query`、`projection`、`row`、`dto` 或 `support` 目录。
+5. 本子任务不实现 controller；可以建立最小 `ICupidProfileService`/实现类来验证 mapper 结果能够完成目录聚合，但不要提前实现详情与 masking。
+6. 交付新增 domain、mapper、必要的最小 service、SQL 查询说明和构建结果，由 Codex 校验后再继续目录接口。
 
-该拆分用于先固定传输结构和数据读取边界，避免实现过程中反复改 mapper 与 DTO。
+该子任务的目标是验证 RuoYi 现有分层能够正确承载 Profile 目录数据读取，并证明批量查询不存在 N+1；不是预先设计一整套新的传输层架构。
