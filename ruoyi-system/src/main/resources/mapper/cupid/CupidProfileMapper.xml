@@ -1,0 +1,621 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.cupid.mapper.CupidProfileMapper">
+
+    <resultMap id="CupidProfileResult" type="CupidProfile">
+        <id property="id" column="id"/>
+        <result property="profileType" column="profile_type"/>
+        <result property="gender" column="gender"/>
+        <result property="birthYear" column="birth_year"/>
+        <result property="height" column="height"/>
+        <result property="cityCode" column="city_code"/>
+        <result property="countryCode" column="country_code"/>
+        <result property="nationalityCode" column="nationality_code"/>
+        <result property="profileStatus" column="profile_status"/>
+        <result property="lastActiveAt" column="last_active_at"/>
+        <result property="familyVisible" column="family_visible"/>
+        <result property="degreeLevel" column="degree_level"/>
+        <result property="educationCode" column="education_code"/>
+        <result property="industryCode" column="industry_code"/>
+        <result property="maritalStatus" column="marital_status"/>
+        <result property="hasChildren" column="has_children"/>
+        <result property="childrenPlan" column="children_plan"/>
+        <result property="acceptsLongDistance" column="accepts_long_distance"/>
+        <result property="datingIntentionCode" column="dating_intention_code"/>
+        <result property="relocation" column="relocation"/>
+        <result property="preferredAgeMin" column="preferred_age_min"/>
+        <result property="preferredAgeMax" column="preferred_age_max"/>
+        <result property="preferredLocation" column="preferred_location"/>
+        <result property="smoking" column="smoking"/>
+        <result property="drinking" column="drinking"/>
+        <result property="activityLevel" column="activity_level"/>
+        <result property="weekendStyle" column="weekend_style"/>
+        <result property="pets" column="pets"/>
+        <result property="communicationStyle" column="communication_style"/>
+        <result property="archivedAt" column="archived_at"/>
+        <result property="createdAt" column="created_at"/>
+        <result property="updatedAt" column="updated_at"/>
+        <result property="isFeatured" column="is_featured"/>
+        <result property="count" column="cnt"/>
+        <result property="city" column="city"/>
+        <result property="education" column="education"/>
+        <result property="industry" column="industry"/>
+    </resultMap>
+
+    <resultMap id="CupidProfilePhotoResult" type="CupidProfilePhoto">
+        <id property="id" column="id"/>
+        <result property="profileId" column="profile_id"/>
+        <result property="url" column="url"/>
+        <result property="isPrimary" column="is_primary"/>
+        <result property="sortOrder" column="sort_order"/>
+        <result property="status" column="status"/>
+        <result property="createdAt" column="created_at"/>
+        <result property="updatedAt" column="updated_at"/>
+    </resultMap>
+    <sql id="profileColumns">
+        p.id, p.profile_type, p.gender, p.birth_year, p.height,
+        p.city_code, p.country_code, p.nationality_code,
+        p.profile_status, p.last_active_at, p.family_visible,
+        p.degree_level, p.education_code, p.industry_code,
+        p.marital_status, p.has_children, p.children_plan,
+        p.accepts_long_distance, p.dating_intention_code,
+        p.relocation, p.preferred_age_min, p.preferred_age_max,
+        p.preferred_location, p.smoking, p.drinking,
+        p.activity_level, p.weekend_style, p.pets, p.communication_style,
+        p.archived_at, p.created_at, p.updated_at
+    </sql>
+    <sql id="selfProfileWhere">
+        p.profile_status in ('open', 'review')
+        and p.archived_at is null
+        <if test="viewerUserId != null and viewerUserId != ''">
+            and not exists (
+                select 1 from cm_profile_ownerships o
+                where o.profile_id = p.id
+                  and o.user_id = #{viewerUserId}
+                  and o.status = 'active'
+            )
+        </if>
+        <if test="gender != null and gender != ''">
+            and p.gender = #{gender}
+        </if>
+        <if test="ageMin != null">
+            and (year(now()) - p.birth_year) &gt;= #{ageMin}
+        </if>
+        <if test="ageMax != null">
+            and (year(now()) - p.birth_year) &lt;= #{ageMax}
+        </if>
+        <if test="heightMin != null">
+            and p.height &gt;= #{heightMin}
+        </if>
+        <if test="heightMax != null">
+            and p.height &lt;= #{heightMax}
+        </if>
+        <if test="city != null and city != ''">
+            and p.city_code = #{city}
+        </if>
+        <if test="education != null and education != ''">
+            and p.degree_level = #{education}
+        </if>
+        <if test="industry != null and industry != ''">
+            and p.industry_code = #{industry}
+        </if>
+        <if test="language != null and language != ''">
+            and exists (
+                select 1 from cm_profile_languages l
+                where l.profile_id = p.id and l.language_code = #{language}
+            )
+        </if>
+        <if test="maritalStatus != null and maritalStatus != ''">
+            and p.marital_status = #{maritalStatus}
+        </if>
+        <if test="hasChildrenFilter != null">
+            and p.has_children = #{hasChildrenFilter}
+        </if>
+        <if test="acceptsLongDistanceFilter != null">
+            and p.accepts_long_distance = #{acceptsLongDistanceFilter}
+        </if>
+        <if test="datingIntentionCode != null and datingIntentionCode != ''">
+            and p.dating_intention_code = #{datingIntentionCode}
+        </if>
+        <if test="verified != null and verified == 'verified'">
+            and exists (
+                select 1 from cm_profile_verifications v
+                where v.profile_id = p.id
+                  and v.identity_status = 'verified'
+                  and v.review_status = 'approved'
+            )
+        </if>
+        <if test="verified != null and verified == 'unverified'">
+            and not exists (
+                select 1 from cm_profile_verifications v
+                where v.profile_id = p.id
+                  and v.identity_status = 'verified'
+                  and v.review_status = 'approved'
+            )
+        </if>
+    </sql>
+
+    <sql id="selfProfileOrderBy">
+        <choose>
+            <when test="sort == 'ageAsc'">order by p.birth_year desc</when>
+            <when test="sort == 'ageDesc'">order by p.birth_year asc</when>
+            <when test="sort == 'priorityFirst'">order by coalesce(ir.is_featured, 0) desc, p.last_active_at desc</when>
+            <otherwise>order by p.last_active_at desc</otherwise>
+        </choose>
+    </sql>
+
+    <select id="selectSelfDirectoryProfiles" parameterType="CupidProfile" resultMap="CupidProfileResult">
+        select <include refid="profileColumns"/>, coalesce(ir.is_featured, 0) as is_featured
+        from cm_profiles p
+        left join cm_profile_internal_records ir on ir.profile_id = p.id
+        <where>
+            <include refid="selfProfileWhere"/>
+        </where>
+        <include refid="selfProfileOrderBy"/>
+        limit #{offset}, #{pageSize}
+    </select>
+
+    <select id="countSelfDirectoryProfiles" parameterType="CupidProfile" resultType="int">
+        select count(1)
+        from cm_profiles p
+        <where>
+            <include refid="selfProfileWhere"/>
+        </where>
+    </select>
+    <sql id="familyProfileWhere">
+        p.family_visible = 1
+        and p.profile_status in ('open', 'review')
+        and p.archived_at is null
+        <if test="viewerUserId != null and viewerUserId != ''">
+            and not exists (
+                select 1 from cm_profile_ownerships o
+                where o.profile_id = p.id
+                  and o.user_id = #{viewerUserId}
+                  and o.status = 'active'
+            )
+        </if>
+        <if test="gender != null and gender != ''">
+            and p.gender = #{gender}
+        </if>
+        <if test="ageMin != null">
+            and (year(now()) - p.birth_year) &gt;= #{ageMin}
+        </if>
+        <if test="ageMax != null">
+            and (year(now()) - p.birth_year) &lt;= #{ageMax}
+        </if>
+        <if test="city != null and city != ''">
+            and p.city_code = #{city}
+        </if>
+        <if test="education != null and education != ''">
+            and p.degree_level = #{education}
+        </if>
+        <if test="industry != null and industry != ''">
+            and p.industry_code = #{industry}
+        </if>
+        <if test="maritalStatus != null and maritalStatus != ''">
+            and p.marital_status = #{maritalStatus}
+        </if>
+        <if test="hasChildrenFilter != null">
+            and p.has_children = #{hasChildrenFilter}
+        </if>
+        <if test="acceptsLongDistanceFilter != null">
+            and p.accepts_long_distance = #{acceptsLongDistanceFilter}
+        </if>
+        <if test="datingIntentionCode != null and datingIntentionCode != ''">
+            and p.dating_intention_code = #{datingIntentionCode}
+        </if>
+        <if test="familyMode != null and familyMode == 'priority'">
+            and exists (
+                select 1 from cm_profile_internal_records ir2
+                where ir2.profile_id = p.id and ir2.is_featured = 1
+            )
+        </if>
+    </sql>
+
+    <sql id="familyProfileOrderBy">
+        <choose>
+            <when test="sort == 'ageAsc'">order by p.birth_year desc</when>
+            <when test="sort == 'ageDesc'">order by p.birth_year asc</when>
+            <when test="sort == 'recentActive'">order by p.last_active_at desc</when>
+            <otherwise>order by coalesce(ir.is_featured, 0) desc, p.last_active_at desc</otherwise>
+        </choose>
+    </sql>
+
+    <select id="selectFamilyDirectoryProfiles" parameterType="CupidProfile" resultMap="CupidProfileResult">
+        select <include refid="profileColumns"/>, coalesce(ir.is_featured, 0) as is_featured
+        from cm_profiles p
+        left join cm_profile_internal_records ir on ir.profile_id = p.id
+        <where>
+            <include refid="familyProfileWhere"/>
+        </where>
+        <include refid="familyProfileOrderBy"/>
+        limit #{offset}, #{pageSize}
+    </select>
+
+    <select id="countFamilyDirectoryProfiles" parameterType="CupidProfile" resultType="int">
+        select count(1)
+        from cm_profiles p
+        <where>
+            <include refid="familyProfileWhere"/>
+        </where>
+    </select>
+    <select id="selectFeaturedDirectoryProfiles" parameterType="CupidProfile" resultMap="CupidProfileResult">
+        select <include refid="profileColumns"/>, ir.is_featured
+        from cm_profiles p
+        join cm_profile_internal_records ir on ir.profile_id = p.id
+        <where>
+            <include refid="selfProfileWhere"/>
+            and ir.is_featured = 1
+        </where>
+        <include refid="selfProfileOrderBy"/>
+        limit #{offset}, #{pageSize}
+    </select>
+
+    <select id="selectApprovedPhotosByProfileIds" resultMap="CupidProfilePhotoResult">
+        select id, profile_id, url, is_primary, sort_order, status, created_at, updated_at
+        from cm_profile_photos
+        where profile_id in
+        <foreach collection="profileIds" item="pid" open="(" separator="," close=")">
+            #{pid}
+        </foreach>
+          and status = 'approved'
+        order by sort_order asc
+    </select>
+
+    <select id="selectLanguagesByProfileIds" resultType="CupidProfileLanguage">
+        select profile_id as profileId, language_code as languageCode
+        from cm_profile_languages
+        where profile_id in
+        <foreach collection="profileIds" item="pid" open="(" separator="," close=")">
+            #{pid}
+        </foreach>
+        order by language_code
+    </select>
+
+    <select id="selectLocalizedFieldsByProfileIds" resultType="CupidProfileLocalizedField">
+        select id, profile_id as profileId, field_name as fieldName, locale,
+               value, source, provider, status, created_at as createdAt, updated_at as updatedAt
+        from cm_profile_localized_fields
+        where profile_id in
+        <foreach collection="profileIds" item="pid" open="(" separator="," close=")">
+            #{pid}
+        </foreach>
+          and field_name in
+        <foreach collection="fieldNames" item="fn" open="(" separator="," close=")">
+            #{fn}
+        </foreach>
+          and status = 'ready'
+          and trim(value) != ''
+        order by profile_id, field_name,
+                 case locale when #{locale} then 0 when 'zh' then 1 when 'en' then 2 else 3 end
+    </select>
+
+    <select id="selectLocalizedItemsByProfileIds" resultType="CupidProfileLocalizedItem">
+        select id, profile_id as profileId, field_name as fieldName, item_order as itemOrder,
+               locale, value, source, provider, status, created_at as createdAt, updated_at as updatedAt
+        from cm_profile_localized_items
+        where profile_id in
+        <foreach collection="profileIds" item="pid" open="(" separator="," close=")">
+            #{pid}
+        </foreach>
+          and field_name in
+        <foreach collection="fieldNames" item="fn" open="(" separator="," close=")">
+            #{fn}
+        </foreach>
+          and status = 'ready'
+          and trim(value) != ''
+        order by profile_id, field_name, item_order,
+                 case locale when #{locale} then 0 when 'zh' then 1 when 'en' then 2 else 3 end
+    </select>
+    <select id="selectProfileById" resultMap="CupidProfileResult">
+        select <include refid="profileColumns"/>
+        from cm_profiles p
+        where p.id = #{id}
+        limit 1
+    </select>
+
+    <select id="selectApprovedPhotosByProfileId" resultMap="CupidProfilePhotoResult">
+        select id, profile_id, url, is_primary, sort_order, status, created_at, updated_at
+        from cm_profile_photos
+        where profile_id = #{profileId}
+          and status = 'approved'
+        order by sort_order asc
+    </select>
+
+    <select id="selectLanguagesByProfileId" resultType="CupidProfileLanguage">
+        select profile_id as profileId, language_code as languageCode
+        from cm_profile_languages
+        where profile_id = #{profileId}
+        order by language_code
+    </select>
+
+    <select id="selectAllLocalizedFieldsByProfileId" resultType="CupidProfileLocalizedField">
+        select id, profile_id as profileId, field_name as fieldName, locale,
+               value, source, provider, status, created_at as createdAt, updated_at as updatedAt
+        from cm_profile_localized_fields
+        where profile_id = #{profileId}
+          and status = 'ready'
+          and trim(value) != ''
+        order by field_name,
+                 case locale when #{locale} then 0 when 'zh' then 1 when 'en' then 2 else 3 end
+    </select>
+
+    <select id="selectAllLocalizedItemsByProfileId" resultType="CupidProfileLocalizedItem">
+        select id, profile_id as profileId, field_name as fieldName, item_order as itemOrder,
+               locale, value, source, provider, status, created_at as createdAt, updated_at as updatedAt
+        from cm_profile_localized_items
+        where profile_id = #{profileId}
+          and status = 'ready'
+          and trim(value) != ''
+        order by field_name, item_order,
+                 case locale when #{locale} then 0 when 'zh' then 1 when 'en' then 2 else 3 end
+    </select>
+
+    <select id="selectRelationshipValuesByProfileId" resultType="CupidProfileRelationshipValue">
+        select profile_id as profileId, value_code as valueCode
+        from cm_profile_relationship_values
+        where profile_id = #{profileId}
+    </select>
+
+    <select id="selectVerificationByProfileId" resultType="CupidProfileVerification">
+        select id, profile_id as profileId, legal_name as legalName, date_of_birth as dateOfBirth,
+               identity_status as identityStatus, education_status as educationStatus,
+               income_status as incomeStatus, marital_status as maritalVerificationStatus,
+               review_status as reviewStatus, verified_at as verifiedAt,
+               verified_by_user_id as verifiedByUserId, created_at as createdAt, updated_at as updatedAt
+        from cm_profile_verifications
+        where profile_id = #{profileId}
+        limit 1
+    </select>
+
+    <select id="selectPrivacyPreferenceByProfileId" resultType="CupidProfilePrivacyPreference">
+        select id, profile_id as profileId,
+               hide_marital_status as hideMaritalStatus,
+               hide_has_children as hideHasChildren,
+               hide_children_plan as hideChildrenPlan,
+               hide_accepts_long_distance as hideAcceptsLongDistance,
+               hide_smoking as hideSmoking,
+               hide_drinking as hideDrinking,
+               created_at as createdAt, updated_at as updatedAt
+        from cm_profile_privacy_preferences
+        where profile_id = #{profileId}
+        limit 1
+    </select>
+
+    <select id="selectOwnershipByUserAndProfile" resultType="CupidProfileOwnership">
+        select id, user_id as userId, profile_id as profileId,
+               relationship_to_profile as relationshipToProfile,
+               permission, status,
+               invited_by_user_id as invitedByUserId,
+               accepted_at as acceptedAt, revoked_at as revokedAt,
+               created_at as createdAt, updated_at as updatedAt
+        from cm_profile_ownerships
+        where user_id = #{userId}
+          and profile_id = #{profileId}
+          and status = 'active'
+        limit 1
+    </select>
+    <select id="selectSelfFacetGender" parameterType="CupidProfile" resultMap="CupidProfileResult">
+        select p.gender, count(1) as cnt
+        from cm_profiles p
+        <where>
+            <include refid="selfProfileWhere"/>
+        </where>
+        group by p.gender
+        order by p.gender
+    </select>
+
+    <select id="selectSelfFacetCity" parameterType="CupidProfile" resultMap="CupidProfileResult">
+        select p.city_code, count(1) as cnt,
+               coalesce((
+                   select lf.value
+                   from cm_profiles lp
+                   join cm_profile_localized_fields lf on lf.profile_id = lp.id
+                   where lp.city_code = p.city_code
+                     and lf.field_name = 'city'
+                     and lf.status = 'ready'
+                     and trim(lf.value) != ''
+                   order by case lf.locale when #{locale} then 0 when 'zh' then 1 when 'en' then 2 else 3 end
+                   limit 1
+               ), p.city_code) as city
+        from cm_profiles p
+        <where>
+            <include refid="selfProfileWhere"/>
+        </where>
+        group by p.city_code
+        order by cnt desc
+    </select>
+
+    <select id="selectSelfFacetEducation" parameterType="CupidProfile" resultMap="CupidProfileResult">
+        select p.degree_level, count(1) as cnt,
+               coalesce((
+                   select lf.value
+                   from cm_profiles lp
+                   join cm_profile_localized_fields lf on lf.profile_id = lp.id
+                   where lp.degree_level = p.degree_level
+                     and lf.field_name = 'education'
+                     and lf.status = 'ready'
+                     and trim(lf.value) != ''
+                   order by case lf.locale when #{locale} then 0 when 'zh' then 1 when 'en' then 2 else 3 end
+                   limit 1
+               ), p.degree_level) as education
+        from cm_profiles p
+        <where>
+            <include refid="selfProfileWhere"/>
+        </where>
+        group by p.degree_level
+        order by p.degree_level
+    </select>
+
+    <select id="selectSelfFacetIndustry" parameterType="CupidProfile" resultMap="CupidProfileResult">
+        select p.industry_code, count(1) as cnt,
+               coalesce((
+                   select lf.value
+                   from cm_profiles lp
+                   join cm_profile_localized_fields lf on lf.profile_id = lp.id
+                   where lp.industry_code = p.industry_code
+                     and lf.field_name = 'industry'
+                     and lf.status = 'ready'
+                     and trim(lf.value) != ''
+                   order by case lf.locale when #{locale} then 0 when 'zh' then 1 when 'en' then 2 else 3 end
+                   limit 1
+               ), p.industry_code) as industry
+        from cm_profiles p
+        <where>
+            <include refid="selfProfileWhere"/>
+        </where>
+        group by p.industry_code
+        order by cnt desc
+    </select>
+
+    <select id="selectFamilyFacetGender" parameterType="CupidProfile" resultMap="CupidProfileResult">
+        select p.gender, count(1) as cnt
+        from cm_profiles p
+        <where>
+            <include refid="familyProfileWhere"/>
+        </where>
+        group by p.gender
+        order by p.gender
+    </select>
+
+    <select id="selectFamilyFacetCity" parameterType="CupidProfile" resultMap="CupidProfileResult">
+        select p.city_code, count(1) as cnt,
+               coalesce((
+                   select lf.value
+                   from cm_profiles lp
+                   join cm_profile_localized_fields lf on lf.profile_id = lp.id
+                   where lp.city_code = p.city_code
+                     and lf.field_name = 'city'
+                     and lf.status = 'ready'
+                     and trim(lf.value) != ''
+                   order by case lf.locale when #{locale} then 0 when 'zh' then 1 when 'en' then 2 else 3 end
+                   limit 1
+               ), p.city_code) as city
+        from cm_profiles p
+        <where>
+            <include refid="familyProfileWhere"/>
+        </where>
+        group by p.city_code
+        order by cnt desc
+    </select>
+
+    <select id="selectFamilyFacetEducation" parameterType="CupidProfile" resultMap="CupidProfileResult">
+        select p.degree_level, count(1) as cnt,
+               coalesce((
+                   select lf.value
+                   from cm_profiles lp
+                   join cm_profile_localized_fields lf on lf.profile_id = lp.id
+                   where lp.degree_level = p.degree_level
+                     and lf.field_name = 'education'
+                     and lf.status = 'ready'
+                     and trim(lf.value) != ''
+                   order by case lf.locale when #{locale} then 0 when 'zh' then 1 when 'en' then 2 else 3 end
+                   limit 1
+               ), p.degree_level) as education
+        from cm_profiles p
+        <where>
+            <include refid="familyProfileWhere"/>
+        </where>
+        group by p.degree_level
+        order by p.degree_level
+    </select>
+
+    <select id="selectFamilyFacetIndustry" parameterType="CupidProfile" resultMap="CupidProfileResult">
+        select p.industry_code, count(1) as cnt,
+               coalesce((
+                   select lf.value
+                   from cm_profiles lp
+                   join cm_profile_localized_fields lf on lf.profile_id = lp.id
+                   where lp.industry_code = p.industry_code
+                     and lf.field_name = 'industry'
+                     and lf.status = 'ready'
+                     and trim(lf.value) != ''
+                   order by case lf.locale when #{locale} then 0 when 'zh' then 1 when 'en' then 2 else 3 end
+                   limit 1
+               ), p.industry_code) as industry
+        from cm_profiles p
+        <where>
+            <include refid="familyProfileWhere"/>
+        </where>
+        group by p.industry_code
+        order by cnt desc
+    </select>
+
+    <select id="selectSelfDistinctIntentions" parameterType="CupidProfile" resultType="string">
+        select distinct p.dating_intention_code
+        from cm_profiles p
+        <where>
+            <include refid="selfProfileWhere"/>
+        </where>
+        order by p.dating_intention_code
+    </select>
+
+    <select id="selectFamilyDistinctIntentions" parameterType="CupidProfile" resultType="string">
+        select distinct p.dating_intention_code
+        from cm_profiles p
+        <where>
+            <include refid="familyProfileWhere"/>
+        </where>
+        order by p.dating_intention_code
+    </select>
+
+    <select id="selectSelfDistinctLanguages" parameterType="CupidProfile" resultType="string">
+        select distinct l.language_code
+        from cm_profile_languages l
+        join cm_profiles p on p.id = l.profile_id
+        where p.profile_status in ('open', 'review')
+          and p.archived_at is null
+          <if test="viewerUserId != null and viewerUserId != ''">
+              and not exists (
+                  select 1 from cm_profile_ownerships o
+                  where o.profile_id = p.id
+                    and o.user_id = #{viewerUserId}
+                    and o.status = 'active'
+              )
+          </if>
+        order by l.language_code
+    </select>
+
+    <select id="selectFavoriteByUserAndProfile" resultType="CupidFavoriteProfile">
+        select id, user_id as userId, profile_id as profileId,
+               created_at as createdAt, updated_at as updatedAt
+        from cm_favorite_profiles
+        where user_id = #{userId}
+          and profile_id = #{profileId}
+        limit 1
+    </select>
+
+    <select id="selectCurrentEntitlementBalance" resultType="CupidUserEntitlementBalance">
+        select id, user_id as userId, membership_id as membershipId,
+               entitlement_code as entitlementCode,
+               period_started_at as periodStartedAt, period_ends_at as periodEndsAt,
+               quota_total as quotaTotal, quota_used as quotaUsed,
+               quota_remaining as quotaRemaining,
+               created_at as createdAt, updated_at as updatedAt
+        from cm_user_entitlement_balances
+        where user_id = #{userId}
+          and entitlement_code = #{entitlementCode}
+          and period_started_at &lt;= now()
+          and period_ends_at &gt; now()
+        order by period_started_at desc
+        limit 1
+    </select>
+
+    <select id="selectLatestIntroductionRequest" resultType="CupidPrivateIntroductionRequest">
+        select id, requester_user_id as requesterUserId,
+               requester_profile_id as requesterProfileId,
+               target_profile_id as targetProfileId, status, message,
+               requested_at as requestedAt, expires_at as expiresAt,
+               responded_at as respondedAt, cooldown_until as cooldownUntil,
+               entitlement_balance_id as entitlementBalanceId,
+               created_at as createdAt, updated_at as updatedAt
+        from cm_private_introduction_requests
+        where requester_user_id = #{userId}
+          and target_profile_id = #{profileId}
+        order by requested_at desc
+        limit 1
+    </select>
+
+</mapper>
