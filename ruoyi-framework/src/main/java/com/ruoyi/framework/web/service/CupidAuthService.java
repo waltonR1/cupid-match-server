@@ -189,6 +189,9 @@ public class CupidAuthService
         return response;
     }
 
+    /**
+     * 查询并校验用户状态（停用直接拒绝）
+     */
     private CupidUser requireActiveUser(String userId)
     {
         CupidUser user = userService.selectUserById(userId);
@@ -203,6 +206,9 @@ public class CupidAuthService
         return user;
     }
 
+    /**
+     * 用户领域对象转为响应结构
+     */
     private Map<String, Object> toUserDto(CupidUser user)
     {
         Map<String, Object> dto = new LinkedHashMap<>();
@@ -214,6 +220,9 @@ public class CupidAuthService
         return dto;
     }
 
+    /**
+     * 会员领域对象转为响应结构
+     */
     private Map<String, Object> toMembershipDto(CupidUserMembership membership)
     {
         if (membership == null)
@@ -226,6 +235,9 @@ public class CupidAuthService
         return dto;
     }
 
+    /**
+     * 标准化登录标识（邮箱转小写、手机号去空格和横线）
+     */
     private String normalizeIdentifier(String provider, String identifier)
     {
         String value = trimmed(identifier);
@@ -240,6 +252,9 @@ public class CupidAuthService
         return value;
     }
 
+    /**
+     * 校验登录标识格式
+     */
     private void validateIdentifier(String provider, String identifier)
     {
         boolean valid = "email".equals(provider)
@@ -251,6 +266,9 @@ public class CupidAuthService
         }
     }
 
+    /**
+     * 校验密码强度
+     */
     private void validatePassword(String password)
     {
         if (password.length() < 8 || !password.matches(".*[A-Za-z].*") || !password.matches(".*\\d.*"))
@@ -259,21 +277,33 @@ public class CupidAuthService
         }
     }
 
+    /**
+     * 校验认证方式是否为 email 或 phone
+     */
     private boolean isProvider(String provider)
     {
         return "email".equals(provider) || "phone".equals(provider);
     }
 
+    /**
+     * 校验注册入口路径
+     */
     private boolean isRegistrationPath(String path)
     {
         return "self".equals(path) || "family".equals(path);
     }
 
+    /**
+     * 校验 locale 是否在允许范围内
+     */
     private boolean isLocale(String locale)
     {
         return "zh".equals(locale) || "fr".equals(locale) || "en".equals(locale);
     }
 
+    /**
+     * 安全去空白
+     */
     private String trimmed(String value)
     {
         return value == null ? "" : value.trim();

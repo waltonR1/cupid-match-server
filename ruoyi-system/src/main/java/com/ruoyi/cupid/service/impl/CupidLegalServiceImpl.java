@@ -69,12 +69,18 @@ public class CupidLegalServiceImpl implements ICupidLegalService
         }
     }
 
+    /**
+     * 标准化 locale 参数
+     */
     private String normalizeLocale(String locale)
     {
         return StringUtils.hasText(locale) ? locale.trim() : "zh";
     }
 
     @SuppressWarnings("unchecked")
+    /**
+     * 解析法务文档 JSON 章节结构
+     */
     private List<Map<String, Object>> parseSections(String sectionsJson)
     {
         List<Map> rawSections = JSON.parseArray(sectionsJson, Map.class);
@@ -91,6 +97,9 @@ public class CupidLegalServiceImpl implements ICupidLegalService
         return sections;
     }
 
+    /**
+     * 安全转换为 int
+     */
     private int asInt(Object value)
     {
         if (value instanceof Number)
@@ -100,6 +109,9 @@ public class CupidLegalServiceImpl implements ICupidLegalService
         return value == null ? 0 : Integer.parseInt(value.toString());
     }
 
+    /**
+     * 格式化日期为字符串
+     */
     private String formatDate(Date date)
     {
         return date == null ? null : DateUtils.parseDateToStr(DateUtils.YYYY_MM_DD_HH_MM_SS, date);
