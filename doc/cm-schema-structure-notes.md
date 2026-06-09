@@ -45,6 +45,7 @@
 - `slug`
 - `status`
 - `visibility`
+- `consumes_membership_quota`
 - `city_code`
 - `address_visibility`
 - `event_date`
@@ -54,6 +55,16 @@
 - `cover_image_url`
 
 这些字段方便目录筛选、排序、索引和后台运营查询。
+
+`cm_membership_plans` 中价格与权益使用普通列：
+
+- `price_cents` + `currency`：欧元确定价格
+- `cny_price_cents`：人民币确定价格，不按运行时汇率换算
+- `billing_type`、`billing_period`、`validity_months`：区分免费、一次性购买、周期扣费和实际有效期
+- `private_introduction_quota`、`private_introduction_period`
+- `event_quota`：一次会员有效期内包含的受控活动次数
+
+活动实际余额不直接从报名数量推导，保存在 `cm_user_entitlement_balances`，权益码为 `event_registration`。`cm_event_registrations.event_quota_consumed_at` 和 `event_quota_released_at` 记录单次报名是否已经扣减或返还，用于保证确认与取消幂等。
 
 ## 多值字段关系表
 
@@ -154,6 +165,8 @@ Event 主表保留可查询字段，本地化文案拆表。
 
 - 新增实体必须生成 UUID，不再创建 `u-002`、`p-003`、`plan-free` 形式的主键。
 - 会员套餐通过唯一 `tier` 查找。业务代码不得依赖具体套餐 UUID。
+- 公共套餐目录和账户可升级套餐必须复用同一套餐查询与本地化组装逻辑。
+- 只有 `cm_events.consumes_membership_quota = 1` 的活动才校验 `event_registration` 余额。
 - `sys_user.user_id` 继续遵守 RuoYi 规则；桥接字段不要求改造 RuoYi 主键。
 - Java entity 可以先按主表和关系表生成，localized 表单独建 service/helper 聚合 DTO。
 - Profile / Event 的列表查询应先查主表和关系表，再按 locale 批量加载 localized 字段。

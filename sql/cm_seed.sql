@@ -501,11 +501,11 @@ insert into cm_profile_privacy_preferences (id, profile_id, hide_marital_status,
   ('1caff97d-06d9-53cb-a771-e169c484b90f', '503a9c99-2842-54db-8858-24fbd3108e3b', 0, 0, 0, 0, 0, 0, '2026-05-23 11:02:04', '2026-05-23 11:02:33');
 
 
-insert into cm_membership_plans (id, tier, price_cents, currency, billing_period, private_introduction_quota, private_introduction_period, event_priority_enabled, staff_review_enabled, profile_detail_access_level, staff_support_level, concierge_priority, featured, sort_order, is_active, created_at, updated_at) values
-  ('f04881cf-b31f-50c5-8e73-c5f861d0bd7f', 'free', 0, 'EUR', 'monthly', 0, 'monthly', 0, 0, 'registered', 'none', 0, 0, 1, 1, '2026-01-01 00:00:00', '2026-01-01 00:00:00'),
-  ('f2886d5f-1d2a-5fed-9b4f-8b23f2067f06', 'silver', 2999, 'EUR', 'monthly', 5, 'monthly', 1, 1, 'registered', 'standard', 0, 1, 2, 1, '2026-01-01 00:00:00', '2026-01-01 00:00:00'),
-  ('eaf73332-f7d1-5f4b-82ba-11368eac30b6', 'gold', 7999, 'EUR', 'monthly', 15, 'monthly', 1, 1, 'premium', 'priority', 1, 1, 3, 1, '2026-01-01 00:00:00', '2026-01-01 00:00:00'),
-  ('9fb53b84-a341-5b63-b6e8-35a474540a4c', 'diamond', 14999, 'EUR', 'monthly', 30, 'monthly', 1, 1, 'premium', 'concierge', 1, 1, 4, 1, '2026-01-01 00:00:00', '2026-01-01 00:00:00');
+insert into cm_membership_plans (id, tier, price_cents, currency, cny_price_cents, billing_type, billing_period, validity_months, private_introduction_quota, private_introduction_period, event_quota, event_priority_enabled, staff_review_enabled, profile_detail_access_level, staff_support_level, concierge_priority, featured, sort_order, is_active, created_at, updated_at) values
+  ('f04881cf-b31f-50c5-8e73-c5f861d0bd7f', 'free', 0, 'EUR', 0, 'free', null, null, 0, 'monthly', 0, 0, 0, 'registered', 'none', 0, 0, 1, 1, '2026-01-01 00:00:00', '2026-01-01 00:00:00'),
+  ('f2886d5f-1d2a-5fed-9b4f-8b23f2067f06', 'silver', 6500, 'EUR', 49900, 'one_time', null, 12, 5, 'monthly', 12, 0, 1, 'registered', 'standard', 0, 0, 2, 1, '2026-01-01 00:00:00', '2026-01-01 00:00:00'),
+  ('eaf73332-f7d1-5f4b-82ba-11368eac30b6', 'gold', 10000, 'EUR', 77000, 'one_time', null, 6, 15, 'monthly', 20, 1, 1, 'premium', 'priority', 1, 1, 3, 1, '2026-01-01 00:00:00', '2026-01-01 00:00:00'),
+  ('9fb53b84-a341-5b63-b6e8-35a474540a4c', 'diamond', 15000, 'EUR', 115500, 'one_time', null, 12, 30, 'monthly', 24, 1, 1, 'premium', 'concierge', 1, 0, 4, 1, '2026-01-01 00:00:00', '2026-01-01 00:00:00');
 
 
 insert into cm_membership_plan_localized_fields (id, plan_id, field_name, locale, value, source, provider, status, created_at, updated_at) values
@@ -515,13 +515,13 @@ insert into cm_membership_plan_localized_fields (id, plan_id, field_name, locale
   ('eeeb9000-b10c-5f4d-b58c-e566c8ea0594', 'f04881cf-b31f-50c5-8e73-c5f861d0bd7f', 'description', 'zh', '基础浏览和匹配功能', 'manual', 'human', 'ready', '2026-01-01 00:00:00', '2026-05-18 12:07:20'),
   ('59722038-aee9-582f-8898-9b101021c40e', 'f04881cf-b31f-50c5-8e73-c5f861d0bd7f', 'description', 'fr', 'Consultation et matching de base', 'manual', 'human', 'ready', '2026-01-01 00:00:00', '2026-05-18 12:07:20'),
   ('439ff16d-7ef0-5c96-8151-3f8b9671a65c', 'f04881cf-b31f-50c5-8e73-c5f861d0bd7f', 'description', 'en', 'Basic browsing and matching', 'manual', 'human', 'ready', '2026-01-01 00:00:00', '2026-05-18 12:07:20'),
-  ('3cec9f31-5749-522a-9d63-7aa146082559', 'f2886d5f-1d2a-5fed-9b4f-8b23f2067f06', 'name', 'zh', '银卡会员', 'manual', 'human', 'ready', '2026-01-01 00:00:00', '2026-05-18 12:07:20'),
+  ('3cec9f31-5749-522a-9d63-7aa146082559', 'f2886d5f-1d2a-5fed-9b4f-8b23f2067f06', 'name', 'zh', '白银会员', 'manual', 'human', 'ready', '2026-01-01 00:00:00', '2026-05-18 12:07:20'),
   ('528a28d1-c43a-5819-8157-eec7342602d5', 'f2886d5f-1d2a-5fed-9b4f-8b23f2067f06', 'name', 'fr', 'Argent', 'manual', 'human', 'ready', '2026-01-01 00:00:00', '2026-05-18 12:07:20'),
   ('b0df0f19-1cd4-5ee0-b70f-2a457eb379df', 'f2886d5f-1d2a-5fed-9b4f-8b23f2067f06', 'name', 'en', 'Silver', 'manual', 'human', 'ready', '2026-01-01 00:00:00', '2026-05-18 12:07:20'),
-  ('61329d75-865c-5931-99d8-3ea3381b1512', 'f2886d5f-1d2a-5fed-9b4f-8b23f2067f06', 'description', 'zh', '更多介绍额度和优先活动报名', 'manual', 'human', 'ready', '2026-01-01 00:00:00', '2026-05-18 12:07:20'),
-  ('e4449a61-ce63-59d0-9678-a5f7e604a40c', 'f2886d5f-1d2a-5fed-9b4f-8b23f2067f06', 'description', 'fr', 'Plus de quotas et priorite evenements', 'manual', 'human', 'ready', '2026-01-01 00:00:00', '2026-05-18 12:07:20'),
-  ('ca912782-aa61-5da0-a2c7-e4bebb4b07e6', 'f2886d5f-1d2a-5fed-9b4f-8b23f2067f06', 'description', 'en', 'More introduction quota and priority event registration', 'manual', 'human', 'ready', '2026-01-01 00:00:00', '2026-05-18 12:07:20'),
-  ('0e5705d3-7919-57ba-a16f-d69752009231', 'eaf73332-f7d1-5f4b-82ba-11368eac30b6', 'name', 'zh', '金卡会员', 'manual', 'human', 'ready', '2026-01-01 00:00:00', '2026-05-18 12:07:20'),
+  ('61329d75-865c-5931-99d8-3ea3381b1512', 'f2886d5f-1d2a-5fed-9b4f-8b23f2067f06', 'description', 'zh', '基础顾问支持与稳定的正式接触节奏', 'manual', 'human', 'ready', '2026-01-01 00:00:00', '2026-05-18 12:07:20'),
+  ('e4449a61-ce63-59d0-9678-a5f7e604a40c', 'f2886d5f-1d2a-5fed-9b4f-8b23f2067f06', 'description', 'fr', 'Accompagnement standard et rythme relationnel regulier', 'manual', 'human', 'ready', '2026-01-01 00:00:00', '2026-05-18 12:07:20'),
+  ('ca912782-aa61-5da0-a2c7-e4bebb4b07e6', 'f2886d5f-1d2a-5fed-9b4f-8b23f2067f06', 'description', 'en', 'Standard advisor support and a steady relationship pace', 'manual', 'human', 'ready', '2026-01-01 00:00:00', '2026-05-18 12:07:20'),
+  ('0e5705d3-7919-57ba-a16f-d69752009231', 'eaf73332-f7d1-5f4b-82ba-11368eac30b6', 'name', 'zh', '黄金会员', 'manual', 'human', 'ready', '2026-01-01 00:00:00', '2026-05-18 12:07:20'),
   ('32ec8316-7c5f-5402-b5de-6ef19f9c3094', 'eaf73332-f7d1-5f4b-82ba-11368eac30b6', 'name', 'fr', 'Or', 'manual', 'human', 'ready', '2026-01-01 00:00:00', '2026-05-18 12:07:20'),
   ('445ff36c-8c7f-5c0b-9033-b38793c0cbfc', 'eaf73332-f7d1-5f4b-82ba-11368eac30b6', 'name', 'en', 'Gold', 'manual', 'human', 'ready', '2026-01-01 00:00:00', '2026-05-18 12:07:20'),
   ('7d72854f-ea44-5c97-84fd-02afd26b5895', 'eaf73332-f7d1-5f4b-82ba-11368eac30b6', 'description', 'zh', '专属顾问和更多可见性', 'manual', 'human', 'ready', '2026-01-01 00:00:00', '2026-05-18 12:07:20'),
@@ -530,23 +530,24 @@ insert into cm_membership_plan_localized_fields (id, plan_id, field_name, locale
   ('f33f791c-1ebe-5641-ab53-5af6fec18745', '9fb53b84-a341-5b63-b6e8-35a474540a4c', 'name', 'zh', '钻石会员', 'manual', 'human', 'ready', '2026-01-01 00:00:00', '2026-05-18 12:07:20'),
   ('3739a5a2-6789-5559-a938-ceefce95f9af', '9fb53b84-a341-5b63-b6e8-35a474540a4c', 'name', 'fr', 'Diamant', 'manual', 'human', 'ready', '2026-01-01 00:00:00', '2026-05-18 12:07:20'),
   ('53b1a49f-54e9-5c72-813a-a0dbaf23b7b9', '9fb53b84-a341-5b63-b6e8-35a474540a4c', 'name', 'en', 'Diamond', 'manual', 'human', 'ready', '2026-01-01 00:00:00', '2026-05-18 12:07:20'),
-  ('9b1ab1ab-b2ec-5e87-a933-7e70ef59f848', '9fb53b84-a341-5b63-b6e8-35a474540a4c', 'description', 'zh', '顶级服务和无限介绍额度', 'manual', 'human', 'ready', '2026-01-01 00:00:00', '2026-05-18 12:07:20'),
-  ('4924d48d-151c-5a29-bf21-bc714058fa22', '9fb53b84-a341-5b63-b6e8-35a474540a4c', 'description', 'fr', 'Service premium et quotas illimites', 'manual', 'human', 'ready', '2026-01-01 00:00:00', '2026-05-18 12:07:20'),
-  ('397fbad3-12e3-544f-acf0-2a6a1328da28', '9fb53b84-a341-5b63-b6e8-35a474540a4c', 'description', 'en', 'Premium service and unlimited introductions', 'manual', 'human', 'ready', '2026-01-01 00:00:00', '2026-05-18 12:07:20');
+  ('9b1ab1ab-b2ec-5e87-a933-7e70ef59f848', '9fb53b84-a341-5b63-b6e8-35a474540a4c', 'description', 'zh', '深度顾问服务和每月 30 次私人介绍', 'manual', 'human', 'ready', '2026-01-01 00:00:00', '2026-05-18 12:07:20'),
+  ('4924d48d-151c-5a29-bf21-bc714058fa22', '9fb53b84-a341-5b63-b6e8-35a474540a4c', 'description', 'fr', 'Service de conciergerie et 30 introductions privees par mois', 'manual', 'human', 'ready', '2026-01-01 00:00:00', '2026-05-18 12:07:20'),
+  ('397fbad3-12e3-544f-acf0-2a6a1328da28', '9fb53b84-a341-5b63-b6e8-35a474540a4c', 'description', 'en', 'Concierge service and 30 private introductions per month', 'manual', 'human', 'ready', '2026-01-01 00:00:00', '2026-05-18 12:07:20');
 
 
 insert into cm_user_memberships (id, user_id, plan_id, tier, status, started_at, expires_at, created_at, updated_at) values
-  ('d052548f-34dc-54f9-aab7-6dca95709306', 'efdca298-c977-5502-ad2e-8ba480ca1ea3', 'eaf73332-f7d1-5f4b-82ba-11368eac30b6', 'gold', 'active', '2026-01-18 00:00:00', null, '2026-01-18 00:00:00', '2026-01-18 00:00:00');
+  ('d052548f-34dc-54f9-aab7-6dca95709306', 'efdca298-c977-5502-ad2e-8ba480ca1ea3', 'eaf73332-f7d1-5f4b-82ba-11368eac30b6', 'gold', 'active', '2026-01-18 00:00:00', '2026-07-18 00:00:00', '2026-01-18 00:00:00', '2026-01-18 00:00:00');
 
 
 insert into cm_user_entitlement_balances (id, user_id, membership_id, entitlement_code, period_started_at, period_ends_at, quota_total, quota_used, quota_remaining, created_at, updated_at) values
-  ('202f036e-42b5-506e-9509-1cfb4960555f', 'efdca298-c977-5502-ad2e-8ba480ca1ea3', 'd052548f-34dc-54f9-aab7-6dca95709306', 'private_introduction', '2026-01-01 00:00:00', '2026-12-31 00:00:00', 15, 0, 15, '2026-01-18 00:00:00', '2026-01-18 00:00:00');
+  ('202f036e-42b5-506e-9509-1cfb4960555f', 'efdca298-c977-5502-ad2e-8ba480ca1ea3', 'd052548f-34dc-54f9-aab7-6dca95709306', 'private_introduction', '2026-06-01 00:00:00', '2026-06-30 00:00:00', 15, 0, 15, '2026-01-18 00:00:00', '2026-01-18 00:00:00'),
+  ('6f796142-1339-5002-980e-8a2c61382c4b', 'efdca298-c977-5502-ad2e-8ba480ca1ea3', 'd052548f-34dc-54f9-aab7-6dca95709306', 'event_registration', '2026-01-18 00:00:00', '2026-07-18 00:00:00', 20, 0, 20, '2026-01-18 00:00:00', '2026-01-18 00:00:00');
 
 
-insert into cm_events (id, slug, status, visibility, city_code, address_visibility, event_date, start_time, end_time, capacity, cover_image_url, created_at, updated_at) values
-  ('0ed043fe-531a-511d-940b-5daa55de963e', 'event-001', 'open', 'registered', 'paris', 'registered_only', '2026-05-12', '18:30', '21:00', 12, 'https://images.unsplash.com/photo-1528605248644-14dd04022da1?auto=format&fit=crop&w=1200&q=80', '2026-04-01 00:00:00', '2026-05-01 00:00:00'),
-  ('38f69abd-73b4-5464-8b07-a95a9bb58547', 'event-002', 'waitlist', 'member', 'paris', 'confirmed_attendee_only', '2026-05-20', '19:00', '22:00', 8, 'https://images.unsplash.com/photo-1414235077428-338989a2e8c0?auto=format&fit=crop&w=1200&q=80', '2026-04-01 00:00:00', '2026-05-01 00:00:00'),
-  ('1bcb995a-540c-5c66-9b92-52471c43e587', 'event-003', 'open', 'registered', 'brussels', 'registered_only', '2026-05-28', '14:30', '17:00', 16, 'https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?auto=format&fit=crop&w=1200&q=80', '2026-04-01 00:00:00', '2026-05-01 00:00:00');
+insert into cm_events (id, slug, status, visibility, consumes_membership_quota, city_code, address_visibility, event_date, start_time, end_time, capacity, cover_image_url, created_at, updated_at) values
+  ('0ed043fe-531a-511d-940b-5daa55de963e', 'event-001', 'open', 'registered', 0, 'paris', 'registered_only', '2026-05-12', '18:30', '21:00', 12, 'https://images.unsplash.com/photo-1528605248644-14dd04022da1?auto=format&fit=crop&w=1200&q=80', '2026-04-01 00:00:00', '2026-05-01 00:00:00'),
+  ('38f69abd-73b4-5464-8b07-a95a9bb58547', 'event-002', 'waitlist', 'member', 1, 'paris', 'confirmed_attendee_only', '2026-05-20', '19:00', '22:00', 8, 'https://images.unsplash.com/photo-1414235077428-338989a2e8c0?auto=format&fit=crop&w=1200&q=80', '2026-04-01 00:00:00', '2026-05-01 00:00:00'),
+  ('1bcb995a-540c-5c66-9b92-52471c43e587', 'event-003', 'open', 'registered', 1, 'brussels', 'registered_only', '2026-05-28', '14:30', '17:00', 16, 'https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?auto=format&fit=crop&w=1200&q=80', '2026-04-01 00:00:00', '2026-05-01 00:00:00');
 
 
 insert into cm_event_localized_fields (id, event_id, field_name, locale, value, source, provider, status, created_at, updated_at) values
@@ -690,10 +691,10 @@ insert into cm_event_agenda_item_localized_fields (id, agenda_item_id, field_nam
   ('b3ede8cb-287b-5574-9c76-fe48837fe4d9', '843e88fb-bf21-593f-a3b0-094f9c75edf9', 'description', 'en', 'Overview of the route and interaction rhythm.', 'manual', 'human', 'ready', '2026-04-01 00:00:00', '2026-05-18 12:07:20');
 
 
-insert into cm_event_registrations (id, user_id, event_id, status, requested_at, confirmed_at, declined_at, waitlisted_at, cancelled_at, attended_at, created_at, updated_at) values
-  ('f44520c6-d6c7-5a4a-a6a2-40aada7743c6', 'efdca298-c977-5502-ad2e-8ba480ca1ea3', '0ed043fe-531a-511d-940b-5daa55de963e', 'cancelled', '2026-05-01 09:00:00', '2026-05-14 01:01:44', null, null, '2026-05-14 01:01:46', null, '2026-05-01 09:00:00', '2026-05-14 01:01:46'),
-  ('85c16633-87ee-5350-9667-b5ec96f2b9e8', 'efdca298-c977-5502-ad2e-8ba480ca1ea3', '38f69abd-73b4-5464-8b07-a95a9bb58547', 'cancelled', '2026-05-01 09:00:00', null, null, null, '2026-05-14 00:37:05', null, '2026-05-01 09:00:00', '2026-05-14 00:37:05'),
-  ('6dcca5e8-969b-5f47-9277-b56dbd051330', 'efdca298-c977-5502-ad2e-8ba480ca1ea3', '1bcb995a-540c-5c66-9b92-52471c43e587', 'cancelled', '2026-05-28 21:28:47', null, null, null, '2026-05-28 21:28:48', null, '2026-05-17 11:01:31', '2026-05-28 21:28:48');
+insert into cm_event_registrations (id, user_id, event_id, status, requested_at, confirmed_at, declined_at, waitlisted_at, cancelled_at, attended_at, event_quota_consumed_at, event_quota_released_at, created_at, updated_at) values
+  ('f44520c6-d6c7-5a4a-a6a2-40aada7743c6', 'efdca298-c977-5502-ad2e-8ba480ca1ea3', '0ed043fe-531a-511d-940b-5daa55de963e', 'cancelled', '2026-05-01 09:00:00', '2026-05-14 01:01:44', null, null, '2026-05-14 01:01:46', null, null, null, '2026-05-01 09:00:00', '2026-05-14 01:01:46'),
+  ('85c16633-87ee-5350-9667-b5ec96f2b9e8', 'efdca298-c977-5502-ad2e-8ba480ca1ea3', '38f69abd-73b4-5464-8b07-a95a9bb58547', 'cancelled', '2026-05-01 09:00:00', null, null, null, '2026-05-14 00:37:05', null, null, null, '2026-05-01 09:00:00', '2026-05-14 00:37:05'),
+  ('6dcca5e8-969b-5f47-9277-b56dbd051330', 'efdca298-c977-5502-ad2e-8ba480ca1ea3', '1bcb995a-540c-5c66-9b92-52471c43e587', 'cancelled', '2026-05-28 21:28:47', null, null, null, '2026-05-28 21:28:48', null, null, null, '2026-05-17 11:01:31', '2026-05-28 21:28:48');
 
 
 insert into cm_favorite_profiles (id, user_id, profile_id, created_at, updated_at) values

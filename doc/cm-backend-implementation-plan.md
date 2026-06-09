@@ -362,6 +362,7 @@ Codex 按以下顺序检查：
 
 ### 接口
 
+- `GET /api/membership/catalog`
 - `GET /api/account/membership`
 - `POST /api/account/membership/upgrade`
 
@@ -377,6 +378,8 @@ Codex 按以下顺序检查：
 ### 强制规则
 
 - 套餐通过 `tier` 查询，禁止硬编码 free plan UUID。
+- 欧元价格、人民币价格、购买类型、有效期和两类额度必须读取结构化套餐字段，禁止从本地化文案解析。
+- 公共 catalog 与账户接口中的可升级套餐必须复用同一 mapper/service 组装逻辑。
 - 当前会员由状态和有效期共同判定。
 - entitlement 使用数据库余额和周期，不从 tier 名称临时推导。
 - `upgrade` 初期只创建外部流程或订单入口；支付或 staff 确认前不得直接激活会员。
@@ -385,7 +388,8 @@ Codex 按以下顺序检查：
 ### 验收矩阵
 
 - plan 按 locale 和 sort order 返回。
-- `GET /api/account/membership` 同时返回当前会员、entitlement 和契约所需的可升级套餐数据，不另造 plans endpoint。
+- `GET /api/membership/catalog` 无需登录，按 locale 和 sort order 返回启用套餐。
+- `GET /api/account/membership` 同时返回当前会员、entitlement 和契约所需的可升级套餐数据。
 - free、active paid、expired 三类用户得到正确会员视图。
 - 重复 upgrade 不产生冲突的活动订单。
 - 未确认支付不会改变 membership。
@@ -411,12 +415,17 @@ Codex 按以下顺序检查：
 - `cm_event_agenda_item_localized_fields`
 - `cm_event_registrations`
 - `cm_user_memberships`
+- `cm_user_entitlement_balances`
 
 ### 强制规则
 
 - `registeredCount`、`waitlistCount` 从 registration 状态派生。
 - 精确地址按 `address_visibility`、活动状态和当前用户报名状态返回。
 - member-only event 必须由有效会员状态判断。
+- 只有 `consumes_membership_quota = 1` 的活动才使用 `event_registration` 余额。
+- 提交申请不扣活动额度；后台确认时原子扣减 1 次，余额不足则确认失败。
+- 已扣额度的报名在 attended 前取消时原子返还 1 次。
+- `event_quota_consumed_at` 和 `event_quota_released_at` 必须保证重复确认、重复取消不重复变更余额。
 - 报名和取消使用唯一约束避免重复记录。
 - 容量判断与写 registration 必须在事务中完成，并防止并发超卖。
 - 活动过期状态优先由日期和正式状态规则判定，不由前端决定。
@@ -428,6 +437,8 @@ Codex 按以下顺序检查：
 - 重复报名不会重复计数。
 - 满员后按契约进入 waitlist 或拒绝。
 - 取消后计数和用户 account events 同步。
+- 受控活动确认后活动余额减 1，取消后返还；重复操作保持幂等。
+- 不消耗会员额度的活动不受活动余额限制。
 - 未满足地址开放条件时不泄露精确地址。
 
 ## 11. 阶段七：Favorite / Private Introduction / Inbox / Dashboard

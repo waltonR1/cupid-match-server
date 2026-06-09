@@ -484,15 +484,19 @@ sql.push(insertInto('cm_profile_privacy_preferences', ['id', 'profile_id', 'hide
     updated_at: toDateTime(row.updatedAt),
   }))));
 
-sql.push(insertInto('cm_membership_plans', ['id', 'tier', 'price_cents', 'currency', 'billing_period', 'private_introduction_quota', 'private_introduction_period', 'event_priority_enabled', 'staff_review_enabled', 'profile_detail_access_level', 'staff_support_level', 'concierge_priority', 'featured', 'sort_order', 'is_active', 'created_at', 'updated_at'],
+sql.push(insertInto('cm_membership_plans', ['id', 'tier', 'price_cents', 'currency', 'cny_price_cents', 'billing_type', 'billing_period', 'validity_months', 'private_introduction_quota', 'private_introduction_period', 'event_quota', 'event_priority_enabled', 'staff_review_enabled', 'profile_detail_access_level', 'staff_support_level', 'concierge_priority', 'featured', 'sort_order', 'is_active', 'created_at', 'updated_at'],
   (db.membership_plans || []).map((row) => ({
     id: row.id,
     tier: row.tier,
-    price_cents: row.priceCents ?? null,
-    currency: row.currency || null,
+    price_cents: row.priceCents,
+    currency: row.currency,
+    cny_price_cents: row.cnyPriceCents,
+    billing_type: row.billingType,
     billing_period: row.billingPeriod || null,
+    validity_months: row.validityMonths ?? null,
     private_introduction_quota: row.privateIntroductionQuota,
     private_introduction_period: row.privateIntroductionPeriod,
+    event_quota: row.eventQuota,
     event_priority_enabled: !!row.eventPriorityEnabled,
     staff_review_enabled: !!row.staffReviewEnabled,
     profile_detail_access_level: row.profileDetailAccessLevel,
@@ -542,12 +546,13 @@ sql.push(insertInto('cm_user_entitlement_balances', ['id', 'user_id', 'membershi
     updated_at: toDateTime(row.updatedAt),
   }))));
 
-sql.push(insertInto('cm_events', ['id', 'slug', 'status', 'visibility', 'city_code', 'address_visibility', 'event_date', 'start_time', 'end_time', 'capacity', 'cover_image_url', 'created_at', 'updated_at'],
+sql.push(insertInto('cm_events', ['id', 'slug', 'status', 'visibility', 'consumes_membership_quota', 'city_code', 'address_visibility', 'event_date', 'start_time', 'end_time', 'capacity', 'cover_image_url', 'created_at', 'updated_at'],
   (db.events || []).map((row) => ({
     id: row.id,
     slug: row.slug,
     status: row.status,
     visibility: row.visibility,
+    consumes_membership_quota: !!row.consumesMembershipQuota,
     city_code: localizedCode(row, 'city', 'city'),
     address_visibility: row.addressVisibility,
     event_date: toDate(row.date),
@@ -623,7 +628,7 @@ const agendaLocalizedRows = [];
 });
 sql.push(insertInto('cm_event_agenda_item_localized_fields', ['id', 'agenda_item_id', 'field_name', 'locale', 'value', 'source', 'provider', 'status', 'created_at', 'updated_at'], agendaLocalizedRows));
 
-sql.push(insertInto('cm_event_registrations', ['id', 'user_id', 'event_id', 'status', 'requested_at', 'confirmed_at', 'declined_at', 'waitlisted_at', 'cancelled_at', 'attended_at', 'created_at', 'updated_at'],
+sql.push(insertInto('cm_event_registrations', ['id', 'user_id', 'event_id', 'status', 'requested_at', 'confirmed_at', 'declined_at', 'waitlisted_at', 'cancelled_at', 'attended_at', 'event_quota_consumed_at', 'event_quota_released_at', 'created_at', 'updated_at'],
   (db.event_registrations || []).map((row) => ({
     id: row.id,
     user_id: row.userId,
@@ -635,6 +640,8 @@ sql.push(insertInto('cm_event_registrations', ['id', 'user_id', 'event_id', 'sta
     waitlisted_at: toDateTime(row.waitlistedAt),
     cancelled_at: toDateTime(row.cancelledAt),
     attended_at: toDateTime(row.attendedAt),
+    event_quota_consumed_at: toDateTime(row.eventQuotaConsumedAt),
+    event_quota_released_at: toDateTime(row.eventQuotaReleasedAt),
     created_at: toDateTime(row.createdAt),
     updated_at: toDateTime(row.updatedAt),
   }))));
