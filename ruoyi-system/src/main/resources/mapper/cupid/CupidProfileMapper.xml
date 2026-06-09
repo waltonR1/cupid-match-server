@@ -242,12 +242,11 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         </where>
     </select>
     <select id="selectFeaturedDirectoryProfiles" parameterType="CupidProfile" resultMap="CupidProfileResult">
-        select <include refid="profileColumns"/>, ir.is_featured
+        select <include refid="profileColumns"/>, coalesce(ir.is_featured, 0) as is_featured
         from cm_profiles p
-        join cm_profile_internal_records ir on ir.profile_id = p.id
+        left join cm_profile_internal_records ir on ir.profile_id = p.id
         <where>
             <include refid="selfProfileWhere"/>
-            and ir.is_featured = 1
         </where>
         <include refid="selfProfileOrderBy"/>
         limit #{offset}, #{pageSize}
