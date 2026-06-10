@@ -117,7 +117,7 @@ validateEntityIds();
 function sqlValue(value) {
   if (value === undefined || value === null) return 'null';
   if (typeof value === 'number') return String(value);
-  if (typeof value === 'boolean') return value ? '1' : '0';
+  if (typeof value === 'boolean') return value ? 'true' : 'false';
   return `'${String(value).replace(/\\/g, '\\\\').replace(/'/g, "''")}'`;
 }
 
@@ -212,7 +212,6 @@ sql.push('-- Generated from doc/reference-from-app/mock-server/db.json');
 sql.push('-- Entity IDs are deterministic UUIDv5 values; regenerating the same source keeps them stable.');
 sql.push('-- Run after sql/cm_schema.sql.');
 sql.push('-- ----------------------------\n');
-sql.push('set names utf8mb4;\n');
 
 sql.push(insertInto('cm_users', ['id', 'account_name', 'avatar_url', 'preferred_locale', 'status', 'created_at', 'updated_at'],
   db.users.map((row) => ({

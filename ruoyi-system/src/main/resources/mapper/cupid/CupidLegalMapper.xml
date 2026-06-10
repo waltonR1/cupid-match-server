@@ -60,11 +60,11 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     <insert id="upsertAcceptance">
         insert into cm_user_agreement_acceptances (id, user_id, document_type, document_version, accepted_at)
         values (#{id}, #{userId}, #{documentType}, #{documentVersion}, #{acceptedAt})
-        on duplicate key update
+        on conflict (user_id, document_type) do update set
             accepted_at = case
-                when document_version &lt;&gt; values(document_version) then values(accepted_at)
-                else accepted_at
+                when cm_user_agreement_acceptances.document_version &lt;&gt; EXCLUDED.document_version then EXCLUDED.accepted_at
+                else cm_user_agreement_acceptances.accepted_at
             end,
-            document_version = values(document_version)
+            document_version = EXCLUDED.document_version
     </insert>
 </mapper>

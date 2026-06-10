@@ -69,17 +69,17 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 				AND lower(table_comment) like lower(concat('%', #{tableComment}, '%'))
 			</if>
 			<if test="params.beginTime != null and params.beginTime != ''"><!-- 开始时间检索 -->
-				AND date_format(create_time,'%Y%m%d') &gt;= date_format(#{params.beginTime},'%Y%m%d')
+				AND to_char(create_time, 'YYYYMMDD') &gt;= #{params.beginTime}
 			</if>
 			<if test="params.endTime != null and params.endTime != ''"><!-- 结束时间检索 -->
-				AND date_format(create_time,'%Y%m%d') &lt;= date_format(#{params.endTime},'%Y%m%d')
+				AND to_char(create_time, 'YYYYMMDD') &lt;= #{params.endTime}
 			</if>
 		</where>
 	</select>
 
 	<select id="selectDbTableList" parameterType="GenTable" resultMap="GenTableResult">
 		select table_name, table_comment, create_time, update_time from information_schema.tables
-		where table_schema = (select database())
+		where table_schema = (SELECT current_database())
 		AND table_name NOT LIKE 'qrtz\_%' AND table_name NOT LIKE 'gen\_%'
 		AND table_name NOT IN (select table_name from gen_table)
 		<if test="tableName != null and tableName != ''">
@@ -89,17 +89,17 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 			AND lower(table_comment) like lower(concat('%', #{tableComment}, '%'))
 		</if>
 		<if test="params.beginTime != null and params.beginTime != ''"><!-- 开始时间检索 -->
-			AND date_format(create_time,'%Y%m%d') &gt;= date_format(#{params.beginTime},'%Y%m%d')
+			AND to_char(create_time, 'YYYYMMDD') &gt;= #{params.beginTime}
 		</if>
 		<if test="params.endTime != null and params.endTime != ''"><!-- 结束时间检索 -->
-			AND date_format(create_time,'%Y%m%d') &lt;= date_format(#{params.endTime},'%Y%m%d')
+			AND to_char(create_time, 'YYYYMMDD') &lt;= #{params.endTime}
 		</if>
         order by create_time desc
 	</select>
 	
 	<select id="selectDbTableListByNames" resultMap="GenTableResult">
 		select table_name, table_comment, create_time, update_time from information_schema.tables
-		where table_name NOT LIKE 'qrtz\_%' and table_name NOT LIKE 'gen\_%' and table_schema = (select database())
+		where table_name NOT LIKE 'qrtz\_%' and table_name NOT LIKE 'gen\_%' and table_schema = (SELECT current_database())
 		and table_name in
 	    <foreach collection="array" item="name" open="(" separator="," close=")">
  			#{name}
@@ -108,7 +108,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 	
 	<select id="selectTableByName" parameterType="String" resultMap="GenTableResult">
 		select table_name, table_comment, create_time, update_time from information_schema.tables
-		where table_comment <![CDATA[ <> ]]> '' and table_schema = (select database())
+		where table_comment <![CDATA[ <> ]]> '' and table_schema = (SELECT current_database())
 		and table_name = #{tableName}
 	</select>
 	
@@ -170,7 +170,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 			<if test="genPath != null and genPath != ''">#{genPath},</if>
 			<if test="remark != null and remark != ''">#{remark},</if>
  			<if test="createBy != null and createBy != ''">#{createBy},</if>
-			sysdate()
+			CURRENT_TIMESTAMP
          )
     </insert>
     
@@ -199,7 +199,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="options != null and options != ''">options = #{options},</if>
             <if test="updateBy != null and updateBy != ''">update_by = #{updateBy},</if>
             <if test="remark != null">remark = #{remark},</if>
-            update_time = sysdate()
+            update_time = CURRENT_TIMESTAMP
         </set>
         where table_id = #{tableId}
     </update>

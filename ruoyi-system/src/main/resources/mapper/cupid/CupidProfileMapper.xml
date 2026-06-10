@@ -165,7 +165,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         </where>
     </select>
     <sql id="familyProfileWhere">
-        p.family_visible = 1
+        p.family_visible = TRUE
         and p.profile_status in ('open', 'review')
         and p.archived_at is null
         <if test="viewerUserId != null and viewerUserId != ''">
@@ -209,7 +209,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <if test="familyMode != null and familyMode == 'priority'">
             and exists (
                 select 1 from cm_profile_internal_records ir2
-                where ir2.profile_id = p.id and ir2.is_featured = 1
+                where ir2.profile_id = p.id and ir2.is_featured = TRUE
             )
         </if>
     </sql>
@@ -677,13 +677,13 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             #{id}, #{profileId}, #{hideMaritalStatus}, #{hideHasChildren},
             #{hideChildrenPlan}, #{hideAcceptsLongDistance},
             #{hideSmoking}, #{hideDrinking}, now(), now()
-        ) on duplicate key update
-            hide_marital_status = values(hide_marital_status),
-            hide_has_children = values(hide_has_children),
-            hide_children_plan = values(hide_children_plan),
-            hide_accepts_long_distance = values(hide_accepts_long_distance),
-            hide_smoking = values(hide_smoking),
-            hide_drinking = values(hide_drinking),
+        ) on conflict (profile_id) do update set
+            hide_marital_status = EXCLUDED.hide_marital_status,
+            hide_has_children = EXCLUDED.hide_has_children,
+            hide_children_plan = EXCLUDED.hide_children_plan,
+            hide_accepts_long_distance = EXCLUDED.hide_accepts_long_distance,
+            hide_smoking = EXCLUDED.hide_smoking,
+            hide_drinking = EXCLUDED.hide_drinking,
             updated_at = now()
     </insert>
 
@@ -694,10 +694,10 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         ) values (
             #{id}, #{profileId}, #{phone}, #{email}, #{wechat},
             #{preferredChannel}, #{visibility}, now(), now()
-        ) on duplicate key update
-            phone = values(phone), email = values(email), wechat = values(wechat),
-            preferred_channel = values(preferred_channel),
-            visibility = values(visibility), updated_at = now()
+        ) on conflict (profile_id) do update set
+            phone = EXCLUDED.phone, email = EXCLUDED.email, wechat = EXCLUDED.wechat,
+            preferred_channel = EXCLUDED.preferred_channel,
+            visibility = EXCLUDED.visibility, updated_at = now()
     </insert>
 
     <update id="updateProfile">
@@ -740,7 +740,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         ) values (
             #{id}, #{profileType}, #{gender}, #{birthYear}, #{height},
             #{cityCode}, #{countryCode}, #{nationalityCode},
-            'draft', now(), 0,
+            'draft', now(), FALSE,
             #{degreeLevel}, #{educationCode}, #{industryCode},
             #{maritalStatus}, #{hasChildren}, #{childrenPlan},
             #{acceptsLongDistance}, #{datingIntentionCode},
@@ -753,7 +753,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 
     <insert id="insertInternalRecord">
         insert into cm_profile_internal_records (id, profile_id, is_featured, created_at, updated_at)
-        values (#{id}, #{profileId}, 0, now(), now())
+        values (#{id}, #{profileId}, FALSE, now(), now())
     </insert>
 
     <insert id="insertOwnership">
@@ -781,9 +781,9 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         ) values (
             #{id}, #{profileId}, #{url}, #{isPrimary},
             #{sortOrder}, #{status}, now(), now()
-        ) on duplicate key update
-            url = values(url), is_primary = values(is_primary),
-            sort_order = values(sort_order), status = values(status), updated_at = now()
+        ) on conflict (id) do update set
+            url = EXCLUDED.url, is_primary = EXCLUDED.is_primary,
+            sort_order = EXCLUDED.sort_order, status = EXCLUDED.status, updated_at = now()
     </insert>
 
     <insert id="insertPhoto">
@@ -802,9 +802,9 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         ) values (
             #{id}, #{profileId}, #{fieldName}, #{locale}, #{value},
             #{source}, #{provider}, #{status}, now(), now()
-        ) on duplicate key update
-            value = values(value), source = values(source),
-            provider = values(provider), status = values(status), updated_at = now()
+        ) on conflict (profile_id, field_name, locale) do update set
+            value = EXCLUDED.value, source = EXCLUDED.source,
+            provider = EXCLUDED.provider, status = EXCLUDED.status, updated_at = now()
     </insert>
 
     <insert id="upsertPendingLocalizedField">
@@ -814,12 +814,12 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         ) values (
             #{id}, #{profileId}, #{fieldName}, #{locale}, '',
             #{source}, #{provider}, 'pending', now(), now()
-        ) on duplicate key update
-            value = if(status in ('pending', 'failed'), values(value), value),
-            source = if(status in ('pending', 'failed'), values(source), source),
-            provider = if(status in ('pending', 'failed'), values(provider), provider),
-            status = if(status in ('pending', 'failed'), values(status), status),
-            updated_at = if(status in ('pending', 'failed'), now(), updated_at)
+        ) on conflict (profile_id, field_name, locale) do update set
+            value = case when cm_profile_localized_fields.status in ('pending', 'failed') then EXCLUDED.value else cm_profile_localized_fields.value end,
+            source = case when cm_profile_localized_fields.status in ('pending', 'failed') then EXCLUDED.source else cm_profile_localized_fields.source end,
+            provider = case when cm_profile_localized_fields.status in ('pending', 'failed') then EXCLUDED.provider else cm_profile_localized_fields.provider end,
+            status = case when cm_profile_localized_fields.status in ('pending', 'failed') then EXCLUDED.status else cm_profile_localized_fields.status end,
+            updated_at = case when cm_profile_localized_fields.status in ('pending', 'failed') then now() else cm_profile_localized_fields.updated_at end
     </insert>
 
     <update id="updatePendingLocalizedFieldStatus">
@@ -877,7 +877,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         ) values (
             #{id}, #{profileId}, 'unverified', 'unverified',
             'unverified', 'unverified', 'unreviewed', now(), now()
-        ) on duplicate key update updated_at = now()
+        ) on conflict (profile_id) do update set updated_at = now()
     </insert>
 
     <insert id="upsertVerificationDraft">
@@ -893,16 +893,16 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             #{maritalVerificationStatus}, #{reviewStatus},
             #{verifiedAt}, #{verifiedByUserId},
             now(), now()
-        ) on duplicate key update
-            legal_name = values(legal_name),
-            date_of_birth = values(date_of_birth),
-            identity_status = values(identity_status),
-            education_status = values(education_status),
-            income_status = values(income_status),
-            marital_status = values(marital_status),
-            review_status = values(review_status),
-            verified_at = values(verified_at),
-            verified_by_user_id = values(verified_by_user_id),
+        ) on conflict (profile_id) do update set
+            legal_name = EXCLUDED.legal_name,
+            date_of_birth = EXCLUDED.date_of_birth,
+            identity_status = EXCLUDED.identity_status,
+            education_status = EXCLUDED.education_status,
+            income_status = EXCLUDED.income_status,
+            marital_status = EXCLUDED.marital_status,
+            review_status = EXCLUDED.review_status,
+            verified_at = EXCLUDED.verified_at,
+            verified_by_user_id = EXCLUDED.verified_by_user_id,
             updated_at = now()
     </insert>
 

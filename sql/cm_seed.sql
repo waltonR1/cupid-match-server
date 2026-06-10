@@ -5,8 +5,6 @@
 -- Run after sql/cm_schema.sql.
 -- ----------------------------
 
-set names utf8mb4;
-
 insert into cm_users (id, account_name, avatar_url, preferred_locale, status, created_at, updated_at) values
   ('efdca298-c977-5502-ad2e-8ba480ca1ea3', 'Lin', '', 'zh', 'active', '2026-01-18 00:00:00', '2026-05-27 18:33:11');
 
@@ -17,7 +15,7 @@ insert into cm_auth_identities (id, user_id, provider, identifier, password_hash
 
 
 insert into cm_user_security_settings (id, user_id, mfa_enabled, mfa_method, mfa_identity_id, mfa_enabled_at, last_challenge_at, created_at, updated_at) values
-  ('c12c12d6-7cf2-580c-afa8-86439bbe71a3', 'efdca298-c977-5502-ad2e-8ba480ca1ea3', 1, 'email', '866d5279-f964-5513-92af-3e3c3005e0af', '2026-05-31 14:39:34', '2026-06-01 12:50:47', '2026-05-31 14:39:34', '2026-06-01 12:50:47');
+  ('c12c12d6-7cf2-580c-afa8-86439bbe71a3', 'efdca298-c977-5502-ad2e-8ba480ca1ea3', true, 'email', '866d5279-f964-5513-92af-3e3c3005e0af', '2026-05-31 14:39:34', '2026-06-01 12:50:47', '2026-05-31 14:39:34', '2026-06-01 12:50:47');
 
 
 insert into cm_user_security_challenges (id, user_id, action, method, identity_id, status, challenge_token, expires_at, verified_at, consumed_at, created_at, updated_at) values
@@ -28,7 +26,7 @@ insert into cm_user_security_challenges (id, user_id, action, method, identity_i
 
 
 insert into cm_user_preferences (id, user_id, preferred_city_code, preferred_contact_channel, staff_contact_enabled, family_assist_enabled, introduction_updates_enabled, event_reminders_enabled, service_announcements_enabled, marketing_emails_enabled, analytics_consent_enabled, created_at, updated_at) values
-  ('0ddabb82-4c33-5f95-8cea-4ee08f4fdd2e', 'efdca298-c977-5502-ad2e-8ba480ca1ea3', 'paris', 'email', 1, 1, 1, 1, 1, 0, 0, '2026-01-01 00:00:00', '2026-05-27 18:36:02');
+  ('0ddabb82-4c33-5f95-8cea-4ee08f4fdd2e', 'efdca298-c977-5502-ad2e-8ba480ca1ea3', 'paris', 'email', true, true, true, true, true, false, false, '2026-01-01 00:00:00', '2026-05-27 18:36:02');
 
 
 insert into cm_legal_documents (id, type, version, status, effective_at, created_at, updated_at) values
@@ -51,11 +49,11 @@ insert into cm_user_agreement_acceptances (id, user_id, document_type, document_
 
 
 insert into cm_profiles (id, profile_type, gender, birth_year, height, city_code, country_code, nationality_code, profile_status, last_active_at, family_visible, degree_level, education_code, industry_code, marital_status, has_children, children_plan, accepts_long_distance, dating_intention_code, relocation, preferred_age_min, preferred_age_max, preferred_location, smoking, drinking, activity_level, weekend_style, pets, communication_style, archived_at, created_at, updated_at) values
-  ('506ce3c7-b236-5b44-b8d0-459c4250ea03', 'self', 'female', 1995, 168, 'paris', 'france', 'french', 'open', '2026-04-20 18:30:00', 0, 'master', 'master', 'luxury', 'never_married', 0, 'wants', 1, 'serious', 'willing', 28, 40, 'regional', 'never', 'social', 'high', 'flexible', 'likes', 'direct', null, '2026-01-12 00:00:00', '2026-04-20 18:30:00'),
-  ('503a9c99-2842-54db-8858-24fbd3108e3b', 'self', 'male', 1992, 178, 'paris', 'france', 'chinese', 'open', '2026-04-22 09:00:00', 1, 'master', 'master', 'technology', 'never_married', 0, 'wants', 1, 'marriage', 'willing', 28, 40, 'regional', 'never', 'social', 'high', 'flexible', 'likes', 'direct', null, '2026-01-18 00:00:00', '2026-05-25 21:07:58'),
-  ('d7a4c336-b6f4-5079-a4ad-c47b4044a740', 'self', 'female', 1990, 170, 'paris', 'france', 'french', 'review', '2026-04-21 20:30:00', 1, 'phd', 'phd', 'public_affairs', 'divorced', 1, 'does_not_want', 1, 'exclusive', 'willing', 28, 40, 'regional', 'never', 'social', 'low', 'flexible', 'likes', 'direct', null, '2026-03-01 00:00:00', '2026-04-21 20:30:00'),
-  ('7972f5d4-3d0d-5ffb-8815-45d43049e2a8', 'self', 'male', 1991, 174, 'geneva', 'switzerland', 'swiss', 'open', '2026-04-25 07:50:00', 1, 'master', 'master', 'finance', 'never_married', 0, 'wants', 1, 'cross_border', 'willing', 28, 40, 'regional', 'never', 'social', 'high', 'flexible', 'likes', 'direct', null, '2026-02-02 00:00:00', '2026-04-25 07:50:00'),
-  ('f82cb5a2-dfc7-5075-9f2a-f72498fc7642', 'self', 'female', 1993, 171, 'amsterdam', 'netherlands', 'dutch', 'open', '2026-04-21 10:45:00', 1, 'master', 'master', 'digital_product', 'divorced', 0, 'wants', 1, 'serious', 'willing', 28, 40, 'regional', 'never', 'social', 'moderate', 'flexible', 'likes', 'direct', null, '2026-02-14 00:00:00', '2026-04-21 10:45:00');
+  ('506ce3c7-b236-5b44-b8d0-459c4250ea03', 'self', 'female', 1995, 168, 'paris', 'france', 'french', 'open', '2026-04-20 18:30:00', false, 'master', 'master', 'luxury', 'never_married', false, 'wants', true, 'serious', 'willing', 28, 40, 'regional', 'never', 'social', 'high', 'flexible', 'likes', 'direct', null, '2026-01-12 00:00:00', '2026-04-20 18:30:00'),
+  ('503a9c99-2842-54db-8858-24fbd3108e3b', 'self', 'male', 1992, 178, 'paris', 'france', 'chinese', 'open', '2026-04-22 09:00:00', true, 'master', 'master', 'technology', 'never_married', false, 'wants', true, 'marriage', 'willing', 28, 40, 'regional', 'never', 'social', 'high', 'flexible', 'likes', 'direct', null, '2026-01-18 00:00:00', '2026-05-25 21:07:58'),
+  ('d7a4c336-b6f4-5079-a4ad-c47b4044a740', 'self', 'female', 1990, 170, 'paris', 'france', 'french', 'review', '2026-04-21 20:30:00', true, 'phd', 'phd', 'public_affairs', 'divorced', true, 'does_not_want', true, 'exclusive', 'willing', 28, 40, 'regional', 'never', 'social', 'low', 'flexible', 'likes', 'direct', null, '2026-03-01 00:00:00', '2026-04-21 20:30:00'),
+  ('7972f5d4-3d0d-5ffb-8815-45d43049e2a8', 'self', 'male', 1991, 174, 'geneva', 'switzerland', 'swiss', 'open', '2026-04-25 07:50:00', true, 'master', 'master', 'finance', 'never_married', false, 'wants', true, 'cross_border', 'willing', 28, 40, 'regional', 'never', 'social', 'high', 'flexible', 'likes', 'direct', null, '2026-02-02 00:00:00', '2026-04-25 07:50:00'),
+  ('f82cb5a2-dfc7-5075-9f2a-f72498fc7642', 'self', 'female', 1993, 171, 'amsterdam', 'netherlands', 'dutch', 'open', '2026-04-21 10:45:00', true, 'master', 'master', 'digital_product', 'divorced', false, 'wants', true, 'serious', 'willing', 28, 40, 'regional', 'never', 'social', 'moderate', 'flexible', 'likes', 'direct', null, '2026-02-14 00:00:00', '2026-04-21 10:45:00');
 
 
 insert into cm_profile_languages (profile_id, language_code) values
@@ -454,21 +452,21 @@ insert into cm_profile_localized_items (id, profile_id, field_name, item_order, 
 
 
 insert into cm_profile_photos (id, profile_id, url, is_primary, sort_order, status, created_at, updated_at) values
-  ('f4391fce-c307-5754-83ab-efd016d9aada', '506ce3c7-b236-5b44-b8d0-459c4250ea03', 'https://picsum.photos/seed/p-001-1/900/1200', 1, 1, 'approved', '2026-01-12 00:00:00', '2026-04-20 18:30:00'),
-  ('b1485a44-d50c-5529-b41e-b61d87902a7b', '506ce3c7-b236-5b44-b8d0-459c4250ea03', 'https://picsum.photos/seed/p-001-2/900/1200', 0, 2, 'approved', '2026-01-12 00:00:00', '2026-04-20 18:30:00'),
-  ('d1286d2d-c0bb-51de-b1b4-c343ffda3e9c', '506ce3c7-b236-5b44-b8d0-459c4250ea03', 'https://picsum.photos/seed/p-001-3/900/1200', 0, 3, 'approved', '2026-01-12 00:00:00', '2026-04-20 18:30:00'),
-  ('9189edae-6db1-566d-abbc-ebf8ce71b63a', '503a9c99-2842-54db-8858-24fbd3108e3b', 'https://picsum.photos/seed/p-002-1/900/1200', 1, 1, 'approved', '2026-01-18 00:00:00', '2026-05-25 21:07:58'),
-  ('27367cf8-7d47-55d1-b745-376e53d8ab80', '503a9c99-2842-54db-8858-24fbd3108e3b', 'https://picsum.photos/seed/p-002-2/900/1200', 0, 2, 'approved', '2026-01-18 00:00:00', '2026-05-25 21:07:58'),
-  ('ce6bd69f-1a5d-567c-a881-3e83aca50550', '503a9c99-2842-54db-8858-24fbd3108e3b', 'https://picsum.photos/seed/p-002-3/900/1200', 0, 3, 'approved', '2026-01-18 00:00:00', '2026-05-25 21:07:58'),
-  ('e9675246-2d82-594a-adf1-bb4ace1c384b', 'd7a4c336-b6f4-5079-a4ad-c47b4044a740', 'https://picsum.photos/seed/p-006-1/900/1200', 1, 1, 'approved', '2026-03-01 00:00:00', '2026-04-21 20:30:00'),
-  ('e7050e2b-8592-5b6a-aa22-859e20d3c9fa', 'd7a4c336-b6f4-5079-a4ad-c47b4044a740', 'https://picsum.photos/seed/p-006-2/900/1200', 0, 2, 'approved', '2026-03-01 00:00:00', '2026-04-21 20:30:00'),
-  ('cc38e10c-0461-5ecc-9518-a67811f5c7b4', 'd7a4c336-b6f4-5079-a4ad-c47b4044a740', 'https://picsum.photos/seed/p-006-3/900/1200', 0, 3, 'approved', '2026-03-01 00:00:00', '2026-04-21 20:30:00'),
-  ('ac0f143b-13c9-548f-a15b-3d6763bc1576', '7972f5d4-3d0d-5ffb-8815-45d43049e2a8', 'https://picsum.photos/seed/p-009-1/900/1200', 1, 1, 'approved', '2026-02-02 00:00:00', '2026-04-25 07:50:00'),
-  ('31f97d57-ccd0-51c1-8b94-05d8f36c5288', '7972f5d4-3d0d-5ffb-8815-45d43049e2a8', 'https://picsum.photos/seed/p-009-2/900/1200', 0, 2, 'approved', '2026-02-02 00:00:00', '2026-04-25 07:50:00'),
-  ('393d2339-10b6-5dd9-bafc-4befd3a800fc', '7972f5d4-3d0d-5ffb-8815-45d43049e2a8', 'https://picsum.photos/seed/p-009-3/900/1200', 0, 3, 'approved', '2026-02-02 00:00:00', '2026-04-25 07:50:00'),
-  ('d1113beb-ce6f-5cf1-996b-f0834252e153', 'f82cb5a2-dfc7-5075-9f2a-f72498fc7642', 'https://picsum.photos/seed/p-010-1/900/1200', 1, 1, 'approved', '2026-02-14 00:00:00', '2026-04-21 10:45:00'),
-  ('cd6ee5a1-7302-56fd-a8bc-4cfb747a53ed', 'f82cb5a2-dfc7-5075-9f2a-f72498fc7642', 'https://picsum.photos/seed/p-010-2/900/1200', 0, 2, 'approved', '2026-02-14 00:00:00', '2026-04-21 10:45:00'),
-  ('d732ca77-9605-5651-9437-1f8b45e87f25', 'f82cb5a2-dfc7-5075-9f2a-f72498fc7642', 'https://picsum.photos/seed/p-010-3/900/1200', 0, 3, 'approved', '2026-02-14 00:00:00', '2026-04-21 10:45:00');
+  ('f4391fce-c307-5754-83ab-efd016d9aada', '506ce3c7-b236-5b44-b8d0-459c4250ea03', 'https://picsum.photos/seed/p-001-1/900/1200', true, 1, 'approved', '2026-01-12 00:00:00', '2026-04-20 18:30:00'),
+  ('b1485a44-d50c-5529-b41e-b61d87902a7b', '506ce3c7-b236-5b44-b8d0-459c4250ea03', 'https://picsum.photos/seed/p-001-2/900/1200', false, 2, 'approved', '2026-01-12 00:00:00', '2026-04-20 18:30:00'),
+  ('d1286d2d-c0bb-51de-b1b4-c343ffda3e9c', '506ce3c7-b236-5b44-b8d0-459c4250ea03', 'https://picsum.photos/seed/p-001-3/900/1200', false, 3, 'approved', '2026-01-12 00:00:00', '2026-04-20 18:30:00'),
+  ('9189edae-6db1-566d-abbc-ebf8ce71b63a', '503a9c99-2842-54db-8858-24fbd3108e3b', 'https://picsum.photos/seed/p-002-1/900/1200', true, 1, 'approved', '2026-01-18 00:00:00', '2026-05-25 21:07:58'),
+  ('27367cf8-7d47-55d1-b745-376e53d8ab80', '503a9c99-2842-54db-8858-24fbd3108e3b', 'https://picsum.photos/seed/p-002-2/900/1200', false, 2, 'approved', '2026-01-18 00:00:00', '2026-05-25 21:07:58'),
+  ('ce6bd69f-1a5d-567c-a881-3e83aca50550', '503a9c99-2842-54db-8858-24fbd3108e3b', 'https://picsum.photos/seed/p-002-3/900/1200', false, 3, 'approved', '2026-01-18 00:00:00', '2026-05-25 21:07:58'),
+  ('e9675246-2d82-594a-adf1-bb4ace1c384b', 'd7a4c336-b6f4-5079-a4ad-c47b4044a740', 'https://picsum.photos/seed/p-006-1/900/1200', true, 1, 'approved', '2026-03-01 00:00:00', '2026-04-21 20:30:00'),
+  ('e7050e2b-8592-5b6a-aa22-859e20d3c9fa', 'd7a4c336-b6f4-5079-a4ad-c47b4044a740', 'https://picsum.photos/seed/p-006-2/900/1200', false, 2, 'approved', '2026-03-01 00:00:00', '2026-04-21 20:30:00'),
+  ('cc38e10c-0461-5ecc-9518-a67811f5c7b4', 'd7a4c336-b6f4-5079-a4ad-c47b4044a740', 'https://picsum.photos/seed/p-006-3/900/1200', false, 3, 'approved', '2026-03-01 00:00:00', '2026-04-21 20:30:00'),
+  ('ac0f143b-13c9-548f-a15b-3d6763bc1576', '7972f5d4-3d0d-5ffb-8815-45d43049e2a8', 'https://picsum.photos/seed/p-009-1/900/1200', true, 1, 'approved', '2026-02-02 00:00:00', '2026-04-25 07:50:00'),
+  ('31f97d57-ccd0-51c1-8b94-05d8f36c5288', '7972f5d4-3d0d-5ffb-8815-45d43049e2a8', 'https://picsum.photos/seed/p-009-2/900/1200', false, 2, 'approved', '2026-02-02 00:00:00', '2026-04-25 07:50:00'),
+  ('393d2339-10b6-5dd9-bafc-4befd3a800fc', '7972f5d4-3d0d-5ffb-8815-45d43049e2a8', 'https://picsum.photos/seed/p-009-3/900/1200', false, 3, 'approved', '2026-02-02 00:00:00', '2026-04-25 07:50:00'),
+  ('d1113beb-ce6f-5cf1-996b-f0834252e153', 'f82cb5a2-dfc7-5075-9f2a-f72498fc7642', 'https://picsum.photos/seed/p-010-1/900/1200', true, 1, 'approved', '2026-02-14 00:00:00', '2026-04-21 10:45:00'),
+  ('cd6ee5a1-7302-56fd-a8bc-4cfb747a53ed', 'f82cb5a2-dfc7-5075-9f2a-f72498fc7642', 'https://picsum.photos/seed/p-010-2/900/1200', false, 2, 'approved', '2026-02-14 00:00:00', '2026-04-21 10:45:00'),
+  ('d732ca77-9605-5651-9437-1f8b45e87f25', 'f82cb5a2-dfc7-5075-9f2a-f72498fc7642', 'https://picsum.photos/seed/p-010-3/900/1200', false, 3, 'approved', '2026-02-14 00:00:00', '2026-04-21 10:45:00');
 
 
 insert into cm_profile_ownerships (id, user_id, profile_id, relationship_to_profile, permission, status, invited_by_user_id, accepted_at, revoked_at, created_at, updated_at) values
@@ -476,11 +474,11 @@ insert into cm_profile_ownerships (id, user_id, profile_id, relationship_to_prof
 
 
 insert into cm_profile_internal_records (id, profile_id, is_featured, source, updated_by_user_id, created_at, updated_at) values
-  ('7ab713a0-49ec-50ce-8249-8b9a76897f96', '506ce3c7-b236-5b44-b8d0-459c4250ea03', 0, null, null, '2026-01-12 00:00:00', '2026-04-20 18:30:00'),
-  ('478efbe6-fca6-5281-979b-54083466ab54', '503a9c99-2842-54db-8858-24fbd3108e3b', 1, null, null, '2026-01-18 00:00:00', '2026-05-25 21:07:58'),
-  ('c0194fe5-c673-522e-8e8e-7a70c1756be7', 'd7a4c336-b6f4-5079-a4ad-c47b4044a740', 0, null, null, '2026-03-01 00:00:00', '2026-04-21 20:30:00'),
-  ('ab6bf2a4-8581-52c6-b12f-89f53d5f31e1', '7972f5d4-3d0d-5ffb-8815-45d43049e2a8', 1, null, null, '2026-02-02 00:00:00', '2026-04-25 07:50:00'),
-  ('8890d441-fb8d-5a09-97b5-7a5f6a0a1e92', 'f82cb5a2-dfc7-5075-9f2a-f72498fc7642', 0, null, null, '2026-02-14 00:00:00', '2026-04-21 10:45:00');
+  ('7ab713a0-49ec-50ce-8249-8b9a76897f96', '506ce3c7-b236-5b44-b8d0-459c4250ea03', false, null, null, '2026-01-12 00:00:00', '2026-04-20 18:30:00'),
+  ('478efbe6-fca6-5281-979b-54083466ab54', '503a9c99-2842-54db-8858-24fbd3108e3b', true, null, null, '2026-01-18 00:00:00', '2026-05-25 21:07:58'),
+  ('c0194fe5-c673-522e-8e8e-7a70c1756be7', 'd7a4c336-b6f4-5079-a4ad-c47b4044a740', false, null, null, '2026-03-01 00:00:00', '2026-04-21 20:30:00'),
+  ('ab6bf2a4-8581-52c6-b12f-89f53d5f31e1', '7972f5d4-3d0d-5ffb-8815-45d43049e2a8', true, null, null, '2026-02-02 00:00:00', '2026-04-25 07:50:00'),
+  ('8890d441-fb8d-5a09-97b5-7a5f6a0a1e92', 'f82cb5a2-dfc7-5075-9f2a-f72498fc7642', false, null, null, '2026-02-14 00:00:00', '2026-04-21 10:45:00');
 
 
 insert into cm_profile_verifications (id, profile_id, legal_name, date_of_birth, identity_status, education_status, income_status, marital_status, review_status, verified_at, verified_by_user_id, created_at, updated_at) values
@@ -498,14 +496,14 @@ insert into cm_profile_contacts (id, profile_id, phone, email, wechat, preferred
 
 
 insert into cm_profile_privacy_preferences (id, profile_id, hide_marital_status, hide_has_children, hide_children_plan, hide_accepts_long_distance, hide_smoking, hide_drinking, created_at, updated_at) values
-  ('1caff97d-06d9-53cb-a771-e169c484b90f', '503a9c99-2842-54db-8858-24fbd3108e3b', 0, 0, 0, 0, 0, 0, '2026-05-23 11:02:04', '2026-05-23 11:02:33');
+  ('1caff97d-06d9-53cb-a771-e169c484b90f', '503a9c99-2842-54db-8858-24fbd3108e3b', false, false, false, false, false, false, '2026-05-23 11:02:04', '2026-05-23 11:02:33');
 
 
 insert into cm_membership_plans (id, tier, price_cents, currency, cny_price_cents, billing_type, billing_period, validity_months, private_introduction_quota, private_introduction_period, event_quota, event_priority_enabled, staff_review_enabled, profile_detail_access_level, staff_support_level, concierge_priority, featured, sort_order, is_active, created_at, updated_at) values
-  ('f04881cf-b31f-50c5-8e73-c5f861d0bd7f', 'free', 0, 'EUR', 0, 'free', null, null, 0, 'monthly', 0, 0, 0, 'registered', 'none', 0, 0, 1, 1, '2026-01-01 00:00:00', '2026-01-01 00:00:00'),
-  ('f2886d5f-1d2a-5fed-9b4f-8b23f2067f06', 'silver', 6500, 'EUR', 49900, 'one_time', null, 12, 5, 'monthly', 12, 0, 1, 'registered', 'standard', 0, 0, 2, 1, '2026-01-01 00:00:00', '2026-01-01 00:00:00'),
-  ('eaf73332-f7d1-5f4b-82ba-11368eac30b6', 'gold', 10000, 'EUR', 77000, 'one_time', null, 6, 15, 'monthly', 20, 1, 1, 'premium', 'priority', 1, 1, 3, 1, '2026-01-01 00:00:00', '2026-01-01 00:00:00'),
-  ('9fb53b84-a341-5b63-b6e8-35a474540a4c', 'diamond', 15000, 'EUR', 115500, 'one_time', null, 12, 30, 'monthly', 24, 1, 1, 'premium', 'concierge', 1, 0, 4, 1, '2026-01-01 00:00:00', '2026-01-01 00:00:00');
+  ('f04881cf-b31f-50c5-8e73-c5f861d0bd7f', 'free', 0, 'EUR', 0, 'free', null, null, 0, 'monthly', 0, false, false, 'registered', 'none', false, false, 1, true, '2026-01-01 00:00:00', '2026-01-01 00:00:00'),
+  ('f2886d5f-1d2a-5fed-9b4f-8b23f2067f06', 'silver', 6500, 'EUR', 49900, 'one_time', null, 12, 5, 'monthly', 12, false, true, 'registered', 'standard', false, false, 2, true, '2026-01-01 00:00:00', '2026-01-01 00:00:00'),
+  ('eaf73332-f7d1-5f4b-82ba-11368eac30b6', 'gold', 10000, 'EUR', 77000, 'one_time', null, 6, 15, 'monthly', 20, true, true, 'premium', 'priority', true, true, 3, true, '2026-01-01 00:00:00', '2026-01-01 00:00:00'),
+  ('9fb53b84-a341-5b63-b6e8-35a474540a4c', 'diamond', 15000, 'EUR', 115500, 'one_time', null, 12, 30, 'monthly', 24, true, true, 'premium', 'concierge', true, false, 4, true, '2026-01-01 00:00:00', '2026-01-01 00:00:00');
 
 
 insert into cm_membership_plan_localized_fields (id, plan_id, field_name, locale, value, source, provider, status, created_at, updated_at) values
@@ -545,9 +543,9 @@ insert into cm_user_entitlement_balances (id, user_id, membership_id, entitlemen
 
 
 insert into cm_events (id, slug, status, visibility, consumes_membership_quota, city_code, address_visibility, event_date, start_time, end_time, capacity, cover_image_url, created_at, updated_at) values
-  ('0ed043fe-531a-511d-940b-5daa55de963e', 'event-001', 'open', 'registered', 0, 'paris', 'registered_only', '2026-05-12', '18:30', '21:00', 12, 'https://images.unsplash.com/photo-1528605248644-14dd04022da1?auto=format&fit=crop&w=1200&q=80', '2026-04-01 00:00:00', '2026-05-01 00:00:00'),
-  ('38f69abd-73b4-5464-8b07-a95a9bb58547', 'event-002', 'waitlist', 'member', 1, 'paris', 'confirmed_attendee_only', '2026-05-20', '19:00', '22:00', 8, 'https://images.unsplash.com/photo-1414235077428-338989a2e8c0?auto=format&fit=crop&w=1200&q=80', '2026-04-01 00:00:00', '2026-05-01 00:00:00'),
-  ('1bcb995a-540c-5c66-9b92-52471c43e587', 'event-003', 'open', 'registered', 1, 'brussels', 'registered_only', '2026-05-28', '14:30', '17:00', 16, 'https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?auto=format&fit=crop&w=1200&q=80', '2026-04-01 00:00:00', '2026-05-01 00:00:00');
+  ('0ed043fe-531a-511d-940b-5daa55de963e', 'event-001', 'open', 'registered', false, 'paris', 'registered_only', '2026-05-12', '18:30', '21:00', 12, 'https://images.unsplash.com/photo-1528605248644-14dd04022da1?auto=format&fit=crop&w=1200&q=80', '2026-04-01 00:00:00', '2026-05-01 00:00:00'),
+  ('38f69abd-73b4-5464-8b07-a95a9bb58547', 'event-002', 'waitlist', 'member', true, 'paris', 'confirmed_attendee_only', '2026-05-20', '19:00', '22:00', 8, 'https://images.unsplash.com/photo-1414235077428-338989a2e8c0?auto=format&fit=crop&w=1200&q=80', '2026-04-01 00:00:00', '2026-05-01 00:00:00'),
+  ('1bcb995a-540c-5c66-9b92-52471c43e587', 'event-003', 'open', 'registered', true, 'brussels', 'registered_only', '2026-05-28', '14:30', '17:00', 16, 'https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?auto=format&fit=crop&w=1200&q=80', '2026-04-01 00:00:00', '2026-05-01 00:00:00');
 
 
 insert into cm_event_localized_fields (id, event_id, field_name, locale, value, source, provider, status, created_at, updated_at) values

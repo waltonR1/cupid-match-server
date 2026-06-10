@@ -83,7 +83,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 
     <insert id="insertSecuritySettings">
         insert into cm_user_security_settings (id, user_id, mfa_enabled)
-        values (#{id}, #{userId}, 0)
+        values (#{id}, #{userId}, FALSE)
     </insert>
 
     <insert id="insertPreferences">
@@ -100,7 +100,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             #{id}, #{userId}, id, tier, 'active', now()
         from cm_membership_plans
         where tier = 'free'
-          and is_active = 1
+          and is_active = TRUE
         limit 1
     </insert>
 
