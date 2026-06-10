@@ -13,8 +13,15 @@ import java.util.Map;
 import java.util.TreeMap;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
+import com.ruoyi.common.constant.HttpStatus;
+import com.ruoyi.common.exception.cupid.CupidApiException;
 import com.ruoyi.common.utils.StringUtils;
+import com.ruoyi.common.utils.uuid.IdUtils;
 import com.ruoyi.cupid.domain.CupidFavoriteProfile;
+import com.ruoyi.cupid.domain.CupidProfileContact;
 import com.ruoyi.cupid.domain.CupidPrivateIntroductionRequest;
 import com.ruoyi.cupid.domain.CupidProfile;
 import com.ruoyi.cupid.domain.CupidProfileLanguage;
@@ -29,6 +36,7 @@ import com.ruoyi.cupid.domain.CupidUserEntitlementBalance;
 import com.ruoyi.cupid.domain.CupidUserMembership;
 import com.ruoyi.cupid.mapper.CupidProfileMapper;
 import com.ruoyi.cupid.service.ICupidProfileService;
+import com.ruoyi.cupid.service.ICupidTranslationService;
 import com.ruoyi.cupid.service.ICupidUserService;
 
 /**
@@ -42,6 +50,33 @@ public class CupidProfileServiceImpl implements ICupidProfileService
     private static final List<String> FAMILY_DIRECTORY_FIELD_NAMES =
             Arrays.asList("city", "education", "industry", "summary", "relationship_goal", "residence_plan");
     private static final List<String> TAG_FIELD_NAMES = Arrays.asList("tags");
+
+    /** 本地化单值字段：DB snake_case → 前端 camelCase */
+    private static final Map<String, String> LOCALIZED_FIELD_MAP = new LinkedHashMap<>();
+    static {
+        LOCALIZED_FIELD_MAP.put("city", "city");
+        LOCALIZED_FIELD_MAP.put("country", "country");
+        LOCALIZED_FIELD_MAP.put("nationality", "nationality");
+        LOCALIZED_FIELD_MAP.put("education", "education");
+        LOCALIZED_FIELD_MAP.put("industry", "industry");
+        LOCALIZED_FIELD_MAP.put("career_direction", "careerDirection");
+        LOCALIZED_FIELD_MAP.put("relationship_goal", "relationshipGoal");
+        LOCALIZED_FIELD_MAP.put("residence_plan", "residencePlan");
+        LOCALIZED_FIELD_MAP.put("preferred_education", "preferredEducation");
+        LOCALIZED_FIELD_MAP.put("family_life", "familyLife");
+        LOCALIZED_FIELD_MAP.put("exercise", "exercise");
+        LOCALIZED_FIELD_MAP.put("summary", "summary");
+        LOCALIZED_FIELD_MAP.put("profile_name", "profileName");
+    }
+
+    /** 本地化列表字段 */
+    private static final Map<String, String> LOCALIZED_ITEM_MAP = new LinkedHashMap<>();
+    static {
+        LOCALIZED_ITEM_MAP.put("deal_breakers", "dealBreakers");
+        LOCALIZED_ITEM_MAP.put("personality_traits", "personalityTraits");
+        LOCALIZED_ITEM_MAP.put("interests", "interests");
+        LOCALIZED_ITEM_MAP.put("tags", "tags");
+    }
     private static final int DEFAULT_PAGE_SIZE = 6;
     private static final int MAX_PAGE_SIZE = 100;
     private static final int DEFAULT_FEATURED_SIZE = 3;
@@ -53,6 +88,9 @@ public class CupidProfileServiceImpl implements ICupidProfileService
 
     @Autowired
     private ICupidUserService userService;
+
+    @Autowired
+    private ICupidTranslationService translationService;
 
     @Override
     public Map<String, Object> getSelfProfileDirectory(Map<String, String> params, String userId)
@@ -118,6 +156,424 @@ public class CupidProfileServiceImpl implements ICupidProfileService
             return null;
         }
         return buildDetail(profile, userId, normalizeLocale(locale), false);
+    }
+
+    @Override
+    public Map<String, Object> getOwnerProfiles(String userId, String locale)
+    {
+        List<CupidProfileOwnership> ownerships = profileMapper.selectOwnershipsByUserId(userId);
+        if (ownerships.isEmpty())
+        {
+            Map<String, Object> response = new LinkedHashMap<>();
+            response.put("profiles", new ArrayList<>());
+            return response;
+        }
+
+        List<String> profileIds = new ArrayList<>();
+        Map<String, CupidProfileOwnership> ownershipByProfileId = new LinkedHashMap<>();
+        for (CupidProfileOwnership ownership : ownerships)
+        {
+            profileIds.add(ownership.getProfileId());
+            ownershipByProfileId.put(ownership.getProfileId(), ownership);
+        }
+
+        List<CupidProfile> profiles = profileMapper.selectProfilesByIds(profileIds);
+        // 过滤已归档
+        profiles.removeIf(p -> p.getArchivedAt() != null);
+        String loc = normalizeLocale(locale);
+        List<String> fieldNames = Arrays.asList("profile_name", "city");
+        Map<String, List<CupidProfilePhoto>> photosByProfile = loadPhotosByProfile(profileIds);
+        Map<String, Map<String, String>> localizedByProfile =
+                loadLocalizedFieldsByProfile(profileIds, fieldNames, loc);
+
+        List<Map<String, Object>> items = new ArrayList<>();
+        for (CupidProfile profile : profiles)
+        {
+            CupidProfileOwnership ownership = ownershipByProfileId.get(profile.getId());
+            CupidProfileVerification verification =
+                    profileMapper.selectVerificationByProfileId(profile.getId());
+
+            Map<String, Object> item = new LinkedHashMap<>();
+            item.put("profileId", profile.getId());
+            item.put("profileType", profile.getProfileType());
+            Map<String, String> fields =
+                    localizedByProfile.getOrDefault(profile.getId(), new LinkedHashMap<>());
+            item.put("profileName", fields.getOrDefault("profile_name", ""));
+            List<CupidProfilePhoto> photos =
+                    photosByProfile.getOrDefault(profile.getId(), new ArrayList<>());
+            item.put("avatarUrl", findPrimaryPhotoUrl(photos));
+            item.put("age", calculateAge(profile.getBirthYear()));
+            item.put("city", fields.getOrDefault("city", profile.getCityCode()));
+            item.put("relationshipToProfile", ownership.getRelationshipToProfile());
+            item.put("permission", ownership.getPermission());
+            item.put("ownershipStatus", ownership.getStatus());
+            item.put("profileStatus", profile.getProfileStatus());
+            item.put("verification", buildVerificationDTO(verification));
+            items.add(item);
+        }
+
+        Map<String, Object> response = new LinkedHashMap<>();
+        response.put("profiles", items);
+        return response;
+    }
+
+    @Override
+    public Map<String, Object> getOwnerProfileDetail(String profileId, String userId, String locale)
+    {
+        CupidProfileOwnership ownership =
+                profileMapper.selectOwnershipByUserAndProfile(userId, profileId);
+        if (ownership == null)
+        {
+            return null;
+        }
+
+        CupidProfile profile = profileMapper.selectProfileById(profileId);
+        if (profile == null || profile.getArchivedAt() != null)
+        {
+            return null;
+        }
+
+        String loc = normalizeLocale(locale);
+        List<CupidProfilePhoto> photos = profileMapper.selectAllPhotosByProfileIds(
+                java.util.Collections.singletonList(profileId));
+        List<CupidProfileLocalizedField> localizedFields =
+                profileMapper.selectAllLocalizedFieldsByProfileId(profileId, loc);
+        List<CupidProfileLocalizedItem> localizedItems =
+                profileMapper.selectAllLocalizedItemsByProfileId(profileId, loc);
+        CupidProfileVerification verification =
+                profileMapper.selectVerificationByProfileId(profileId);
+        CupidProfilePrivacyPreference privacy =
+                profileMapper.selectPrivacyPreferenceByProfileId(profileId);
+        CupidProfileContact contact = profileMapper.selectContactByProfileId(profileId);
+
+        Map<String, String> fields = resolveEditableLocalizedFields(localizedFields, loc);
+        Map<String, List<String>> items = resolveEditableLocalizedItems(localizedItems, loc);
+        List<CupidProfileLanguage> languages = profileMapper.selectLanguagesByProfileId(profileId);
+        List<CupidProfileRelationshipValue> relationshipValues =
+                profileMapper.selectRelationshipValuesByProfileId(profileId);
+
+        Map<String, Object> detail = new LinkedHashMap<>();
+        detail.put("profileId", profile.getId());
+        detail.put("profileType", profile.getProfileType());
+        detail.put("profileName", value(fields, "profile_name", ""));
+        detail.put("avatarUrl", findPrimaryPhotoUrl(photos));
+        detail.put("ownership", buildOwnershipDTO(ownership));
+        detail.put("verification", buildVerificationDTO(verification));
+        detail.put("privacyPreferences", buildPrivacyPreferencesDTO(privacy));
+        detail.put("localizedMeta", buildLocalizedMeta(localizedFields, localizedItems, loc));
+        detail.put("contact", buildContactDTO(contact));
+        detail.put("photos", buildPhotoListWithStatus(photos));
+
+        // 使用可编辑本地化值（raw value，不回落）
+        detail.put("city", value(fields, "city", profile.getCityCode()));
+        detail.put("country", value(fields, "country", profile.getCountryCode()));
+        detail.put("nationality", value(fields, "nationality", profile.getNationalityCode()));
+        detail.put("education", value(fields, "education", profile.getEducationCode()));
+        detail.put("industry", value(fields, "industry", profile.getIndustryCode()));
+        detail.put("careerDirection", fields.containsKey("career_direction")
+                ? value(fields, "career_direction", "") : null);
+        detail.put("relationshipGoal", value(fields, "relationship_goal", ""));
+        detail.put("residencePlan", value(fields, "residence_plan", ""));
+        detail.put("preferredEducation", value(fields, "preferred_education", ""));
+        detail.put("familyLife", value(fields, "family_life", ""));
+        detail.put("exercise", value(fields, "exercise", ""));
+        detail.put("summary", value(fields, "summary", ""));
+        detail.put("dealBreakers", items.getOrDefault("deal_breakers", new ArrayList<>()));
+        detail.put("personalityTraits", items.getOrDefault("personality_traits", new ArrayList<>()));
+        detail.put("interests", items.getOrDefault("interests", new ArrayList<>()));
+        detail.put("tags", items.getOrDefault("tags", new ArrayList<>()));
+
+        // 资料基础字段
+        detail.put("gender", profile.getGender());
+        detail.put("birthYear", profile.getBirthYear());
+        detail.put("height", profile.getHeight());
+        detail.put("profileStatus", profile.getProfileStatus());
+        detail.put("lastActiveAt", profile.getLastActiveAt());
+        detail.put("familyVisible", profile.isFamilyVisible());
+        detail.put("degreeLevel", profile.getDegreeLevel());
+        detail.put("maritalStatus", profile.getMaritalStatus());
+        detail.put("hasChildren", profile.isHasChildren());
+        detail.put("childrenPlan", profile.getChildrenPlan());
+        detail.put("acceptsLongDistance", profile.isAcceptsLongDistance());
+        detail.put("datingIntentionCode", profile.getDatingIntentionCode());
+        detail.put("relocation", profile.getRelocation());
+        detail.put("preferredAgeMin", profile.getPreferredAgeMin());
+        detail.put("preferredAgeMax", profile.getPreferredAgeMax());
+        detail.put("preferredLocation", profile.getPreferredLocation());
+        detail.put("smoking", profile.getSmoking());
+        detail.put("drinking", profile.getDrinking());
+        detail.put("activityLevel", profile.getActivityLevel());
+        detail.put("weekendStyle", profile.getWeekendStyle());
+        detail.put("pets", profile.getPets());
+        detail.put("communicationStyle", profile.getCommunicationStyle());
+        detail.put("relationshipValues", toValueCodes(relationshipValues));
+        detail.put("languages", toLanguageCodes(languages));
+        detail.put("createdAt", profile.getCreatedAt());
+        detail.put("updatedAt", profile.getUpdatedAt());
+        boolean blankDraft = "draft".equals(profile.getProfileStatus())
+                && profile.getBirthYear() == 0
+                && profile.getHeight() == 0
+                && languages.isEmpty()
+                && !hasLocalizedValue(profileId, "city")
+                && !hasLocalizedValue(profileId, "education")
+                && !hasLocalizedValue(profileId, "summary");
+        detail.put("isBlankDraft", blankDraft);
+
+        return detail;
+    }
+
+    @Override
+    @Transactional
+    public Map<String, Object> saveProfile(String userId, Map<String, Object> payload, String locale)
+    {
+        return saveProfileWithLocale(userId, payload, locale);
+    }
+
+    private Map<String, Object> saveProfileWithLocale(String userId, Map<String, Object> payload, String locale)
+    {
+        String profileId = (String) payload.get("profileId");
+        String profileType = string(payload, "profileType", "self");
+        boolean isNew = !StringUtils.hasText(profileId);
+
+        if (isNew)
+        {
+            if ("self".equals(profileType))
+            {
+                List<CupidProfileOwnership> existingOwnerships =
+                        profileMapper.selectOwnershipsByUserId(userId);
+                for (CupidProfileOwnership o : existingOwnerships)
+                {
+                    CupidProfile existing = profileMapper.selectProfileById(o.getProfileId());
+                    if (existing != null && "self".equals(existing.getProfileType())
+                            && existing.getArchivedAt() == null)
+                    {
+                        throw new CupidApiException(HttpStatus.CONFLICT, "duplicate_self");
+                    }
+                }
+            }
+            profileId = IdUtils.fastUUID();
+        }
+        else
+        {
+            CupidProfileOwnership existing =
+                    profileMapper.selectOwnershipByUserAndProfile(userId, profileId);
+            if (existing == null)
+            {
+                throw new CupidApiException(HttpStatus.NOT_FOUND, "profile_not_found");
+            }
+            if (!"owner".equals(existing.getPermission())
+                    && !"manager".equals(existing.getPermission()))
+            {
+                throw new CupidApiException(HttpStatus.FORBIDDEN, "not_profile_owner");
+            }
+            CupidProfile target = profileMapper.selectProfileById(profileId);
+            if (target != null && target.getArchivedAt() != null)
+            {
+                throw new CupidApiException(HttpStatus.NOT_FOUND, "profile_not_found");
+            }
+        }
+
+        Map<String, Object> profileData = (Map) payload.get("profile");
+        CupidProfile profile = buildProfileFromPayload(profileId, profileType, profileData, isNew);
+        if (isNew)
+        {
+            profileMapper.insertProfile(profile);
+            CupidProfileOwnership ownership = new CupidProfileOwnership();
+            ownership.setId(IdUtils.fastUUID());
+            ownership.setUserId(userId);
+            ownership.setProfileId(profileId);
+            Map<String, Object> ownershipData = (Map) payload.get("ownership");
+            ownership.setRelationshipToProfile(
+                    String.valueOf(ownershipData != null
+                            ? ownershipData.getOrDefault("relationshipToProfile",
+                                    "self".equals(profileType) ? "self" : "relative")
+                            : "self".equals(profileType) ? "self" : "relative"));
+            ownership.setPermission("owner");
+            profileMapper.insertOwnership(ownership);
+            profileMapper.upsertVerification(buildInitialVerification(profileId));
+            saveInternalRecord(profileId);
+        }
+        else
+        {
+            // 部分更新：仅写入 payload 中存在的字段
+            CupidProfile existing = profileMapper.selectProfileById(profileId);
+            applyProfileChanges(existing, profileData);
+            profileMapper.updateProfile(existing);
+        }
+
+        // 本地化单值字段写入（camelCase payload key → snake_case DB field，仅删当前 locale）
+        List<String> translatedFields = new ArrayList<>();
+        for (String dbField : LOCALIZED_FIELD_MAP.keySet())
+        {
+            String camelKey = LOCALIZED_FIELD_MAP.get(dbField);
+            if (!profileData.containsKey(camelKey))
+            {
+                continue;
+            }
+            String value = string(profileData, camelKey, null);
+            profileMapper.deleteLocalizedFieldsByProfileAndField(profileId, dbField, locale);
+            if (value != null)
+            {
+                CupidProfileLocalizedField field = new CupidProfileLocalizedField();
+                field.setId(IdUtils.fastUUID());
+                field.setProfileId(profileId);
+                field.setFieldName(dbField);
+                field.setLocale(locale);
+                field.setValue(value);
+                field.setSource("manual");
+                field.setProvider("human");
+                field.setStatus("ready");
+                profileMapper.upsertLocalizedField(field);
+                translatedFields.add(dbField);
+            }
+        }
+
+        // 本地化列表字段写入（仅删当前 locale）
+        for (String dbField : LOCALIZED_ITEM_MAP.keySet())
+        {
+            String camelKey = LOCALIZED_ITEM_MAP.get(dbField);
+            if (!profileData.containsKey(camelKey))
+            {
+                continue;
+            }
+            profileMapper.deleteLocalizedItemsByProfileAndField(profileId, dbField, locale);
+            List<String> values = (List) profileData.get(camelKey);
+            if (values != null)
+            {
+                for (int i = 0; i < values.size(); i++)
+                {
+                    CupidProfileLocalizedItem item = new CupidProfileLocalizedItem();
+                    item.setId(IdUtils.fastUUID());
+                    item.setProfileId(profileId);
+                    item.setFieldName(dbField);
+                    item.setItemOrder(i);
+                    item.setLocale(locale);
+                    item.setValue(values.get(i));
+                    item.setSource("manual");
+                    item.setProvider("human");
+                    item.setStatus("ready");
+                    profileMapper.insertLocalizedItem(item);
+                }
+            }
+        }
+
+        // 请求其他语言的机器翻译
+        if (!translatedFields.isEmpty())
+        {
+            requestTranslationsAfterCommit(profileId, locale, new ArrayList<>(translatedFields));
+        }
+
+        // 语言写入
+        List<String> languages = (List) profileData.get("languages");
+        if (languages != null)
+        {
+            profileMapper.deleteLanguagesByProfileId(profileId);
+            for (String lang : languages)
+            {
+                profileMapper.insertLanguage(profileId, lang);
+            }
+        }
+
+        // 关系价值观写入
+        List<String> relationshipValues = (List) profileData.get("relationshipValues");
+        if (relationshipValues != null)
+        {
+            profileMapper.deleteRelationshipValuesByProfileId(profileId);
+            for (String v : relationshipValues)
+            {
+                profileMapper.insertRelationshipValue(profileId, v);
+            }
+        }
+
+        // 联系方式（更新时保留未传入的字段）
+        Map<String, Object> contactData = (Map) payload.get("contact");
+        if (contactData != null)
+        {
+            CupidProfileContact contact = buildContactFromPayload(profileId, contactData, isNew
+                    ? null : profileMapper.selectContactByProfileId(profileId));
+            profileMapper.upsertContact(contact);
+        }
+
+        // 照片对账
+        List<Map<String, Object>> photosPayload = (List) payload.get("photos");
+        if (photosPayload != null)
+        {
+            reconcilePhotos(profileId, photosPayload);
+        }
+
+        // 认证草稿
+        Map<String, Object> verificationPayload = (Map) payload.get("verification");
+        if (verificationPayload != null)
+        {
+            profileMapper.upsertVerificationDraft(
+                    buildVerificationFromPayload(profileId, verificationPayload,
+                            profileMapper.selectVerificationByProfileId(profileId)));
+        }
+
+        return getOwnerProfileDetail(profileId, userId, locale);
+    }
+
+    @Override
+    public Map<String, Object> archiveProfile(String profileId, String userId)
+    {
+        CupidProfileOwnership ownership =
+                profileMapper.selectOwnershipByUserAndProfile(userId, profileId);
+        if (ownership == null)
+        {
+            throw new CupidApiException(HttpStatus.NOT_FOUND, "profile_not_found");
+        }
+        if (!"owner".equals(ownership.getPermission()))
+        {
+            throw new CupidApiException(HttpStatus.FORBIDDEN, "not_profile_owner");
+        }
+        CupidProfile archivedProfile = profileMapper.selectProfileById(profileId);
+        if (archivedProfile != null && archivedProfile.getArchivedAt() != null)
+        {
+            throw new CupidApiException(HttpStatus.CONFLICT, "already_archived");
+        }
+        int active = profileMapper.countActiveIntroductionsByProfileId(profileId);
+        if (active > 0)
+        {
+            throw new CupidApiException(HttpStatus.CONFLICT, "active_introductions_exist");
+        }
+        profileMapper.archiveProfile(profileId);
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("profileId", profileId);
+        result.put("archivedAt", new java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'").format(new Date()));
+        return result;
+    }
+
+    @Override
+    public Map<String, Object> updatePrivacyPreferences(String profileId, String userId, Map<String, Object> prefs)
+    {
+        CupidProfileOwnership ownership =
+                profileMapper.selectOwnershipByUserAndProfile(userId, profileId);
+        if (ownership == null
+                || (!"owner".equals(ownership.getPermission())
+                && !"manager".equals(ownership.getPermission())))
+        {
+            throw new CupidApiException(HttpStatus.FORBIDDEN, "not_profile_owner");
+        }
+        CupidProfilePrivacyPreference record = new CupidProfilePrivacyPreference();
+        record.setId(IdUtils.fastUUID());
+        record.setProfileId(profileId);
+        CupidProfilePrivacyPreference existing =
+                profileMapper.selectPrivacyPreferenceByProfileId(profileId);
+        record.setHideMaritalStatus(booleanPatch(prefs, "hideMaritalStatus",
+                existing != null && existing.isHideMaritalStatus()));
+        record.setHideHasChildren(booleanPatch(prefs, "hideHasChildren",
+                existing != null && existing.isHideHasChildren()));
+        record.setHideChildrenPlan(booleanPatch(prefs, "hideChildrenPlan",
+                existing != null && existing.isHideChildrenPlan()));
+        record.setHideAcceptsLongDistance(booleanPatch(prefs, "hideAcceptsLongDistance",
+                existing != null && existing.isHideAcceptsLongDistance()));
+        record.setHideSmoking(booleanPatch(prefs, "hideSmoking",
+                existing != null && existing.isHideSmoking()));
+        record.setHideDrinking(booleanPatch(prefs, "hideDrinking",
+                existing != null && existing.isHideDrinking()));
+        profileMapper.upsertPrivacyPreference(record);
+        return buildPrivacyPreferencesDTO(
+                profileMapper.selectPrivacyPreferenceByProfileId(profileId));
     }
 
     /**
@@ -849,7 +1305,29 @@ public class CupidProfileServiceImpl implements ICupidProfileService
         Map<String, String> selected = new LinkedHashMap<>();
         for (CupidProfileLocalizedField field : fields)
         {
+            if (!"ready".equals(field.getStatus()) || !StringUtils.hasText(field.getValue()))
+            {
+                continue;
+            }
             selected.putIfAbsent(field.getFieldName(), field.getValue());
+        }
+        return selected;
+    }
+
+    /**
+     * 解析 owner 编辑页当前语言槽位，不使用其他语言回退。
+     */
+    private Map<String, String> resolveEditableLocalizedFields(
+            List<CupidProfileLocalizedField> fields, String locale)
+    {
+        Map<String, String> selected = new LinkedHashMap<>();
+        for (CupidProfileLocalizedField field : fields)
+        {
+            if (locale.equals(field.getLocale()))
+            {
+                selected.putIfAbsent(field.getFieldName(),
+                        field.getValue() == null ? "" : field.getValue());
+            }
         }
         return selected;
     }
@@ -862,6 +1340,28 @@ public class CupidProfileServiceImpl implements ICupidProfileService
         Map<String, Map<Integer, String>> selected = new LinkedHashMap<>();
         for (CupidProfileLocalizedItem item : items)
         {
+            selected.computeIfAbsent(item.getFieldName(), key -> new TreeMap<>())
+                    .putIfAbsent(item.getItemOrder(), item.getValue());
+        }
+        Map<String, List<String>> result = new LinkedHashMap<>();
+        selected.forEach((fieldName, values) ->
+                result.put(fieldName, new ArrayList<>(values.values())));
+        return result;
+    }
+
+    /**
+     * 解析 owner 编辑页当前语言列表项，不使用其他语言回退。
+     */
+    private Map<String, List<String>> resolveEditableLocalizedItems(
+            List<CupidProfileLocalizedItem> items, String locale)
+    {
+        Map<String, Map<Integer, String>> selected = new LinkedHashMap<>();
+        for (CupidProfileLocalizedItem item : items)
+        {
+            if (!locale.equals(item.getLocale()))
+            {
+                continue;
+            }
             selected.computeIfAbsent(item.getFieldName(), key -> new TreeMap<>())
                     .putIfAbsent(item.getItemOrder(), item.getValue());
         }
@@ -1085,5 +1585,536 @@ public class CupidProfileServiceImpl implements ICupidProfileService
     private int clamp(int value, int minimum, int maximum)
     {
         return Math.max(minimum, Math.min(maximum, value));
+    }
+
+    /**
+     * 构建认证信息响应
+     */
+    private Map<String, Object> buildVerificationDTO(CupidProfileVerification verification)
+    {
+        Map<String, Object> dto = new LinkedHashMap<>();
+        if (verification == null)
+        {
+            dto.put("identityStatus", "unverified");
+            dto.put("educationStatus", "unverified");
+            dto.put("incomeStatus", "unverified");
+            dto.put("maritalStatus", "unverified");
+            dto.put("reviewStatus", "unreviewed");
+            return dto;
+        }
+        dto.put("legalName", verification.getLegalName());
+        dto.put("dateOfBirth", verification.getDateOfBirth());
+        dto.put("identityStatus", verification.getIdentityStatus());
+        dto.put("educationStatus", verification.getEducationStatus());
+        dto.put("incomeStatus", verification.getIncomeStatus());
+        dto.put("maritalStatus", verification.getMaritalVerificationStatus());
+        dto.put("reviewStatus", verification.getReviewStatus());
+        dto.put("verifiedByUserId", verification.getVerifiedByUserId());
+        return dto;
+    }
+
+    /**
+     * 构建资料归属信息响应
+     */
+    private Map<String, Object> buildOwnershipDTO(CupidProfileOwnership ownership)
+    {
+        Map<String, Object> dto = new LinkedHashMap<>();
+        dto.put("relationshipToProfile", ownership.getRelationshipToProfile());
+        dto.put("permission", ownership.getPermission());
+        dto.put("status", ownership.getStatus());
+        dto.put("invitedByUserId", ownership.getInvitedByUserId());
+        dto.put("acceptedAt", ownership.getAcceptedAt());
+        dto.put("revokedAt", ownership.getRevokedAt());
+        return dto;
+    }
+
+    /**
+     * 构建隐私偏好响应
+     */
+    private Map<String, Object> buildPrivacyPreferencesDTO(CupidProfilePrivacyPreference privacy)
+    {
+        Map<String, Object> dto = new LinkedHashMap<>();
+        if (privacy == null)
+        {
+            dto.put("hideMaritalStatus", false);
+            dto.put("hideHasChildren", false);
+            dto.put("hideChildrenPlan", false);
+            dto.put("hideAcceptsLongDistance", false);
+            dto.put("hideSmoking", false);
+            dto.put("hideDrinking", false);
+            return dto;
+        }
+        dto.put("hideMaritalStatus", privacy.isHideMaritalStatus());
+        dto.put("hideHasChildren", privacy.isHideHasChildren());
+        dto.put("hideChildrenPlan", privacy.isHideChildrenPlan());
+        dto.put("hideAcceptsLongDistance", privacy.isHideAcceptsLongDistance());
+        dto.put("hideSmoking", privacy.isHideSmoking());
+        dto.put("hideDrinking", privacy.isHideDrinking());
+        return dto;
+    }
+
+    /**
+     * 构建可编辑本地化元数据响应（camelCase 字段名 + 单 locale 对象）
+     */
+    private Map<String, Object> buildLocalizedMeta(
+            List<CupidProfileLocalizedField> fields,
+            List<CupidProfileLocalizedItem> items, String locale)
+    {
+        Map<String, Object> meta = new LinkedHashMap<>();
+        meta.put("editLocale", locale);
+        Map<String, Object> fieldMeta = new LinkedHashMap<>();
+
+        for (CupidProfileLocalizedField field : fields)
+        {
+            String camelKey = toCamelCase(field.getFieldName());
+            if (!field.getLocale().equals(locale))
+            {
+                continue;
+            }
+            Map<String, Object> entry = new LinkedHashMap<>();
+            entry.put("locale", field.getLocale());
+            entry.put("source", field.getSource());
+            entry.put("provider", field.getProvider());
+            entry.put("status", field.getStatus());
+            entry.put("updatedAt", field.getUpdatedAt());
+            entry.put("hasValue", StringUtils.hasText(field.getValue()));
+            fieldMeta.putIfAbsent(camelKey, entry);
+        }
+
+        for (CupidProfileLocalizedItem item : items)
+        {
+            if (!item.getLocale().equals(locale))
+            {
+                continue;
+            }
+            String camelKey = toCamelCase(item.getFieldName());
+            Map<String, Object> entry = (Map<String, Object>) fieldMeta.get(camelKey);
+            if (entry == null)
+            {
+                entry = new LinkedHashMap<>();
+                entry.put("locale", item.getLocale());
+                entry.put("source", item.getSource());
+                entry.put("provider", item.getProvider());
+                entry.put("status", item.getStatus());
+                entry.put("updatedAt", item.getUpdatedAt());
+                entry.put("hasValue", false);
+                fieldMeta.put(camelKey, entry);
+            }
+            if (StringUtils.hasText(item.getValue()))
+            {
+                entry.put("hasValue", true);
+            }
+        }
+
+        // 为所有支持的 field 补充 missing 状态
+        String[] allFields = {"profileName", "city", "country", "nationality", "education",
+                "industry", "careerDirection", "relationshipGoal", "residencePlan",
+                "preferredEducation", "familyLife", "exercise", "summary",
+                "dealBreakers", "personalityTraits", "interests", "tags"};
+        for (String fn : allFields)
+        {
+            if (!fieldMeta.containsKey(fn))
+            {
+                Map<String, Object> missing = new LinkedHashMap<>();
+                missing.put("locale", locale);
+                missing.put("source", null);
+                missing.put("provider", null);
+                missing.put("status", "missing");
+                missing.put("hasValue", false);
+                fieldMeta.put(fn, missing);
+            }
+        }
+
+        meta.put("fields", fieldMeta);
+        return meta;
+    }
+
+    /**
+     * snake_case 转 camelCase
+     */
+    private String toCamelCase(String snake)
+    {
+        StringBuilder sb = new StringBuilder();
+        boolean up = false;
+        for (int i = 0; i < snake.length(); i++)
+        {
+            char c = snake.charAt(i);
+            if (c == '_')
+            {
+                up = true;
+            }
+            else if (up)
+            {
+                sb.append(Character.toUpperCase(c));
+                up = false;
+            }
+            else
+            {
+                sb.append(c);
+            }
+        }
+        return sb.toString();
+    }
+
+    /**
+     * 构建联系方式响应（仅 owner 可见）
+     */
+    private Map<String, Object> buildContactDTO(CupidProfileContact contact)
+    {
+        Map<String, Object> dto = new LinkedHashMap<>();
+        if (contact == null)
+        {
+            dto.put("phone", null);
+            dto.put("email", null);
+            dto.put("wechat", null);
+            dto.put("preferredChannel", null);
+            dto.put("visibility", "after_introduction");
+            return dto;
+        }
+        dto.put("phone", contact.getPhone());
+        dto.put("email", contact.getEmail());
+        dto.put("wechat", contact.getWechat());
+        dto.put("preferredChannel", contact.getPreferredChannel());
+        dto.put("visibility", contact.getVisibility());
+        return dto;
+    }
+
+    /**
+     * 构建照片列表响应（含审核状态）
+     */
+    private List<Map<String, Object>> buildPhotoListWithStatus(List<CupidProfilePhoto> photos)
+    {
+        List<Map<String, Object>> result = new ArrayList<>();
+        for (CupidProfilePhoto photo : photos)
+        {
+            Map<String, Object> item = new LinkedHashMap<>();
+            item.put("id", photo.getId());
+            item.put("url", photo.getUrl());
+            item.put("isPrimary", photo.getIsPrimary());
+            item.put("sortOrder", photo.getSortOrder());
+            item.put("status", photo.getStatus());
+            result.add(item);
+        }
+        return result;
+    }
+
+    /**
+     * 从保存 payload 构建 CupidProfile
+     */
+    private CupidProfile buildProfileFromPayload(String profileId, String profileType,
+            Map<String, Object> data, boolean isNew)
+    {
+        CupidProfile p = new CupidProfile();
+        p.setId(profileId);
+        p.setProfileType(profileType);
+        p.setGender(string(data, "gender", "female"));
+        p.setBirthYear(intValue(data, "birthYear", 0));
+        p.setHeight(intValue(data, "height", 0));
+        p.setCityCode(string(data, "cityCode", ""));
+        p.setCountryCode(string(data, "countryCode", ""));
+        p.setNationalityCode(string(data, "nationalityCode", ""));
+        p.setDegreeLevel(string(data, "degreeLevel", "bachelor"));
+        p.setEducationCode(string(data, "educationCode", ""));
+        p.setIndustryCode(string(data, "industryCode", ""));
+        p.setMaritalStatus(string(data, "maritalStatus", "never_married"));
+        p.setHasChildren(Boolean.TRUE.equals(data.get("hasChildren")));
+        p.setChildrenPlan(string(data, "childrenPlan", "open_to_discuss"));
+        p.setAcceptsLongDistance(Boolean.TRUE.equals(data.get("acceptsLongDistance")));
+        p.setDatingIntentionCode(string(data, "datingIntentionCode", "serious"));
+        p.setRelocation(string(data, "relocation", "willing"));
+        p.setPreferredAgeMin(intValue(data, "preferredAgeMin", 0));
+        p.setPreferredAgeMax(intValue(data, "preferredAgeMax", 0));
+        p.setPreferredLocation(string(data, "preferredLocation", "local"));
+        p.setSmoking(string(data, "smoking", "never"));
+        p.setDrinking(string(data, "drinking", "never"));
+        p.setActivityLevel(string(data, "activityLevel", "moderate"));
+        p.setWeekendStyle(string(data, "weekendStyle", "flexible"));
+        p.setPets(string(data, "pets", "none"));
+        p.setCommunicationStyle(string(data, "communicationStyle", "balanced"));
+        p.setFamilyVisible(Boolean.TRUE.equals(data.get("familyVisible")));
+        return p;
+    }
+
+    /**
+     * 从保存 payload 构建 CupidProfileContact
+     */
+    private CupidProfileContact buildContactFromPayload(
+            String profileId, Map<String, Object> data, CupidProfileContact existing)
+    {
+        CupidProfileContact c = new CupidProfileContact();
+        c.setId(IdUtils.fastUUID());
+        c.setProfileId(profileId);
+        c.setPhone(string(data, "phone", existing == null ? null : existing.getPhone()));
+        c.setEmail(string(data, "email", existing == null ? null : existing.getEmail()));
+        c.setWechat(string(data, "wechat", existing == null ? null : existing.getWechat()));
+        c.setPreferredChannel(string(data, "preferredChannel",
+                existing == null ? null : existing.getPreferredChannel()));
+        c.setVisibility(string(data, "visibility",
+                existing == null ? "after_introduction" : existing.getVisibility()));
+        return c;
+    }
+
+    /**
+     * 从部分认证 payload 构建认证草稿，未提交字段保留旧值。
+     */
+    private CupidProfileVerification buildVerificationFromPayload(
+            String profileId, Map<String, Object> data, CupidProfileVerification existing)
+    {
+        CupidProfileVerification v = new CupidProfileVerification();
+        v.setId(IdUtils.fastUUID());
+        v.setProfileId(profileId);
+
+        String legalName = string(data, "legalName",
+                existing == null ? null : existing.getLegalName());
+        Date dateOfBirth = existing == null ? null : existing.getDateOfBirth();
+        if (data.containsKey("dateOfBirth"))
+        {
+            dateOfBirth = parseSqlDate(string(data, "dateOfBirth", null));
+        }
+
+        boolean identityChanged = existing == null
+                || !equalsNullable(legalName, existing.getLegalName())
+                || !equalsNullable(dateOfBirth, existing.getDateOfBirth());
+        boolean hasIdentityData = StringUtils.hasText(legalName) || dateOfBirth != null;
+
+        v.setLegalName(legalName);
+        v.setDateOfBirth(dateOfBirth);
+        v.setIdentityStatus(identityChanged
+                ? (hasIdentityData ? "pending" : "unverified")
+                : existing.getIdentityStatus());
+        v.setEducationStatus(existing == null ? "unverified" : existing.getEducationStatus());
+        v.setIncomeStatus(existing == null ? "unverified" : existing.getIncomeStatus());
+        v.setMaritalVerificationStatus(existing == null
+                ? "unverified" : existing.getMaritalVerificationStatus());
+        v.setReviewStatus(identityChanged ? "unreviewed" : existing.getReviewStatus());
+        if (!identityChanged && existing != null)
+        {
+            v.setVerifiedAt(existing.getVerifiedAt());
+            v.setVerifiedByUserId(existing.getVerifiedByUserId());
+        }
+        return v;
+    }
+
+    /**
+     * 新建内部记录
+     */
+    private void saveInternalRecord(String profileId)
+    {
+        profileMapper.insertInternalRecord(IdUtils.fastUUID(), profileId);
+    }
+
+    /**
+     * 仅将 payload 中存在的字段覆盖到已有 profile（部分更新）
+     */
+    private void applyProfileChanges(CupidProfile target, Map<String, Object> data)
+    {
+        if (data.containsKey("gender")) target.setGender(string(data, "gender", target.getGender()));
+        if (data.containsKey("birthYear")) target.setBirthYear(intValue(data, "birthYear", target.getBirthYear()));
+        if (data.containsKey("height")) target.setHeight(intValue(data, "height", target.getHeight()));
+        if (data.containsKey("cityCode")) target.setCityCode(string(data, "cityCode", target.getCityCode()));
+        if (data.containsKey("countryCode")) target.setCountryCode(string(data, "countryCode", target.getCountryCode()));
+        if (data.containsKey("nationalityCode")) target.setNationalityCode(string(data, "nationalityCode", target.getNationalityCode()));
+        if (data.containsKey("degreeLevel")) target.setDegreeLevel(string(data, "degreeLevel", target.getDegreeLevel()));
+        if (data.containsKey("educationCode")) target.setEducationCode(string(data, "educationCode", target.getEducationCode()));
+        if (data.containsKey("industryCode")) target.setIndustryCode(string(data, "industryCode", target.getIndustryCode()));
+        if (data.containsKey("maritalStatus")) target.setMaritalStatus(string(data, "maritalStatus", target.getMaritalStatus()));
+        if (data.containsKey("hasChildren")) target.setHasChildren(Boolean.TRUE.equals(data.get("hasChildren")));
+        if (data.containsKey("childrenPlan")) target.setChildrenPlan(string(data, "childrenPlan", target.getChildrenPlan()));
+        if (data.containsKey("acceptsLongDistance")) target.setAcceptsLongDistance(Boolean.TRUE.equals(data.get("acceptsLongDistance")));
+        if (data.containsKey("datingIntentionCode")) target.setDatingIntentionCode(string(data, "datingIntentionCode", target.getDatingIntentionCode()));
+        if (data.containsKey("relocation")) target.setRelocation(string(data, "relocation", target.getRelocation()));
+        if (data.containsKey("preferredAgeMin")) target.setPreferredAgeMin(intValue(data, "preferredAgeMin", target.getPreferredAgeMin()));
+        if (data.containsKey("preferredAgeMax")) target.setPreferredAgeMax(intValue(data, "preferredAgeMax", target.getPreferredAgeMax()));
+        if (data.containsKey("preferredLocation")) target.setPreferredLocation(string(data, "preferredLocation", target.getPreferredLocation()));
+        if (data.containsKey("smoking")) target.setSmoking(string(data, "smoking", target.getSmoking()));
+        if (data.containsKey("drinking")) target.setDrinking(string(data, "drinking", target.getDrinking()));
+        if (data.containsKey("activityLevel")) target.setActivityLevel(string(data, "activityLevel", target.getActivityLevel()));
+        if (data.containsKey("weekendStyle")) target.setWeekendStyle(string(data, "weekendStyle", target.getWeekendStyle()));
+        if (data.containsKey("pets")) target.setPets(string(data, "pets", target.getPets()));
+        if (data.containsKey("communicationStyle")) target.setCommunicationStyle(string(data, "communicationStyle", target.getCommunicationStyle()));
+        if (data.containsKey("familyVisible")) target.setFamilyVisible(Boolean.TRUE.equals(data.get("familyVisible")));
+    }
+
+    /**
+     * 照片对账：仅保留 payload 中的照片，删除未包含的已有照片
+     */
+    private void reconcilePhotos(String profileId, List<Map<String, Object>> photosPayload)
+    {
+        List<CupidProfilePhoto> existingPhotos =
+                profileMapper.selectAllPhotosByProfileIds(
+                        java.util.Collections.singletonList(profileId));
+        for (Map<String, Object> p : photosPayload)
+        {
+            String photoId = string(p, "id", null);
+            if (booleanValue(p.get("delete")))
+            {
+                if (StringUtils.hasText(photoId))
+                {
+                    profileMapper.deletePhotoByProfileAndId(profileId, photoId);
+                }
+                continue;
+            }
+
+            String url = string(p, "url", "").trim();
+            if (url.isEmpty())
+            {
+                continue;
+            }
+            CupidProfilePhoto existingPhoto = findExistingPhoto(existingPhotos, photoId);
+            if (existingPhoto != null)
+            {
+                boolean urlChanged = !url.equals(existingPhoto.getUrl());
+                existingPhoto.setUrl(url);
+                existingPhoto.setIsPrimary(booleanValue(p.get("isPrimary")));
+                existingPhoto.setSortOrder(intValue(p, "sortOrder", existingPhoto.getSortOrder()));
+                if (urlChanged)
+                {
+                    existingPhoto.setStatus("review");
+                }
+                profileMapper.upsertPhoto(existingPhoto);
+            }
+            else
+            {
+                CupidProfilePhoto photo = new CupidProfilePhoto();
+                photo.setId(StringUtils.hasText(photoId) ? photoId : IdUtils.fastUUID());
+                photo.setProfileId(profileId);
+                photo.setUrl(url);
+                photo.setIsPrimary(booleanValue(p.get("isPrimary")));
+                photo.setSortOrder(intValue(p, "sortOrder", 0));
+                profileMapper.insertPhoto(photo);
+            }
+        }
+    }
+
+    private CupidProfilePhoto findExistingPhoto(List<CupidProfilePhoto> existing, String photoId)
+    {
+        if (photoId == null)
+        {
+            return null;
+        }
+        for (CupidProfilePhoto p : existing)
+        {
+            if (photoId.equals(p.getId()))
+            {
+                return p;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * 检查指定字段在任意 locale 是否有非空值
+     */
+    private boolean hasLocalizedValue(String profileId, String fieldName)
+    {
+        for (String loc : new String[]{"zh", "fr", "en"})
+        {
+            List<CupidProfileLocalizedField> result =
+                    profileMapper.selectLocalizedFieldsByProfileIds(
+                            java.util.Collections.singletonList(profileId),
+                            java.util.Collections.singletonList(fieldName), loc);
+            if (!result.isEmpty() && StringUtils.hasText(result.get(0).getValue()))
+            {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * 构建初始认证记录
+     */
+    private CupidProfileVerification buildInitialVerification(String profileId)
+    {
+        CupidProfileVerification v = new CupidProfileVerification();
+        v.setId(IdUtils.fastUUID());
+        v.setProfileId(profileId);
+        v.setIdentityStatus("unverified");
+        v.setEducationStatus("unverified");
+        v.setIncomeStatus("unverified");
+        v.setMaritalVerificationStatus("unverified");
+        v.setReviewStatus("unreviewed");
+        return v;
+    }
+
+    /**
+     * 从 Map 安全取字符串值
+     */
+    private String string(Map<String, Object> data, String key, String defaultValue)
+    {
+        Object value = data.get(key);
+        return value != null ? String.valueOf(value) : defaultValue;
+    }
+
+    /**
+     * 从 Map 安全取整数值
+     */
+    private int intValue(Map<String, Object> data, String key, int defaultValue)
+    {
+        Object value = data.get(key);
+        if (value instanceof Number)
+        {
+            return ((Number) value).intValue();
+        }
+        if (value != null)
+        {
+            try
+            {
+                return Integer.parseInt(String.valueOf(value));
+            }
+            catch (NumberFormatException ignored)
+            {
+            }
+        }
+        return defaultValue;
+    }
+
+    private boolean booleanPatch(Map<String, Object> data, String key, boolean defaultValue)
+    {
+        return data.containsKey(key) ? booleanValue(data.get(key)) : defaultValue;
+    }
+
+    private boolean booleanValue(Object value)
+    {
+        return Boolean.TRUE.equals(value) || "true".equalsIgnoreCase(String.valueOf(value));
+    }
+
+    private Date parseSqlDate(String value)
+    {
+        if (!StringUtils.hasText(value))
+        {
+            return null;
+        }
+        try
+        {
+            return java.sql.Date.valueOf(value);
+        }
+        catch (IllegalArgumentException ignored)
+        {
+            return null;
+        }
+    }
+
+    private boolean equalsNullable(Object left, Object right)
+    {
+        return left == null ? right == null : left.equals(right);
+    }
+
+    private void requestTranslationsAfterCommit(
+            String profileId, String locale, List<String> translatedFields)
+    {
+        if (TransactionSynchronizationManager.isSynchronizationActive())
+        {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization()
+            {
+                @Override
+                public void afterCommit()
+                {
+                    translationService.requestTranslations(profileId, locale, translatedFields);
+                }
+            });
+            return;
+        }
+        translationService.requestTranslations(profileId, locale, translatedFields);
     }
 }

@@ -10,6 +10,7 @@ import com.ruoyi.cupid.domain.CupidProfileOwnership;
 import com.ruoyi.cupid.domain.CupidProfilePhoto;
 import com.ruoyi.cupid.domain.CupidProfilePrivacyPreference;
 import com.ruoyi.cupid.domain.CupidProfileRelationshipValue;
+import com.ruoyi.cupid.domain.CupidProfileContact;
 import com.ruoyi.cupid.domain.CupidProfileVerification;
 import com.ruoyi.cupid.domain.CupidFavoriteProfile;
 import com.ruoyi.cupid.domain.CupidPrivateIntroductionRequest;
@@ -91,6 +92,11 @@ public interface CupidProfileMapper
      */
     List<CupidProfileLocalizedField> selectAllLocalizedFieldsByProfileId(
             @Param("profileId") String profileId, @Param("locale") String locale);
+
+    /**
+     * 按资料 ID 集合批量查询资料
+     */
+    List<CupidProfile> selectProfilesByIds(@Param("profileIds") List<String> profileIds);
 
     /**
      * 查询指定资料的全部本地化列表项
@@ -190,4 +196,133 @@ public interface CupidProfileMapper
      */
     CupidPrivateIntroductionRequest selectLatestIntroductionRequest(
             @Param("userId") String userId, @Param("profileId") String profileId);
+
+    /**
+     * 查询用户管理的全部资料归属关系
+     */
+    List<CupidProfileOwnership> selectOwnershipsByUserId(@Param("userId") String userId);
+
+    /**
+     * 按资料 ID 集合查询全部照片（含待审核与隐藏）
+     */
+    List<CupidProfilePhoto> selectAllPhotosByProfileIds(@Param("profileIds") List<String> profileIds);
+
+    /**
+     * 查询指定资料的联系方式
+     */
+    CupidProfileContact selectContactByProfileId(@Param("profileId") String profileId);
+    /**
+     * 归档资料（设置 archived_at）
+     */
+    int archiveProfile(@Param("id") String id);
+
+    /**
+     * 统计指定资料的有效私人介绍请求数
+     */
+    int countActiveIntroductionsByProfileId(@Param("profileId") String profileId);
+
+    /**
+     * 新增或更新隐私偏好设置
+     */
+    int upsertPrivacyPreference(CupidProfilePrivacyPreference pref);
+
+    /**
+     * 新增或更新资料联系方式
+     */
+    int upsertContact(CupidProfileContact contact);
+
+    /**
+     * 更新资料主表
+     */
+    int updateProfile(CupidProfile profile);
+
+    /**
+     * 新增资料
+     */
+    int insertProfile(CupidProfile profile);
+
+    /**
+     * 新增资料归属关系
+     */
+    /**
+     * 新增内部记录
+     */
+    int insertInternalRecord(@Param("id") String id, @Param("profileId") String profileId);
+
+    int insertOwnership(CupidProfileOwnership ownership);
+
+    /**
+     * 按资料 ID 删除全部照片
+     */
+    int deletePhotosByProfileId(@Param("profileId") String profileId);
+
+    /**
+     * 按资料 ID 和照片 ID 删除单张照片
+     */
+    int deletePhotoByProfileAndId(@Param("profileId") String profileId, @Param("id") String id);
+
+    /**
+     * 新增照片
+     */
+    int insertPhoto(CupidProfilePhoto photo);
+
+    /**
+     * 更新已有照片
+     */
+    int upsertPhoto(CupidProfilePhoto photo);
+
+    /**
+     * 新增或更新本地化字段
+     */
+    int upsertLocalizedField(CupidProfileLocalizedField field);
+
+    /**
+     * 新增或更新认证草稿（legalName / dateOfBirth）
+     */
+    int upsertVerificationDraft(CupidProfileVerification verification);
+
+    /**
+     * 按资料 ID 和字段名删除本地化字段
+     */
+    int deleteLocalizedFieldsByProfileAndField(
+            @Param("profileId") String profileId, @Param("fieldName") String fieldName,
+            @Param("locale") String locale);
+
+    /**
+     * 按资料 ID 和字段名删除本地化列表项
+     */
+    int deleteLocalizedItemsByProfileAndField(
+            @Param("profileId") String profileId, @Param("fieldName") String fieldName,
+            @Param("locale") String locale);
+
+    /**
+     * 新增本地化列表项
+     */
+    int insertLocalizedItem(CupidProfileLocalizedItem item);
+
+    /**
+     * 按资料 ID 删除全部语言记录
+     */
+    int deleteLanguagesByProfileId(@Param("profileId") String profileId);
+
+    /**
+     * 新增语言记录
+     */
+    int insertLanguage(@Param("profileId") String profileId, @Param("languageCode") String languageCode);
+
+    /**
+     * 按资料 ID 删除全部关系价值观
+     */
+    int deleteRelationshipValuesByProfileId(@Param("profileId") String profileId);
+
+    /**
+     * 新增关系价值观
+     */
+    int insertRelationshipValue(@Param("profileId") String profileId, @Param("valueCode") String valueCode);
+
+    /**
+     * 新增或更新认证信息
+     */
+    int upsertVerification(CupidProfileVerification verification);
+
 }

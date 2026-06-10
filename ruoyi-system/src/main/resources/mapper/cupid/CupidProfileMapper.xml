@@ -308,6 +308,15 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         order by profile_id, field_name, item_order,
                  case locale when #{locale} then 0 when 'zh' then 1 when 'en' then 2 else 3 end
     </select>
+    <select id="selectProfilesByIds" resultMap="CupidProfileResult">
+        select <include refid="profileColumns"/>
+        from cm_profiles p
+        where p.id in
+        <foreach collection="profileIds" item="pid" open="(" separator="," close=")">
+            #{pid}
+        </foreach>
+    </select>
+
     <select id="selectProfileById" resultMap="CupidProfileResult">
         select <include refid="profileColumns"/>
         from cm_profiles p
@@ -335,8 +344,6 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
                value, source, provider, status, created_at as createdAt, updated_at as updatedAt
         from cm_profile_localized_fields
         where profile_id = #{profileId}
-          and status = 'ready'
-          and trim(value) != ''
         order by field_name,
                  case locale when #{locale} then 0 when 'zh' then 1 when 'en' then 2 else 3 end
     </select>
@@ -392,6 +399,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
                created_at as createdAt, updated_at as updatedAt
         from cm_profile_ownerships
         where user_id = #{userId}
+          and status = 'active'
           and profile_id = #{profileId}
           and status = 'active'
         limit 1
@@ -616,5 +624,262 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         order by requested_at desc
         limit 1
     </select>
+
+    <select id="selectOwnershipsByUserId" resultType="CupidProfileOwnership">
+        select id, user_id as userId, profile_id as profileId,
+               relationship_to_profile as relationshipToProfile,
+               permission, status,
+               invited_by_user_id as invitedByUserId,
+               accepted_at as acceptedAt, revoked_at as revokedAt,
+               created_at as createdAt, updated_at as updatedAt
+        from cm_profile_ownerships
+        where user_id = #{userId}
+          and status = 'active'
+        order by created_at desc
+    </select>
+
+    <select id="selectAllPhotosByProfileIds" resultMap="CupidProfilePhotoResult">
+        select id, profile_id, url, is_primary, sort_order, status, created_at, updated_at
+        from cm_profile_photos
+        where profile_id in
+        <foreach collection="profileIds" item="pid" open="(" separator="," close=")">
+            #{pid}
+        </foreach>
+        order by sort_order asc
+    </select>
+
+    <select id="selectContactByProfileId" resultType="CupidProfileContact">
+        select id, profile_id as profileId, phone, email, wechat,
+               preferred_channel as preferredChannel,
+               visibility,
+               created_at as createdAt, updated_at as updatedAt
+        from cm_profile_contacts
+        where profile_id = #{profileId}
+        limit 1
+    </select>
+
+    <update id="archiveProfile">
+        update cm_profiles set archived_at = now() where id = #{id}
+    </update>
+
+    <select id="countActiveIntroductionsByProfileId" resultType="int">
+        select count(1) from cm_private_introduction_requests
+        where target_profile_id = #{profileId}
+          and status in ('requested', 'accepted')
+    </select>
+
+    <insert id="upsertPrivacyPreference">
+        insert into cm_profile_privacy_preferences (
+            id, profile_id, hide_marital_status, hide_has_children,
+            hide_children_plan, hide_accepts_long_distance,
+            hide_smoking, hide_drinking, created_at, updated_at
+        ) values (
+            #{id}, #{profileId}, #{hideMaritalStatus}, #{hideHasChildren},
+            #{hideChildrenPlan}, #{hideAcceptsLongDistance},
+            #{hideSmoking}, #{hideDrinking}, now(), now()
+        ) on duplicate key update
+            hide_marital_status = values(hide_marital_status),
+            hide_has_children = values(hide_has_children),
+            hide_children_plan = values(hide_children_plan),
+            hide_accepts_long_distance = values(hide_accepts_long_distance),
+            hide_smoking = values(hide_smoking),
+            hide_drinking = values(hide_drinking),
+            updated_at = now()
+    </insert>
+
+    <insert id="upsertContact">
+        insert into cm_profile_contacts (
+            id, profile_id, phone, email, wechat,
+            preferred_channel, visibility, created_at, updated_at
+        ) values (
+            #{id}, #{profileId}, #{phone}, #{email}, #{wechat},
+            #{preferredChannel}, #{visibility}, now(), now()
+        ) on duplicate key update
+            phone = values(phone), email = values(email), wechat = values(wechat),
+            preferred_channel = values(preferred_channel),
+            visibility = values(visibility), updated_at = now()
+    </insert>
+
+    <update id="updateProfile">
+        update cm_profiles set
+            profile_type = #{profileType}, gender = #{gender},
+            birth_year = #{birthYear}, height = #{height},
+            city_code = #{cityCode}, country_code = #{countryCode},
+            nationality_code = #{nationalityCode},
+            degree_level = #{degreeLevel},
+            education_code = #{educationCode}, industry_code = #{industryCode},
+            marital_status = #{maritalStatus},
+            has_children = #{hasChildren}, children_plan = #{childrenPlan},
+            accepts_long_distance = #{acceptsLongDistance},
+            dating_intention_code = #{datingIntentionCode},
+            relocation = #{relocation},
+            preferred_age_min = #{preferredAgeMin},
+            preferred_age_max = #{preferredAgeMax},
+            preferred_location = #{preferredLocation},
+            smoking = #{smoking}, drinking = #{drinking},
+            activity_level = #{activityLevel},
+            weekend_style = #{weekendStyle}, pets = #{pets},
+            communication_style = #{communicationStyle},
+            family_visible = #{familyVisible},
+            updated_at = now()
+        where id = #{id}
+    </update>
+
+    <insert id="insertProfile">
+        insert into cm_profiles (
+            id, profile_type, gender, birth_year, height,
+            city_code, country_code, nationality_code,
+            profile_status, last_active_at, family_visible,
+            degree_level, education_code, industry_code,
+            marital_status, has_children, children_plan,
+            accepts_long_distance, dating_intention_code,
+            relocation, preferred_age_min, preferred_age_max,
+            preferred_location, smoking, drinking,
+            activity_level, weekend_style, pets, communication_style,
+            created_at, updated_at
+        ) values (
+            #{id}, #{profileType}, #{gender}, #{birthYear}, #{height},
+            #{cityCode}, #{countryCode}, #{nationalityCode},
+            'draft', now(), 0,
+            #{degreeLevel}, #{educationCode}, #{industryCode},
+            #{maritalStatus}, #{hasChildren}, #{childrenPlan},
+            #{acceptsLongDistance}, #{datingIntentionCode},
+            #{relocation}, #{preferredAgeMin}, #{preferredAgeMax},
+            #{preferredLocation}, #{smoking}, #{drinking},
+            #{activityLevel}, #{weekendStyle}, #{pets}, #{communicationStyle},
+            now(), now()
+        )
+    </insert>
+
+    <insert id="insertInternalRecord">
+        insert into cm_profile_internal_records (id, profile_id, is_featured, created_at, updated_at)
+        values (#{id}, #{profileId}, 0, now(), now())
+    </insert>
+
+    <insert id="insertOwnership">
+        insert into cm_profile_ownerships (
+            id, user_id, profile_id, relationship_to_profile,
+            permission, status, created_at, updated_at
+        ) values (
+            #{id}, #{userId}, #{profileId}, #{relationshipToProfile},
+            #{permission}, 'active', now(), now()
+        )
+    </insert>
+
+    <delete id="deletePhotosByProfileId">
+        delete from cm_profile_photos where profile_id = #{profileId}
+    </delete>
+
+    <delete id="deletePhotoByProfileAndId">
+        delete from cm_profile_photos
+        where profile_id = #{profileId} and id = #{id}
+    </delete>
+
+    <insert id="upsertPhoto">
+        insert into cm_profile_photos (
+            id, profile_id, url, is_primary, sort_order, status, created_at, updated_at
+        ) values (
+            #{id}, #{profileId}, #{url}, #{isPrimary},
+            #{sortOrder}, #{status}, now(), now()
+        ) on duplicate key update
+            url = values(url), is_primary = values(is_primary),
+            sort_order = values(sort_order), status = values(status), updated_at = now()
+    </insert>
+
+    <insert id="insertPhoto">
+        insert into cm_profile_photos (
+            id, profile_id, url, is_primary, sort_order, status, created_at, updated_at
+        ) values (
+            #{id}, #{profileId}, #{url}, #{isPrimary},
+            #{sortOrder}, 'review', now(), now()
+        )
+    </insert>
+
+    <insert id="upsertLocalizedField">
+        insert into cm_profile_localized_fields (
+            id, profile_id, field_name, locale, value,
+            source, provider, status, created_at, updated_at
+        ) values (
+            #{id}, #{profileId}, #{fieldName}, #{locale}, #{value},
+            #{source}, #{provider}, #{status}, now(), now()
+        ) on duplicate key update
+            value = values(value), source = values(source),
+            provider = values(provider), status = values(status), updated_at = now()
+    </insert>
+
+    <delete id="deleteLocalizedFieldsByProfileAndField">
+        delete from cm_profile_localized_fields
+        where profile_id = #{profileId} and field_name = #{fieldName} and locale = #{locale}
+    </delete>
+
+    <delete id="deleteLocalizedItemsByProfileAndField">
+        delete from cm_profile_localized_items
+        where profile_id = #{profileId} and field_name = #{fieldName} and locale = #{locale}
+    </delete>
+
+    <insert id="insertLocalizedItem">
+        insert into cm_profile_localized_items (
+            id, profile_id, field_name, item_order, locale, value,
+            source, provider, status, created_at, updated_at
+        ) values (
+            #{id}, #{profileId}, #{fieldName}, #{itemOrder}, #{locale}, #{value},
+            #{source}, #{provider}, 'ready', now(), now()
+        )
+    </insert>
+
+    <delete id="deleteLanguagesByProfileId">
+        delete from cm_profile_languages where profile_id = #{profileId}
+    </delete>
+
+    <insert id="insertLanguage">
+        insert into cm_profile_languages (profile_id, language_code)
+        values (#{profileId}, #{languageCode})
+    </insert>
+
+    <delete id="deleteRelationshipValuesByProfileId">
+        delete from cm_profile_relationship_values where profile_id = #{profileId}
+    </delete>
+
+    <insert id="insertRelationshipValue">
+        insert into cm_profile_relationship_values (profile_id, value_code)
+        values (#{profileId}, #{valueCode})
+    </insert>
+
+    <insert id="upsertVerification">
+        insert into cm_profile_verifications (
+            id, profile_id, identity_status, education_status,
+            income_status, marital_status, review_status,
+            created_at, updated_at
+        ) values (
+            #{id}, #{profileId}, 'unverified', 'unverified',
+            'unverified', 'unverified', 'unreviewed', now(), now()
+        ) on duplicate key update updated_at = now()
+    </insert>
+
+    <insert id="upsertVerificationDraft">
+        insert into cm_profile_verifications (
+            id, profile_id, legal_name, date_of_birth,
+            identity_status, education_status,
+            income_status, marital_status, review_status,
+            verified_at, verified_by_user_id,
+            created_at, updated_at
+        ) values (
+            #{id}, #{profileId}, #{legalName}, #{dateOfBirth},
+            #{identityStatus}, #{educationStatus}, #{incomeStatus},
+            #{maritalVerificationStatus}, #{reviewStatus},
+            #{verifiedAt}, #{verifiedByUserId},
+            now(), now()
+        ) on duplicate key update
+            legal_name = values(legal_name),
+            date_of_birth = values(date_of_birth),
+            identity_status = values(identity_status),
+            education_status = values(education_status),
+            income_status = values(income_status),
+            marital_status = values(marital_status),
+            review_status = values(review_status),
+            verified_at = values(verified_at),
+            verified_by_user_id = values(verified_by_user_id),
+            updated_at = now()
+    </insert>
 
 </mapper>

@@ -72,13 +72,15 @@ spring:
     # redis 配置
     redis:
       # 地址
-      host: localhost
+      host: steel-lexical-bit-58519.db.redis.io
       # 端口，默认为6379
-      port: 6379
+      port: 15762
       # 数据库索引
       database: 0
+      # 用户名
+      username: default
       # 密码
-      password:
+      password: EXh0ecv54lj18uXIg9Jjmo52oW7Qwq9R
       # 连接超时时间
       timeout: 10s
       lettuce:
@@ -105,6 +107,10 @@ cupid:
   auth:
     # 开发环境验证码调试开关，开启后会将验证码输出到日志，生产环境必须关闭
     verification-code-log-enabled: true
+  # 翻译配置
+  translation:
+    # LibreTranslate API 地址
+    api-url: http://localhost:5000
 
 # MyBatis配置
 mybatis:

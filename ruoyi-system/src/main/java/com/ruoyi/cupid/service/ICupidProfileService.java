@@ -31,4 +31,29 @@ public interface ICupidProfileService
      * 查询家庭征婚资料详情
      */
     Map<String, Object> getFamilyProfileDetail(String profileId, String userId, String locale);
+
+    /**
+     * 查询当前用户管理的全部资料
+     */
+    Map<String, Object> getOwnerProfiles(String userId, String locale);
+
+    /**
+     * 查询当前用户管理的资料详情
+     */
+    Map<String, Object> getOwnerProfileDetail(String profileId, String userId, String locale);
+
+    /**
+     * 保存资料（新建或更新）
+     */
+    Map<String, Object> saveProfile(String userId, Map<String, Object> payload, String locale);
+
+    /**
+     * 归档资料
+     */
+    Map<String, Object> archiveProfile(String profileId, String userId);
+
+    /**
+     * 更新资料隐私偏好
+     */
+    Map<String, Object> updatePrivacyPreferences(String profileId, String userId, Map<String, Object> prefs);
 }
