@@ -286,6 +286,8 @@ Codex 按以下顺序检查：
 4. 实现 privacy preference upsert。
 5. 实现 archive 业务前置检查。
 6. 最后接入 upload；数据库只保存公开 asset URL 和必要元数据。
+7. 机器翻译由 `cupid.translation.enabled` 控制；启用时保存源语言后先写入目标语言 `pending`，事务提交后异步调用 LibreTranslate。
+8. `cupid.translation.fail-fast` 启用时，应用启动阶段检查翻译器可用性；运行中翻译失败只更新为 `failed` 并记录日志，不影响资料保存。
 
 ### 强制规则
 
@@ -306,6 +308,7 @@ Codex 按以下顺序检查：
 - 照片新增、排序、替换和删除后返回结构与数据库一致。
 - archive 后公共目录不可见，owner 侧结果符合契约。
 - 上传拒绝非法类型和超限文件。
+- 翻译器正常时 pending 能更新为 ready；翻译器运行中失败时 pending 更新为 failed，公共详情不读取 pending/failed。
 
 ## 8. 阶段四：Account 设置与安全
 

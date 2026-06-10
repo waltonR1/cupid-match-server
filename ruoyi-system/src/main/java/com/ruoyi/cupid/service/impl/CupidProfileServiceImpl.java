@@ -460,6 +460,7 @@ public class CupidProfileServiceImpl implements ICupidProfileService
         // 请求其他语言的机器翻译
         if (!translatedFields.isEmpty())
         {
+            translationService.prepareTranslations(profileId, locale, new ArrayList<>(translatedFields));
             requestTranslationsAfterCommit(profileId, locale, new ArrayList<>(translatedFields));
         }
 

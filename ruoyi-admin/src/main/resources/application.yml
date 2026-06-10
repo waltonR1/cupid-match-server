@@ -109,8 +109,16 @@ cupid:
     verification-code-log-enabled: true
   # 翻译配置
   translation:
+    # 是否启用机器翻译链路
+    enabled: true
+    # 启用后启动时检查翻译器可用性，不可用则终止启动
+    fail-fast: true
     # LibreTranslate API 地址
     api-url: http://localhost:5000
+    # 连接翻译器超时时间
+    connect-timeout: 3s
+    # 等待翻译响应超时时间
+    read-timeout: 10s
 
 # MyBatis配置
 mybatis:

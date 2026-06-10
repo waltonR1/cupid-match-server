@@ -277,6 +277,20 @@ public interface CupidProfileMapper
     int upsertLocalizedField(CupidProfileLocalizedField field);
 
     /**
+     * 新增或刷新待机器翻译的本地化字段占位
+     */
+    int upsertPendingLocalizedField(CupidProfileLocalizedField field);
+
+    /**
+     * 更新待机器翻译字段的处理状态
+     */
+    int updatePendingLocalizedFieldStatus(
+            @Param("profileId") String profileId,
+            @Param("fieldName") String fieldName,
+            @Param("locale") String locale,
+            @Param("status") String status);
+
+    /**
      * 新增或更新认证草稿（legalName / dateOfBirth）
      */
     int upsertVerificationDraft(CupidProfileVerification verification);

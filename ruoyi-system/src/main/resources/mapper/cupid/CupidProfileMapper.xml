@@ -807,6 +807,30 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             provider = values(provider), status = values(status), updated_at = now()
     </insert>
 
+    <insert id="upsertPendingLocalizedField">
+        insert into cm_profile_localized_fields (
+            id, profile_id, field_name, locale, value,
+            source, provider, status, created_at, updated_at
+        ) values (
+            #{id}, #{profileId}, #{fieldName}, #{locale}, '',
+            #{source}, #{provider}, 'pending', now(), now()
+        ) on duplicate key update
+            value = if(status in ('pending', 'failed'), values(value), value),
+            source = if(status in ('pending', 'failed'), values(source), source),
+            provider = if(status in ('pending', 'failed'), values(provider), provider),
+            status = if(status in ('pending', 'failed'), values(status), status),
+            updated_at = if(status in ('pending', 'failed'), now(), updated_at)
+    </insert>
+
+    <update id="updatePendingLocalizedFieldStatus">
+        update cm_profile_localized_fields
+        set status = #{status}, updated_at = now()
+        where profile_id = #{profileId}
+          and field_name = #{fieldName}
+          and locale = #{locale}
+          and status = 'pending'
+    </update>
+
     <delete id="deleteLocalizedFieldsByProfileAndField">
         delete from cm_profile_localized_fields
         where profile_id = #{profileId} and field_name = #{fieldName} and locale = #{locale}
