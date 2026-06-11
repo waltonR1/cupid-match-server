@@ -363,11 +363,29 @@ Codex 按以下顺序检查：
 
 ## 9. 阶段五：Membership / Entitlement
 
+### 当前基础
+
+- `cm_membership_plans` 已包含 EUR/CNY 价格、购买类型、计费周期、有效期、私人介绍额度、活动额度和各类能力开关。
+- 套餐名称和描述已经拆入 `cm_membership_plan_localized_fields`，仅使用 `status = 'ready'` 的本地化值并按请求 locale 回退。
+- 注册流程已通过 `tier = 'free'` 查询启用的免费套餐并创建初始会员，不依赖固定套餐 UUID。
+- 已有 active membership 查询同时检查 `status = 'active'` 和 `expires_at`。
+- `CupidUserMembership`、`CupidUserEntitlementBalance` 以及 Profile 私人介绍额度查询可以复用，但尚未形成独立的 Membership 领域 service。
+- 当前 Profile 仍以 `tier != 'free'` 判断会员查看角色；本阶段必须改为读取套餐的 `profile_detail_access_level`，不能继续按 tier 推导权限。
+
 ### 接口
 
 - `GET /api/membership/catalog`
 - `GET /api/account/membership`
 - `POST /api/account/membership/upgrade`
+
+### 响应约定
+
+- `GET /api/membership/catalog` 返回 `{ plans: MembershipPlanDTO[] }`，与当前前端 API 和公共会员页面调用保持一致。
+- `GET /api/account/membership` 返回 `{ membership, entitlements, availablePlans }`。
+- `membership` 必须包含当前套餐的本地化名称、状态、起止时间、`staffSupportLevel` 和 `conciergePriority`。
+- `entitlements` 只返回当前有效会员、当前有效周期的余额；每项包含 `code`、`quotaTotal`、`quotaUsed`、`quotaRemaining`、`periodStartedAt` 和 `periodEndsAt`。
+- `availablePlans` 与公共 catalog 复用同一套餐 DTO 组装方法，不允许形成第二套字段映射。
+- `POST /api/account/membership/upgrade` 本阶段只返回 `{ status: 'pending_external_flow', requestedTier }`，不创建订单、不修改会员、不初始化权益。
 
 ### 主要表
 
@@ -375,8 +393,19 @@ Codex 按以下顺序检查：
 - `cm_membership_plan_localized_fields`
 - `cm_user_memberships`
 - `cm_user_entitlement_balances`
-- `cm_orders`
-- `cm_payments`
+
+`cm_orders` 和 `cm_payments` 已在 schema 中预留，但不属于本阶段实现范围；正式支付或 staff 确认流程在阶段九处理。
+
+### 实施顺序
+
+1. 先建立 Membership 套餐 domain、mapper 和 service，集中完成启用套餐查询、本地化回退和 `MembershipPlanDTO` 组装。
+2. 实现公共 catalog，并确认无需登录即可按 `sort_order` 返回全部启用套餐。
+3. 扩展当前会员查询，使会员记录与对应套餐能力在一次领域查询或聚合中返回。
+4. 查询当前会员对应、当前周期有效的 entitlement balances，禁止返回历史会员或历史周期余额。
+5. 实现账户会员聚合接口，复用公共 catalog 的套餐组装结果生成 `availablePlans`。
+6. 实现无数据库写入的 upgrade 外部流程占位响应，并校验请求 tier 对应启用套餐。
+7. 将 Profile 详情权限从 `tier != 'free'` 调整为读取 `profile_detail_access_level`；私人介绍仍读取数据库中的当前 entitlement balance。
+8. 最后检查已有 Profile 代码是否存在可复用的会员或权益查询，只提取实际重复逻辑，不预先建立额外 support/query/projection 层。
 
 ### 强制规则
 
@@ -384,19 +413,23 @@ Codex 按以下顺序检查：
 - 欧元价格、人民币价格、购买类型、有效期和两类额度必须读取结构化套餐字段，禁止从本地化文案解析。
 - 公共 catalog 与账户接口中的可升级套餐必须复用同一 mapper/service 组装逻辑。
 - 当前会员由状态和有效期共同判定。
-- entitlement 使用数据库余额和周期，不从 tier 名称临时推导。
-- `upgrade` 初期只创建外部流程或订单入口；支付或 staff 确认前不得直接激活会员。
-- 会员变更和 entitlement 初始化必须在同一事务中。
+- entitlement 使用数据库余额和周期，不从 tier 名称或套餐额度临时推导。
+- entitlement 查询必须限定当前 `membership_id` 和当前有效周期，不能只按 `user_id + entitlement_code` 查询。
+- Profile 详情访问读取 `profile_detail_access_level`，活动优先、staff review、顾问支持和 concierge 权限分别读取对应套餐字段。
+- 本阶段 `upgrade` 不创建订单；支付或 staff 确认前不得直接激活会员或增加 entitlement。
+- 会员变更和 entitlement 初始化同事务属于阶段九正式确认流程的强制规则，本阶段只保留边界，不提前实现。
 
 ### 验收矩阵
 
-- plan 按 locale 和 sort order 返回。
-- `GET /api/membership/catalog` 无需登录，按 locale 和 sort order 返回启用套餐。
-- `GET /api/account/membership` 同时返回当前会员、entitlement 和契约所需的可升级套餐数据。
-- free、active paid、expired 三类用户得到正确会员视图。
-- 重复 upgrade 不产生冲突的活动订单。
-- 未确认支付不会改变 membership。
-- 已确认流程不会重复增加 entitlement。
+- `GET /api/membership/catalog` 无需登录，以 `{ plans }` 结构按 locale 和 sort order 返回启用套餐。
+- catalog 的价格、周期、额度和能力字段全部来自结构化列，名称和描述按 locale 正确回退。
+- `GET /api/account/membership` 同时返回当前会员、当前周期 entitlement 和可升级套餐。
+- 账户接口与公共 catalog 对同一套餐返回一致的 `MembershipPlanDTO`。
+- free、Silver、Gold、Diamond、无有效会员和已过期会员得到正确会员视图。
+- Silver 的 `profile_detail_access_level = 'registered'` 不会被错误当作 premium；Gold/Diamond 按套餐能力获得对应权限。
+- 当前会员存在多期或历史 entitlement 时，账户页只返回当前会员当前周期的余额。
+- `upgrade` 对不存在、停用或非法 tier 返回错误；有效 tier 返回 `pending_external_flow`。
+- 调用 `upgrade` 前后 `cm_user_memberships`、`cm_user_entitlement_balances`、`cm_orders` 和 `cm_payments` 均不发生变化。
 
 ## 10. 阶段六：Events
 
