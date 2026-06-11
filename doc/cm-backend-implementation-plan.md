@@ -133,8 +133,8 @@ Codex 按以下顺序检查：
 | 阶段一：Legal / Auth / Account Me | 已完成并验收 | 2026-06-08 已通过构建和真实运行冒烟 |
 | 阶段二：Profile 只读目录与详情 | 已完成并验收 | 2026-06-09 已通过构建与真实接口冒烟 |
 | 阶段三：Account Profile 管理与上传 | 已完成并验收 | 2026-06-10 已通过构建；owner 读写、上传、隐私、归档和异步翻译链路已接入 |
-| 阶段四：Account 设置与安全 | 下一阶段 | 复用阶段一认证能力与阶段三 owner account 边界 |
-| 阶段五：Membership / Entitlement | 未开始 | Profile masking 可先只读取现有会员数据 |
+| 阶段四：Account 设置与安全 | 已完成并验收 | 2026-06-11 已通过构建；settings、preferences、身份绑定/解绑、MFA、安全挑战、密码修改、导出和停用链路已接入 |
+| 阶段五：Membership / Entitlement | 下一阶段 | Profile masking 可先只读取现有会员数据 |
 | 阶段六：Events | 未开始 | 依赖会员判断 |
 | 阶段七：Favorite / Private Introduction / Inbox / Dashboard | 未开始 | 依赖 Profile、Membership、Events |
 | 阶段八：RuoYi 后台运营 | 未开始 | 前台核心链路稳定后执行 |
@@ -562,10 +562,10 @@ Codex 按以下顺序检查：
 
 ## 15. 下一执行入口
 
-下一任务是阶段四：Account 设置与安全。
+下一任务是阶段五：Membership / Entitlement。
 
-1. 先复查阶段一已有认证、Redis session、JWT、验证码和 account me 能力，优先复用现有 service 与 mapper。
-2. 实现 account settings 读取、account basics 更新、偏好设置更新、密码修改、身份绑定/解绑、MFA 状态、安全挑战、数据导出和账号停用。
-3. 敏感操作继续使用验证码或安全挑战 token，密码修改后复用现有 token/session 清理能力。
-4. 查询与响应继续遵守现有 RuoYi 分层，不新增成套 DTO、query、projection 或 support 目录。
-5. 交付阶段四接口、真实数据冒烟和构建结果，由 Codex 校验后再继续进入 Membership / Entitlement。
+1. 先复查阶段二 profile masking 已读取的会员上下文，避免为 membership 再造一套平行判断。
+2. 实现公共会员套餐 catalog 与账户会员接口，套餐查询和本地化组装必须复用同一 mapper/service。
+3. 实现 entitlement balance 聚合，并确保 profile detail access、private introduction 和 event quota 使用同一权益口径。
+4. `POST /api/account/membership/upgrade` 在支付阶段前只返回契约规定的外部流程占位，不伪造正式支付成功。
+5. 交付阶段五接口、真实数据冒烟和构建结果，由 Codex 校验后再继续进入 Events。

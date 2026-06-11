@@ -272,7 +272,7 @@ sql.push(insertInto('cm_user_preferences', ['id', 'user_id', 'preferred_city_cod
     user_id: row.userId,
     preferred_city_code: toCode(row.preferredCity, null),
     preferred_contact_channel: row.preferredContactChannel || null,
-    staff_contact_enabled: row.advisorContactEnabled ?? true,
+    staff_contact_enabled: row.staffContactEnabled ?? true,
     family_assist_enabled: row.familyAssistEnabled ?? true,
     introduction_updates_enabled: row.introductionUpdatesEnabled ?? true,
     event_reminders_enabled: row.eventRemindersEnabled ?? true,

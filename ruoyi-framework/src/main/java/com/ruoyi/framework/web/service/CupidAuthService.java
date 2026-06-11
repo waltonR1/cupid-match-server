@@ -1,6 +1,8 @@
 package com.ruoyi.framework.web.service;
 
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.regex.Pattern;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -11,6 +13,7 @@ import com.ruoyi.common.exception.cupid.CupidApiException;
 import com.ruoyi.cupid.domain.CupidAuthIdentity;
 import com.ruoyi.cupid.domain.CupidUser;
 import com.ruoyi.cupid.domain.CupidUserMembership;
+import com.ruoyi.cupid.mapper.CupidAuthMapper;
 import com.ruoyi.cupid.service.ICupidLegalService;
 import com.ruoyi.cupid.service.ICupidUserService;
 import com.ruoyi.common.utils.SecurityUtils;
@@ -25,6 +28,8 @@ public class CupidAuthService
 {
     private static final Pattern EMAIL_PATTERN = Pattern.compile("^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$");
     private static final Pattern PHONE_PATTERN = Pattern.compile("^\\+?[1-9]\\d{6,14}$");
+    private static final java.util.Set<String> SENSITIVE_ACTIONS = java.util.Set.of(
+            "change_password", "deactivate_account", "export_data", "unbind_identity");
 
     @Autowired
     private ICupidUserService userService;
@@ -37,6 +42,9 @@ public class CupidAuthService
 
     @Autowired
     private CupidVerificationCodeService verificationCodeService;
+
+    @Autowired
+    private CupidAuthMapper authMapper;
 
     @Transactional
     public Map<String, Object> login(String identifier, String password)
@@ -275,6 +283,254 @@ public class CupidAuthService
         {
             throw new CupidApiException(HttpStatus.BAD_REQUEST, "weak_password");
         }
+    }
+
+    /**
+     * 获取账户设置聚合（account + identities + password + mfa + preferences）
+     */
+    public Map<String, Object> getSettings(String userId)
+    {
+        CupidUser user = userService.selectUserById(userId);
+        List<CupidAuthIdentity> identities = userService.getIdentities(userId);
+        Map<String, Object> mfa = userService.getMfaStatus(userId);
+        Map<String, Object> prefs = userService.getPreferences(userId);
+
+        Map<String, Object> accountInfo = new LinkedHashMap<>();
+        accountInfo.put("id", user.getId());
+        accountInfo.put("accountName", user.getAccountName());
+        accountInfo.put("avatarUrl", user.getAvatarUrl());
+        accountInfo.put("preferredLocale", user.getPreferredLocale());
+        accountInfo.put("status", user.getStatus());
+        accountInfo.put("createdAt", user.getCreatedAt());
+        accountInfo.put("updatedAt", user.getUpdatedAt());
+
+        List<Map<String, Object>> identityList = new ArrayList<>();
+        for (CupidAuthIdentity id : identities)
+        {
+            Map<String, Object> item = new LinkedHashMap<>();
+            item.put("id", id.getId());
+            item.put("provider", id.getProvider());
+            item.put("identifier", id.getIdentifier());
+            item.put("verifiedAt", id.getVerifiedAt());
+            identityList.add(item);
+        }
+
+        Map<String, Object> passwordInfo = new LinkedHashMap<>();
+        CupidAuthIdentity loginIdentity = findPasswordIdentity(identities);
+        passwordInfo.put("isSet", loginIdentity != null && StringUtils.hasText(loginIdentity.getPasswordHash()));
+        passwordInfo.put("lastChangedAt", loginIdentity != null ? loginIdentity.getUpdatedAt() : null);
+        passwordInfo.put("canReset", loginIdentity != null && StringUtils.hasText(loginIdentity.getPasswordHash()));
+        passwordInfo.put("requiresMfa", mfa != null && isTruthy(mfa.get("enabled")));
+
+        Map<String, Object> response = new LinkedHashMap<>();
+        response.put("account", accountInfo);
+        response.put("identities", identityList);
+        response.put("password", passwordInfo);
+        response.put("mfa", mfa);
+        response.put("preferences", prefs);
+        return response;
+    }
+
+    /**
+     * 修改密码（需验证当前密码）
+     */
+    @Transactional
+    public void changePassword(String userId, String oldPassword, String newPassword, String challengeToken)
+    {
+        requireChallengeIfMfaEnabled(userId, "change_password", challengeToken);
+        List<CupidAuthIdentity> identities = userService.getIdentities(userId);
+        CupidAuthIdentity loginIdentity = findPasswordIdentity(identities);
+        if (loginIdentity == null || !SecurityUtils.matchesPassword(oldPassword, loginIdentity.getPasswordHash()))
+        {
+            throw new CupidApiException(HttpStatus.BAD_REQUEST, "incorrect_current_password");
+        }
+        validatePassword(newPassword);
+        userService.updatePassword(loginIdentity.getId(), SecurityUtils.encryptPassword(newPassword));
+        tokenService.deleteUserTokens(userId);
+    }
+
+    /**
+     * 请求安全挑战验证码
+     */
+    public Map<String, Object> requestSecurityChallenge(String userId, String action, String identityId)
+    {
+        validateSensitiveAction(action);
+        Map<String, Object> mfa = userService.getMfaStatus(userId);
+        if (!isTruthy(mfa.get("enabled")) || mfa.get("identityId") == null)
+        {
+            throw new CupidApiException(HttpStatus.BAD_REQUEST, "mfa_not_configured");
+        }
+        if (!StringUtils.hasText(identityId) && isTruthy(mfa.get("enabled"))
+                && mfa.get("identityId") != null)
+        {
+            identityId = mfa.get("identityId").toString();
+        }
+        List<CupidAuthIdentity> identities = userService.getIdentities(userId);
+        CupidAuthIdentity target = null;
+        for (CupidAuthIdentity id : identities)
+        {
+            if (id.getId().equals(identityId)) { target = id; break; }
+        }
+        if (target == null)
+        {
+            throw new CupidApiException(HttpStatus.BAD_REQUEST, "invalid_identity");
+        }
+        if (isTruthy(mfa.get("enabled")) && !identityId.equals(mfa.get("identityId")))
+        {
+            throw new CupidApiException(HttpStatus.BAD_REQUEST, "invalid_mfa_identity");
+        }
+        Map<String, Object> result = verificationCodeService.create(
+                "challenge_" + action, target.getProvider(), target.getIdentifier());
+        authMapper.insertSecurityChallenge(IdUtils.fastUUID(), userId, action, target.getProvider(),
+                target.getId(), new java.util.Date(System.currentTimeMillis() + 5 * 60 * 1000L));
+        return result;
+    }
+
+    /**
+     * 验证安全挑战并返回一次性 token
+     */
+    public Map<String, Object> verifySecurityChallenge(String userId, String action, String code)
+    {
+        validateSensitiveAction(action);
+        Map<String, Object> mfa = userService.getMfaStatus(userId);
+        if (!isTruthy(mfa.get("enabled")))
+        {
+            throw new CupidApiException(HttpStatus.BAD_REQUEST, "mfa_not_configured");
+        }
+        String mfaId = (String) mfa.get("identityId");
+        CupidAuthIdentity mfaIdentity = null;
+        for (CupidAuthIdentity id : userService.getIdentities(userId))
+        {
+            if (id.getId().equals(mfaId)) { mfaIdentity = id; break; }
+        }
+        if (mfaIdentity == null)
+        {
+            throw new CupidApiException(HttpStatus.BAD_REQUEST, "identity_gone");
+        }
+        Map<String, Object> pending =
+                authMapper.selectPendingSecurityChallenge(userId, action, mfaIdentity.getId());
+        if (pending == null)
+        {
+            throw new CupidApiException(HttpStatus.BAD_REQUEST, "invalid_or_expired_verification_code");
+        }
+        if (!verificationCodeService.verifyAndConsume("challenge_" + action,
+                mfaIdentity.getProvider(), mfaIdentity.getIdentifier(), code))
+        {
+            throw new CupidApiException(HttpStatus.BAD_REQUEST, "invalid_or_expired_verification_code");
+        }
+        String token = IdUtils.fastUUID();
+        java.util.Date expiresAt = new java.util.Date(System.currentTimeMillis() + 5 * 60 * 1000L);
+        if (authMapper.verifySecurityChallenge(pending.get("id").toString(), token, expiresAt) != 1)
+        {
+            throw new CupidApiException(HttpStatus.BAD_REQUEST, "invalid_or_expired_verification_code");
+        }
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("challengeToken", token);
+        result.put("expiresAt", expiresAt);
+        return result;
+    }
+
+    /**
+     * 消费安全挑战 token
+     */
+    public void consumeChallengeToken(String userId, String action, String challengeToken)
+    {
+        validateSensitiveAction(action);
+        if (authMapper.consumeSecurityChallenge(userId, action, challengeToken) != 1)
+        {
+            authMapper.expireSecurityChallenge(userId, action, challengeToken);
+            throw new CupidApiException(HttpStatus.FORBIDDEN, "invalid_challenge");
+        }
+    }
+
+    public void requireChallengeIfMfaEnabled(String userId, String action, String challengeToken)
+    {
+        validateSensitiveAction(action);
+        Map<String, Object> mfa = userService.getMfaStatus(userId);
+        if (isTruthy(mfa.get("enabled")))
+        {
+            consumeChallengeToken(userId, action, challengeToken);
+        }
+    }
+
+    /**
+     * 停用当前账号
+     */
+    @Transactional
+    public Map<String, Object> deactivateAccount(String userId, String challengeToken)
+    {
+        requireChallengeIfMfaEnabled(userId, "deactivate_account", challengeToken);
+        userService.deactivateUser(userId);
+        tokenService.deleteUserTokens(userId);
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("status", "deactivated");
+        result.put("deactivatedAt", new java.util.Date());
+        return result;
+    }
+
+    /**
+     * 导出账户数据
+     */
+    public Map<String, Object> exportAccountData(String userId)
+    {
+        Map<String, Object> data = new LinkedHashMap<>();
+        data.put("user", toUserDto(userService.selectUserById(userId)));
+        List<Map<String, Object>> identities = new ArrayList<>();
+        for (CupidAuthIdentity identity : userService.getIdentities(userId))
+        {
+            identities.add(toIdentityDto(identity));
+        }
+        data.put("identities", identities);
+        data.put("preferences", userService.getPreferences(userId));
+        data.put("mfa", userService.getMfaStatus(userId));
+        return data;
+    }
+
+    public Map<String, Object> createAccountExport(String userId, String challengeToken)
+    {
+        requireChallengeIfMfaEnabled(userId, "export_data", challengeToken);
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("status", "generated");
+        result.put("downloadUrl", "/account/export/download");
+        return result;
+    }
+
+    private Map<String, Object> toIdentityDto(CupidAuthIdentity identity)
+    {
+        Map<String, Object> dto = new LinkedHashMap<>();
+        dto.put("id", identity.getId());
+        dto.put("provider", identity.getProvider());
+        dto.put("identifier", identity.getIdentifier());
+        dto.put("verifiedAt", identity.getVerifiedAt());
+        return dto;
+    }
+
+    private void validateSensitiveAction(String action)
+    {
+        if (!SENSITIVE_ACTIONS.contains(action))
+        {
+            throw new CupidApiException(HttpStatus.BAD_REQUEST, "invalid_action");
+        }
+    }
+
+    private CupidAuthIdentity findPasswordIdentity(List<CupidAuthIdentity> identities)
+    {
+        for (CupidAuthIdentity identity : identities)
+        {
+            if (StringUtils.hasText(identity.getPasswordHash()))
+            {
+                return identity;
+            }
+        }
+        return null;
+    }
+
+    private static boolean isTruthy(Object value)
+    {
+        if (value instanceof Boolean) return (Boolean) value;
+        if (value instanceof Number) return ((Number) value).intValue() != 0;
+        if (value instanceof String) return "true".equalsIgnoreCase((String) value) || "1".equals(value);
+        return false;
     }
 
     /**
