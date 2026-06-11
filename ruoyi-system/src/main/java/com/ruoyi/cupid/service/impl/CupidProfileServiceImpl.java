@@ -21,6 +21,7 @@ import com.ruoyi.common.exception.cupid.CupidApiException;
 import com.ruoyi.common.utils.StringUtils;
 import com.ruoyi.common.utils.uuid.IdUtils;
 import com.ruoyi.cupid.domain.CupidFavoriteProfile;
+import com.ruoyi.cupid.domain.CupidMembershipPlan;
 import com.ruoyi.cupid.domain.CupidProfileContact;
 import com.ruoyi.cupid.domain.CupidPrivateIntroductionRequest;
 import com.ruoyi.cupid.domain.CupidProfile;
@@ -34,6 +35,7 @@ import com.ruoyi.cupid.domain.CupidProfileRelationshipValue;
 import com.ruoyi.cupid.domain.CupidProfileVerification;
 import com.ruoyi.cupid.domain.CupidUserEntitlementBalance;
 import com.ruoyi.cupid.domain.CupidUserMembership;
+import com.ruoyi.cupid.mapper.CupidMembershipMapper;
 import com.ruoyi.cupid.mapper.CupidProfileMapper;
 import com.ruoyi.cupid.service.ICupidProfileService;
 import com.ruoyi.cupid.service.ICupidTranslationService;
@@ -91,6 +93,9 @@ public class CupidProfileServiceImpl implements ICupidProfileService
 
     @Autowired
     private ICupidTranslationService translationService;
+
+    @Autowired
+    private CupidMembershipMapper membershipMapper;
 
     @Override
     public Map<String, Object> getSelfProfileDirectory(Map<String, String> params, String userId)
@@ -829,7 +834,12 @@ public class CupidProfileServiceImpl implements ICupidProfileService
             return VIEWER_OWNER;
         }
         CupidUserMembership membership = userService.selectActiveMembershipByUserId(userId);
-        return membership != null && !"free".equals(membership.getTier())
+        if (membership == null)
+        {
+            return VIEWER_FREE_USER;
+        }
+        CupidMembershipPlan plan = membershipMapper.selectPlanById(membership.getPlanId());
+        return plan != null && "premium".equals(plan.getProfileDetailAccessLevel())
                 ? VIEWER_MEMBER : VIEWER_FREE_USER;
     }
 
@@ -927,8 +937,9 @@ public class CupidProfileServiceImpl implements ICupidProfileService
 
         CupidUserMembership membership = userService.selectActiveMembershipByUserId(userId);
         String tier = membership == null ? "free" : membership.getTier();
-        CupidUserEntitlementBalance balance = profileMapper.selectCurrentEntitlementBalance(
-                userId, "private_introduction");
+        CupidUserEntitlementBalance balance = membership == null ? null
+                : profileMapper.selectCurrentEntitlementBalance(
+                        userId, membership.getId(), "private_introduction");
         int quotaTotal = balance == null ? 0 : Math.max(0, balance.getQuotaTotal());
         int quotaRemaining = balance == null ? 0 : Math.max(0, balance.getQuotaRemaining());
         boolean owner = VIEWER_OWNER.equals(viewerRole);

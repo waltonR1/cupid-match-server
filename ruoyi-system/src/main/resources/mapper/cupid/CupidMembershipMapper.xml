@@ -1,0 +1,89 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.cupid.mapper.CupidMembershipMapper">
+
+    <resultMap id="PlanResult" type="CupidMembershipPlan">
+        <id property="id" column="id"/>
+        <result property="tier" column="tier"/>
+        <result property="priceCents" column="price_cents"/>
+        <result property="currency" column="currency"/>
+        <result property="cnyPriceCents" column="cny_price_cents"/>
+        <result property="billingType" column="billing_type"/>
+        <result property="billingPeriod" column="billing_period"/>
+        <result property="validityMonths" column="validity_months"/>
+        <result property="privateIntroductionQuota" column="private_introduction_quota"/>
+        <result property="privateIntroductionPeriod" column="private_introduction_period"/>
+        <result property="eventQuota" column="event_quota"/>
+        <result property="eventPriorityEnabled" column="event_priority_enabled"/>
+        <result property="staffReviewEnabled" column="staff_review_enabled"/>
+        <result property="profileDetailAccessLevel" column="profile_detail_access_level"/>
+        <result property="staffSupportLevel" column="staff_support_level"/>
+        <result property="conciergePriority" column="concierge_priority"/>
+        <result property="featured" column="featured"/>
+        <result property="sortOrder" column="sort_order"/>
+        <result property="isActive" column="is_active"/>
+        <result property="createdAt" column="created_at"/>
+        <result property="updatedAt" column="updated_at"/>
+    </resultMap>
+
+    <select id="selectActivePlans" resultMap="PlanResult">
+        select id, tier, price_cents, currency, cny_price_cents,
+               billing_type, billing_period, validity_months,
+               private_introduction_quota, private_introduction_period, event_quota,
+               event_priority_enabled, staff_review_enabled,
+               profile_detail_access_level, staff_support_level,
+               concierge_priority, featured, sort_order,
+               is_active, created_at, updated_at
+        from cm_membership_plans
+        where is_active = 1
+        order by sort_order
+    </select>
+
+    <select id="selectPlanById" resultMap="PlanResult">
+        select id, tier, price_cents, currency, cny_price_cents,
+               billing_type, billing_period, validity_months,
+               private_introduction_quota, private_introduction_period, event_quota,
+               event_priority_enabled, staff_review_enabled,
+               profile_detail_access_level, staff_support_level,
+               concierge_priority, featured, sort_order,
+               is_active, created_at, updated_at
+        from cm_membership_plans
+        where id = #{planId}
+        limit 1
+    </select>
+
+    <select id="selectLatestMembershipByUserId" resultType="CupidUserMembership">
+        select id, user_id as userId, plan_id as planId, tier, status,
+               started_at as startedAt, expires_at as expiresAt,
+               created_at as createdAt, updated_at as updatedAt
+        from cm_user_memberships
+        where user_id = #{userId}
+        order by started_at desc
+        limit 1
+    </select>
+
+    <select id="selectCurrentEntitlementBalances" resultType="CupidUserEntitlementBalance">
+        select id, user_id as userId, membership_id as membershipId,
+               entitlement_code as entitlementCode,
+               period_started_at as periodStartedAt, period_ends_at as periodEndsAt,
+               quota_total as quotaTotal, quota_used as quotaUsed,
+               quota_remaining as quotaRemaining,
+               created_at as createdAt, updated_at as updatedAt
+        from cm_user_entitlement_balances
+        where user_id = #{userId}
+          and membership_id = #{membershipId}
+          and period_started_at &lt;= now()
+          and period_ends_at &gt; now()
+        order by entitlement_code
+    </select>
+
+    <select id="selectPlanLocalizedNames" resultType="map">
+        select lf.plan_id as planId, lf.field_name as fieldName, lf.value
+        from cm_membership_plan_localized_fields lf
+        where lf.status = 'ready' and trim(lf.value) != ''
+          and lf.field_name in ('name', 'description')
+        order by lf.plan_id, lf.field_name,
+                 case lf.locale when #{locale} then 0 when 'zh' then 1 when 'en' then 2 else 3 end
+    </select>
+
+</mapper>

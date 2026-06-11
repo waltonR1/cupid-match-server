@@ -134,7 +134,7 @@ Codex 按以下顺序检查：
 | 阶段二：Profile 只读目录与详情 | 已完成并验收 | 2026-06-09 已通过构建与真实接口冒烟 |
 | 阶段三：Account Profile 管理与上传 | 已完成并验收 | 2026-06-10 已通过构建；owner 读写、上传、隐私、归档和异步翻译链路已接入 |
 | 阶段四：Account 设置与安全 | 已完成并验收 | 2026-06-11 已通过构建；settings、preferences、身份绑定/解绑、MFA、安全挑战、密码修改、导出和停用链路已接入 |
-| 阶段五：Membership / Entitlement | 下一阶段 | Profile masking 可先只读取现有会员数据 |
+| 阶段五：Membership / Entitlement | 代码完成，待真实接口冒烟 | 2026-06-11 已通过编译和契约校验；公共套餐、账户会员、当前周期权益、升级占位及 Profile 权限已接入 |
 | 阶段六：Events | 未开始 | 依赖会员判断 |
 | 阶段七：Favorite / Private Introduction / Inbox / Dashboard | 未开始 | 依赖 Profile、Membership、Events |
 | 阶段八：RuoYi 后台运营 | 未开始 | 前台核心链路稳定后执行 |
@@ -363,14 +363,18 @@ Codex 按以下顺序检查：
 
 ## 9. 阶段五：Membership / Entitlement
 
+### 状态
+
+代码已完成并通过编译和契约校验，尚需使用真实 MySQL、Redis 和 seed 数据完成接口冒烟后才能标记为“已完成并验收”。
+
 ### 当前基础
 
 - `cm_membership_plans` 已包含 EUR/CNY 价格、购买类型、计费周期、有效期、私人介绍额度、活动额度和各类能力开关。
 - 套餐名称和描述已经拆入 `cm_membership_plan_localized_fields`，仅使用 `status = 'ready'` 的本地化值并按请求 locale 回退。
 - 注册流程已通过 `tier = 'free'` 查询启用的免费套餐并创建初始会员，不依赖固定套餐 UUID。
 - 已有 active membership 查询同时检查 `status = 'active'` 和 `expires_at`。
-- `CupidUserMembership`、`CupidUserEntitlementBalance` 以及 Profile 私人介绍额度查询可以复用，但尚未形成独立的 Membership 领域 service。
-- 当前 Profile 仍以 `tier != 'free'` 判断会员查看角色；本阶段必须改为读取套餐的 `profile_detail_access_level`，不能继续按 tier 推导权限。
+- Membership 领域 service 已复用 `CupidUserMembership`、`CupidUserEntitlementBalance` 和 Profile 私人介绍额度查询口径。
+- Profile 已改为读取套餐的 `profile_detail_access_level` 判断查看角色，不再按 tier 名称推导权限。
 
 ### 接口
 
@@ -595,10 +599,10 @@ Codex 按以下顺序检查：
 
 ## 15. 下一执行入口
 
-下一任务是阶段五：Membership / Entitlement。
+下一任务是完成阶段五真实接口冒烟；通过后将阶段五标记为“已完成并验收”，再进入阶段六 Events。
 
-1. 先复查阶段二 profile masking 已读取的会员上下文，避免为 membership 再造一套平行判断。
-2. 实现公共会员套餐 catalog 与账户会员接口，套餐查询和本地化组装必须复用同一 mapper/service。
-3. 实现 entitlement balance 聚合，并确保 profile detail access、private introduction 和 event quota 使用同一权益口径。
-4. `POST /api/account/membership/upgrade` 在支付阶段前只返回契约规定的外部流程占位，不伪造正式支付成功。
-5. 交付阶段五接口、真实数据冒烟和构建结果，由 Codex 校验后再继续进入 Events。
+1. 以游客身份调用 `GET /api/membership/catalog`，验证启用套餐、排序和多语言回退。
+2. 分别以免费、有效付费和已过期会员调用 `GET /api/account/membership`，验证会员状态和当前周期权益。
+3. 调用 `POST /api/account/membership/upgrade`，验证只返回外部流程占位且不写入会员、订单或权益数据。
+4. 验证 Profile 详情权限读取 `profile_detail_access_level`，私人介绍额度只读取当前会员和当前周期余额。
+5. 冒烟通过后执行完整 Maven package，再开始阶段六 Events。

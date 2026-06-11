@@ -603,6 +603,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
                created_at as createdAt, updated_at as updatedAt
         from cm_user_entitlement_balances
         where user_id = #{userId}
+          and membership_id = #{membershipId}
           and entitlement_code = #{entitlementCode}
           and period_started_at &lt;= now()
           and period_ends_at &gt; now()

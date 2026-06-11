@@ -189,7 +189,9 @@ public interface CupidProfileMapper
      * 查询用户当前权益余额
      */
     CupidUserEntitlementBalance selectCurrentEntitlementBalance(
-            @Param("userId") String userId, @Param("entitlementCode") String entitlementCode);
+            @Param("userId") String userId,
+            @Param("membershipId") String membershipId,
+            @Param("entitlementCode") String entitlementCode);
 
     /**
      * 查询用户对指定资料最近一次私人介绍请求
