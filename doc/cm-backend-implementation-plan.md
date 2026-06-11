@@ -134,7 +134,7 @@ Codex 按以下顺序检查：
 | 阶段二：Profile 只读目录与详情 | 已完成并验收 | 2026-06-09 已通过构建与真实接口冒烟 |
 | 阶段三：Account Profile 管理与上传 | 已完成并验收 | 2026-06-10 已通过构建；owner 读写、上传、隐私、归档和异步翻译链路已接入 |
 | 阶段四：Account 设置与安全 | 已完成并验收 | 2026-06-11 已通过构建；settings、preferences、身份绑定/解绑、MFA、安全挑战、密码修改、导出和停用链路已接入 |
-| 阶段五：Membership / Entitlement | 代码完成，待真实接口冒烟 | 2026-06-11 已通过编译和契约校验；公共套餐、账户会员、当前周期权益、升级占位及 Profile 权限已接入 |
+| 阶段五：Membership / Entitlement | 已完成并验收 | 2026-06-11 已通过完整构建和真实接口冒烟；套餐、会员、当前周期权益、升级占位及 Profile 权限已验证 |
 | 阶段六：Events | 未开始 | 依赖会员判断 |
 | 阶段七：Favorite / Private Introduction / Inbox / Dashboard | 未开始 | 依赖 Profile、Membership、Events |
 | 阶段八：RuoYi 后台运营 | 未开始 | 前台核心链路稳定后执行 |
@@ -365,7 +365,7 @@ Codex 按以下顺序检查：
 
 ### 状态
 
-代码已完成并通过编译和契约校验，尚需使用真实 MySQL、Redis 和 seed 数据完成接口冒烟后才能标记为“已完成并验收”。
+已完成并验收。2026-06-11 使用真实 MySQL、Redis 和 seed 数据验证了公共套餐、账户会员、权益周期、套餐权限、过期会员、升级占位和无数据库写入行为，并通过完整 Maven package。
 
 ### 当前基础
 
@@ -599,10 +599,10 @@ Codex 按以下顺序检查：
 
 ## 15. 下一执行入口
 
-下一任务是完成阶段五真实接口冒烟；通过后将阶段五标记为“已完成并验收”，再进入阶段六 Events。
+下一任务是阶段六：Events。
 
-1. 以游客身份调用 `GET /api/membership/catalog`，验证启用套餐、排序和多语言回退。
-2. 分别以免费、有效付费和已过期会员调用 `GET /api/account/membership`，验证会员状态和当前周期权益。
-3. 调用 `POST /api/account/membership/upgrade`，验证只返回外部流程占位且不写入会员、订单或权益数据。
-4. 验证 Profile 详情权限读取 `profile_detail_access_level`，私人介绍额度只读取当前会员和当前周期余额。
-5. 冒烟通过后执行完整 Maven package，再开始阶段六 Events。
+1. 先复用阶段五已经确定的有效会员和 `event_registration` entitlement 口径，不建立平行会员判断。
+2. 实现活动目录和详情，验证多语言、筛选、排序、名额统计与地址可见性。
+3. 实现报名和取消事务，只有 `consumes_membership_quota = 1` 的活动才扣减或返还当前周期活动权益。
+4. 实现账户活动聚合，并验证用户只能操作自己的报名记录。
+5. 交付阶段六真实接口冒烟和完整构建结果后，再进入阶段七聚合功能。
