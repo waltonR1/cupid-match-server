@@ -135,7 +135,7 @@ Codex 按以下顺序检查：
 | 阶段三：Account Profile 管理与上传 | 已完成并验收 | 2026-06-10 已通过构建；owner 读写、上传、隐私、归档和异步翻译链路已接入 |
 | 阶段四：Account 设置与安全 | 已完成并验收 | 2026-06-11 已通过构建；settings、preferences、身份绑定/解绑、MFA、安全挑战、密码修改、导出和停用链路已接入 |
 | 阶段五：Membership / Entitlement | 已完成并验收 | 2026-06-11 已通过完整构建和真实接口冒烟；套餐、会员、当前周期权益、升级占位及 Profile 权限已验证 |
-| 阶段六：Events | 未开始 | 依赖会员判断 |
+| 阶段六：Events | 已完成并验收 | 2026-06-12 已通过完整构建和真实接口冒烟；目录、详情、报名、取消、地址权限、额度返还和账户活动聚合已验证 |
 | 阶段七：Favorite / Private Introduction / Inbox / Dashboard | 未开始 | 依赖 Profile、Membership、Events |
 | 阶段八：RuoYi 后台运营 | 未开始 | 前台核心链路稳定后执行 |
 | 阶段九：支付、审计与生产化 | 未开始 | 最后执行 |
@@ -463,11 +463,13 @@ Codex 按以下顺序检查：
 - 精确地址按 `address_visibility`、活动状态和当前用户报名状态返回。
 - member-only event 必须由有效会员状态判断。
 - 只有 `consumes_membership_quota = 1` 的活动才使用 `event_registration` 余额。
-- 提交申请不扣活动额度；后台确认时原子扣减 1 次，余额不足则确认失败。
+- 提交申请只写 `requested`，不扣活动额度。
+- 后台确认、候补和拒绝属于阶段八报名审核；确认时必须在同一事务内校验容量并原子扣减 1 次活动额度，余额不足则确认失败。
 - 已扣额度的报名在 attended 前取消时原子返还 1 次。
 - `event_quota_consumed_at` 和 `event_quota_released_at` 必须保证重复确认、重复取消不重复变更余额。
 - 报名和取消使用唯一约束避免重复记录。
-- 容量判断与写 registration 必须在事务中完成，并防止并发超卖。
+- 前台重复报名必须返回已有有效报名；未确认取消可重新提交，已确认后取消不可由用户自行重报。
+- 阶段八确认报名时必须锁定活动和报名记录，防止并发确认造成超卖。
 - 活动过期状态优先由日期和正式状态规则判定，不由前端决定。
 
 ### 验收矩阵
@@ -475,9 +477,10 @@ Codex 按以下顺序检查：
 - 目录过滤、分页、本地化和状态展示正确。
 - guest、free、member 对 member-only event 的结果正确。
 - 重复报名不会重复计数。
-- 满员后按契约进入 waitlist 或拒绝。
+- 前台申请统一进入 `requested`；满员后的 waitlist / declined 分配由阶段八报名审核完成。
 - 取消后计数和用户 account events 同步。
-- 受控活动确认后活动余额减 1，取消后返还；重复操作保持幂等。
+- 已消耗活动额度的报名取消后返还；重复取消保持幂等。
+- 阶段八实现确认动作时，必须补充确认扣减、余额不足和并发容量验收。
 - 不消耗会员额度的活动不受活动余额限制。
 - 未满足地址开放条件时不泄露精确地址。
 
@@ -599,10 +602,10 @@ Codex 按以下顺序检查：
 
 ## 15. 下一执行入口
 
-下一任务是阶段六：Events。
+下一任务是阶段七：Favorite / Private Introduction / Inbox / Dashboard。
 
-1. 先复用阶段五已经确定的有效会员和 `event_registration` entitlement 口径，不建立平行会员判断。
-2. 实现活动目录和详情，验证多语言、筛选、排序、名额统计与地址可见性。
-3. 实现报名和取消事务，只有 `consumes_membership_quota = 1` 的活动才扣减或返还当前周期活动权益。
-4. 实现账户活动聚合，并验证用户只能操作自己的报名记录。
-5. 交付阶段六真实接口冒烟和完整构建结果后，再进入阶段七聚合功能。
+1. 先实现 Favorite，复用 Profile 可见性和 owner 判断，不在收藏模块复制资料权限规则。
+2. 实现 Private Introduction，复用阶段五当前会员与 `private_introduction` entitlement，并保证创建申请与扣减额度原子执行。
+3. 实现 Inbox 的 thread ownership、消息游标分页和 read 状态，不提前开放普通用户发消息能力。
+4. 最后实现 Dashboard，只聚合已有 Profile、Membership、Events、Introduction 和 Favorite service 的只读结果。
+5. 阶段七出现真实复用点时再提取共享方法；不因现有 service 文件长度预先拆分。
