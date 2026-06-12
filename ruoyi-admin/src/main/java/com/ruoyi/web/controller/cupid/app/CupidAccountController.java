@@ -83,7 +83,7 @@ public class CupidAccountController
     {
         Map<String, Object> prefs = (Map) body.get("preferences");
         if (prefs != null) userService.updatePreferences(principal.getUserId(), prefs);
-        return AjaxResult.success(userService.getPreferences(principal.getUserId()));
+        return AjaxResult.success(authService.getSettings(principal.getUserId()));
     }
 
     /**
@@ -93,9 +93,8 @@ public class CupidAccountController
     public AjaxResult changePassword(@RequestBody Map<String, String> body,
             @AuthenticationPrincipal CupidLoginUser principal)
     {
-        authService.changePassword(principal.getUserId(),
-                body.get("oldPassword"), body.get("newPassword"), body.get("challengeToken"));
-        return AjaxResult.success();
+        return AjaxResult.success(authService.changePassword(principal.getUserId(),
+                body.get("currentPassword"), body.get("newPassword"), body.get("challengeToken")));
     }
 
     /**

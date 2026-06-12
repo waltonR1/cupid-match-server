@@ -1,5 +1,6 @@
 package com.ruoyi.framework.web.service;
 
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -335,18 +336,23 @@ public class CupidAuthService
      * 修改密码（需验证当前密码）
      */
     @Transactional
-    public void changePassword(String userId, String oldPassword, String newPassword, String challengeToken)
+    public Map<String, Object> changePassword(String userId, String currentPassword, String newPassword,
+            String challengeToken)
     {
         requireChallengeIfMfaEnabled(userId, "change_password", challengeToken);
         List<CupidAuthIdentity> identities = userService.getIdentities(userId);
         CupidAuthIdentity loginIdentity = findPasswordIdentity(identities);
-        if (loginIdentity == null || !SecurityUtils.matchesPassword(oldPassword, loginIdentity.getPasswordHash()))
+        if (loginIdentity == null
+                || !SecurityUtils.matchesPassword(currentPassword, loginIdentity.getPasswordHash()))
         {
             throw new CupidApiException(HttpStatus.BAD_REQUEST, "incorrect_current_password");
         }
         validatePassword(newPassword);
         userService.updatePassword(loginIdentity.getId(), SecurityUtils.encryptPassword(newPassword));
         tokenService.deleteUserTokens(userId);
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("passwordUpdatedAt", Instant.now().toString());
+        return result;
     }
 
     /**
@@ -381,6 +387,7 @@ public class CupidAuthService
         }
         Map<String, Object> result = verificationCodeService.create(
                 "challenge_" + action, target.getProvider(), target.getIdentifier());
+        result.put("maskedIdentifier", resolveMaskedIdentifier(mfa, target.getId()));
         authMapper.insertSecurityChallenge(IdUtils.fastUUID(), userId, action, target.getProvider(),
                 target.getId(), new java.util.Date(System.currentTimeMillis() + 5 * 60 * 1000L));
         return result;
@@ -523,6 +530,24 @@ public class CupidAuthService
             }
         }
         return null;
+    }
+
+    private String resolveMaskedIdentifier(Map<String, Object> mfa, String identityId)
+    {
+        Object methods = mfa.get("availableMethods");
+        if (methods instanceof List<?>)
+        {
+            for (Object item : (List<?>) methods)
+            {
+                if (item instanceof Map<?, ?> method
+                        && identityId.equals(method.get("identityId")))
+                {
+                    Object maskedIdentifier = method.get("maskedIdentifier");
+                    return maskedIdentifier == null ? "" : String.valueOf(maskedIdentifier);
+                }
+            }
+        }
+        return "";
     }
 
     private static boolean isTruthy(Object value)

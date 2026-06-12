@@ -297,6 +297,7 @@ Codex 按以下顺序检查：
 - contacts 只能通过 owner API 写入，不能出现在公共详情响应。
 - photos payload 采用对账式更新时，必须防止删除或修改其他 profile 的照片。
 - archive 前检查契约规定的未完成正式流程。
+- `/api/upload` 使用 `multipart/form-data`，图片字段名固定为 `file`，并复用 RuoYi `FileUploadUtils` 完成图片类型与大小校验。
 - 上传必须限制文件类型、大小和生成文件名；不得信任原始文件名作为存储路径。
 
 ### 验收矩阵
