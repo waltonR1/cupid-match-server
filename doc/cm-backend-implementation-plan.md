@@ -536,36 +536,18 @@ Codex 按以下顺序检查：
 
 ## 12. 阶段八：RuoYi 后台运营
 
-### 目标
+阶段八涉及独立的 `cupid-match-admin`、RuoYi 后台接口、权限菜单、staff 身份和审计，详细实施与验收要求迁移至：
 
-将必要 debug 能力转成受权限和审计约束的正式后台能力。
+- `doc/cm-admin-implementation-plan.md`
 
-优先模块：
+本阶段保持以下总边界：
 
-- Profile、Photo、Verification 审核
-- Private Introduction 处理
-- Event 管理与报名审核
-- Inbox 通知工具
-- User 状态管理
-- Staff tasks
-
-### 强制规则
-
-- 后台接口放入 `controller/cupid/admin`。
-- 使用 RuoYi 登录态、角色、菜单和权限注解。
-- 通过 `cm_staff_members` 获取业务 staff 身份。
-- 重要状态修改写 `cm_audit_logs` 或明确复用 RuoYi 操作日志。
-- 不开放 `/api/debug/*`。
-- 不先生成所有表的通用 CRUD。
-
-### Debug 映射
-
-- verification code 查看：仅本地开发工具，不进入生产。
-- profile/photo verification：后台审核。
-- private introduction accept/decline：后台处理。
-- event registration review：后台审核。
-- event status：后台活动管理。
-- inbox notify：后台通知工具。
+- 正式运营能力在 `cupid-match-admin` 和 `controller/cupid/admin` 中实现。
+- 后台沿用 RuoYi 登录态、角色、菜单、权限和操作日志。
+- 通过 `cm_staff_members` 获取 Cupid 业务 staff 身份。
+- Java 产品后端不开放 `/api/debug/*`。
+- `cupid-match-app` Debug 页面继续保留用于 Mock 和开发回归，生产环境通过 `VITE_ENABLE_DEBUG=false` 禁止访问。
+- RuoYi 生成器只生成机械骨架，不负责审核状态机、跨表事务、并发锁、权益扣减或审计。
 
 ## 13. 阶段九：支付、审计与生产化
 
@@ -603,10 +585,6 @@ Codex 按以下顺序检查：
 
 ## 15. 下一执行入口
 
-下一任务是阶段八：RuoYi 后台运营。
+下一任务是阶段八的 Phase 8.1：后台基础接入。
 
-1. 先建立后台菜单和权限标识，沿用 RuoYi `sys_menu`、角色与数据权限机制。
-2. 实现 Profile、Photo、Verification 审核，不复制前台 Profile 聚合逻辑。
-3. 实现 Private Introduction 和 Event Registration 的后台确认动作。
-4. 实现 Event 管理、Inbox 通知工具和用户状态管理。
-5. 最后补 Staff task 与后台审计入口，并按阶段八验收矩阵执行验证。
+具体执行顺序、生成器规则、三工程边界和验收矩阵以 `doc/cm-admin-implementation-plan.md` 为准。
