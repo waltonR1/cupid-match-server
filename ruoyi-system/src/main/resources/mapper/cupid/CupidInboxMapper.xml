@@ -1,0 +1,107 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.cupid.mapper.CupidInboxMapper">
+
+    <select id="selectThreadsByUserId" resultType="map">
+        select t.id, t.category, t.subject_type as subjectType,
+               t.subject_id as subjectId, t.status,
+               (
+                   select m.body from cm_inbox_messages m
+                   where m.thread_id = t.id
+                   order by m.created_at desc, m.id desc limit 1
+               ) as lastMessage,
+               (
+                   select m.created_at from cm_inbox_messages m
+                   where m.thread_id = t.id
+                   order by m.created_at desc, m.id desc limit 1
+               ) as lastMessageAt,
+               case when (
+                   select max(m.created_at) from cm_inbox_messages m
+                   where m.thread_id = t.id
+               ) &gt; coalesce((
+                   select r.last_read_at from cm_inbox_reads r
+                   where r.thread_id = t.id and r.user_id = t.user_id
+                   limit 1
+               ), '1970-01-01 00:00:00') then true else false end as unread,
+               t.created_at as createdAt, t.updated_at as updatedAt
+        from cm_inbox_threads t
+        where t.user_id = #{userId}
+        order by coalesce((
+            select max(m.created_at) from cm_inbox_messages m where m.thread_id = t.id
+        ), t.updated_at) desc, t.id desc
+    </select>
+
+    <select id="selectThreadByIdAndUserId" resultType="map">
+        select id, user_id as userId, category,
+               subject_type as subjectType, subject_id as subjectId,
+               status, created_at as createdAt, updated_at as updatedAt
+        from cm_inbox_threads
+        where id = #{threadId} and user_id = #{userId}
+        limit 1
+    </select>
+
+    <select id="selectMessages" resultType="map">
+        select m.id, m.sender_type as senderType,
+               m.message_type as messageType, m.body,
+               m.created_at as createdAt
+        from cm_inbox_messages m
+        where m.thread_id = #{threadId}
+        <if test="before != null and before != ''">
+            and (
+                not exists (
+                    select 1 from cm_inbox_messages cursor_message
+                    where cursor_message.id = #{before}
+                      and cursor_message.thread_id = #{threadId}
+                )
+                or m.created_at &lt; (
+                    select cursor_message.created_at
+                    from cm_inbox_messages cursor_message
+                    where cursor_message.id = #{before}
+                      and cursor_message.thread_id = #{threadId}
+                )
+                or (
+                    m.created_at = (
+                        select cursor_message.created_at
+                        from cm_inbox_messages cursor_message
+                        where cursor_message.id = #{before}
+                          and cursor_message.thread_id = #{threadId}
+                    )
+                    and m.id &lt; #{before}
+                )
+            )
+        </if>
+        order by m.created_at desc, m.id desc
+        limit #{limit}
+    </select>
+
+    <insert id="upsertRead">
+        insert into cm_inbox_reads (
+            id, thread_id, user_id, last_read_at, created_at, updated_at
+        ) values (
+            #{id}, #{threadId}, #{userId}, now(), now(), now()
+        ) on duplicate key update last_read_at = now(), updated_at = now()
+    </insert>
+
+    <select id="selectRead" resultType="map">
+        select thread_id as threadId, last_read_at as lastReadAt
+        from cm_inbox_reads
+        where thread_id = #{threadId} and user_id = #{userId}
+        limit 1
+    </select>
+
+    <insert id="insertMessage">
+        insert into cm_inbox_messages (
+            id, thread_id, sender_type, sender_user_id,
+            message_type, body, created_at, updated_at
+        ) values (
+            #{id}, #{threadId}, 'user', #{userId},
+            'text', #{body}, now(), now()
+        )
+    </insert>
+
+    <update id="touchThread">
+        update cm_inbox_threads set updated_at = now() where id = #{threadId}
+    </update>
+</mapper>

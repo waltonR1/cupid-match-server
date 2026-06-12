@@ -185,6 +185,14 @@ public interface CupidProfileMapper
     CupidFavoriteProfile selectFavoriteByUserAndProfile(
             @Param("userId") String userId, @Param("profileId") String profileId);
 
+    int insertFavorite(@Param("id") String id, @Param("userId") String userId, @Param("profileId") String profileId);
+
+    int deleteFavorite(@Param("userId") String userId, @Param("profileId") String profileId);
+
+    List<CupidFavoriteProfile> selectFavoritesByUserId(@Param("userId") String userId);
+
+    int countFavoritesByUserId(@Param("userId") String userId);
+
     /**
      * 查询用户当前权益余额
      */
@@ -198,6 +206,34 @@ public interface CupidProfileMapper
      */
     CupidPrivateIntroductionRequest selectLatestIntroductionRequest(
             @Param("userId") String userId, @Param("profileId") String profileId);
+
+    CupidPrivateIntroductionRequest selectLatestIntroductionRequestForUpdate(
+            @Param("userId") String userId, @Param("profileId") String profileId);
+
+    /**
+     * 新增私人介绍申请
+     */
+    int insertIntroductionRequest(@Param("id") String id,
+            @Param("requesterUserId") String requesterUserId,
+            @Param("targetProfileId") String targetProfileId,
+            @Param("status") String status,
+            @Param("expiresAt") java.util.Date expiresAt,
+            @Param("entitlementBalanceId") String entitlementBalanceId);
+
+    int expireIntroductionRequest(@Param("id") String id);
+
+    int consumeIntroductionEntitlement(@Param("balanceId") String balanceId);
+
+    /**
+     * 查询用户发出的全部私人介绍申请
+     */
+    List<CupidPrivateIntroductionRequest> selectIntroductionsByUserId(
+            @Param("userId") String userId);
+
+    /**
+     * 根据 ID 查询私人介绍申请
+     */
+    CupidPrivateIntroductionRequest selectIntroductionRequestById(@Param("id") String id);
 
     /**
      * 查询用户管理的全部资料归属关系

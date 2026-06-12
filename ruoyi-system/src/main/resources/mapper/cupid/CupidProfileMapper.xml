@@ -585,12 +585,31 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         order by l.language_code
     </select>
 
+    <insert id="insertFavorite">
+        insert into cm_favorite_profiles (id, user_id, profile_id, created_at, updated_at)
+        values (#{id}, #{userId}, #{profileId}, now(), now())
+    </insert>
+
+    <delete id="deleteFavorite">
+        delete from cm_favorite_profiles where user_id = #{userId} and profile_id = #{profileId}
+    </delete>
+
+    <select id="selectFavoritesByUserId" resultType="CupidFavoriteProfile">
+        select id, user_id as userId, profile_id as profileId,
+               created_at as createdAt, updated_at as updatedAt
+        from cm_favorite_profiles where user_id = #{userId}
+        order by created_at desc
+    </select>
+
+    <select id="countFavoritesByUserId" resultType="int">
+        select count(1) from cm_favorite_profiles where user_id = #{userId}
+    </select>
+
     <select id="selectFavoriteByUserAndProfile" resultType="CupidFavoriteProfile">
         select id, user_id as userId, profile_id as profileId,
                created_at as createdAt, updated_at as updatedAt
         from cm_favorite_profiles
-        where user_id = #{userId}
-          and profile_id = #{profileId}
+        where user_id = #{userId} and profile_id = #{profileId}
         limit 1
     </select>
 
@@ -611,7 +630,34 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         limit 1
     </select>
 
-    <select id="selectLatestIntroductionRequest" resultType="CupidPrivateIntroductionRequest">
+    <insert id="insertIntroductionRequest">
+        insert into cm_private_introduction_requests (
+            id, requester_user_id, target_profile_id, status, expires_at,
+            entitlement_balance_id, requested_at, created_at, updated_at
+        ) values (
+            #{id}, #{requesterUserId}, #{targetProfileId}, #{status}, #{expiresAt},
+            #{entitlementBalanceId}, now(), now(), now()
+        )
+    </insert>
+
+    <update id="expireIntroductionRequest">
+        update cm_private_introduction_requests
+        set status = 'cancelled', updated_at = now()
+        where id = #{id} and status = 'requested' and expires_at &lt;= now()
+    </update>
+
+    <update id="consumeIntroductionEntitlement">
+        update cm_user_entitlement_balances
+        set quota_used = quota_used + 1,
+            quota_remaining = quota_remaining - 1,
+            updated_at = now()
+        where id = #{balanceId}
+          and period_started_at &lt;= now()
+          and period_ends_at &gt; now()
+          and quota_remaining &gt; 0
+    </update>
+
+    <select id="selectIntroductionsByUserId" resultType="CupidPrivateIntroductionRequest">
         select id, requester_user_id as requesterUserId,
                requester_profile_id as requesterProfileId,
                target_profile_id as targetProfileId, status, message,
@@ -621,9 +667,44 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
                created_at as createdAt, updated_at as updatedAt
         from cm_private_introduction_requests
         where requester_user_id = #{userId}
-          and target_profile_id = #{profileId}
         order by requested_at desc
-        limit 1
+    </select>
+
+    <select id="selectIntroductionRequestById" resultType="CupidPrivateIntroductionRequest">
+        select id, requester_user_id as requesterUserId,
+               requester_profile_id as requesterProfileId,
+               target_profile_id as targetProfileId, status, message,
+               requested_at as requestedAt, expires_at as expiresAt,
+               responded_at as respondedAt, cooldown_until as cooldownUntil,
+               entitlement_balance_id as entitlementBalanceId,
+               created_at as createdAt, updated_at as updatedAt
+        from cm_private_introduction_requests where id = #{id} limit 1
+    </select>
+
+    <select id="selectLatestIntroductionRequest" resultType="CupidPrivateIntroductionRequest">
+        select id, requester_user_id as requesterUserId,
+               requester_profile_id as requesterProfileId,
+               target_profile_id as targetProfileId, status, message,
+               requested_at as requestedAt, expires_at as expiresAt,
+               responded_at as respondedAt, cooldown_until as cooldownUntil,
+               entitlement_balance_id as entitlementBalanceId,
+               created_at as createdAt, updated_at as updatedAt
+        from cm_private_introduction_requests
+        where requester_user_id = #{userId} and target_profile_id = #{profileId}
+        order by requested_at desc limit 1
+    </select>
+
+    <select id="selectLatestIntroductionRequestForUpdate" resultType="CupidPrivateIntroductionRequest">
+        select id, requester_user_id as requesterUserId,
+               requester_profile_id as requesterProfileId,
+               target_profile_id as targetProfileId, status, message,
+               requested_at as requestedAt, expires_at as expiresAt,
+               responded_at as respondedAt, cooldown_until as cooldownUntil,
+               entitlement_balance_id as entitlementBalanceId,
+               created_at as createdAt, updated_at as updatedAt
+        from cm_private_introduction_requests
+        where requester_user_id = #{userId} and target_profile_id = #{profileId}
+        order by requested_at desc limit 1 for update
     </select>
 
     <select id="selectOwnershipsByUserId" resultType="CupidProfileOwnership">

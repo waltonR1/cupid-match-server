@@ -14,6 +14,7 @@ import org.springframework.web.bind.annotation.RestController;
 import com.ruoyi.common.core.domain.AjaxResult;
 import com.ruoyi.common.core.domain.model.CupidLoginUser;
 import com.ruoyi.cupid.service.ICupidProfileService;
+import com.ruoyi.cupid.service.ICupidDashboardService;
 import com.ruoyi.cupid.service.ICupidUserService;
 import com.ruoyi.framework.web.service.CupidAuthService;
 import com.ruoyi.framework.web.service.CupidVerificationCodeService;
@@ -30,6 +31,9 @@ public class CupidAccountController
 
     @Autowired
     private ICupidProfileService profileService;
+
+    @Autowired
+    private ICupidDashboardService dashboardService;
 
     @Autowired
     private ICupidUserService userService;
@@ -342,5 +346,15 @@ public class CupidAccountController
     {
         return AjaxResult.success(
                 profileService.updatePrivacyPreferences(profileId, principal.getUserId(), prefs));
+    }
+    /**
+     * 聚合账户首页所需的只读领域数据。
+     */
+    @GetMapping("/dashboard")
+    public AjaxResult dashboard(@AuthenticationPrincipal CupidLoginUser principal,
+            @RequestParam(value = "lang", defaultValue = "zh") String locale)
+    {
+        return AjaxResult.success(
+                dashboardService.getDashboard(principal.getUserId(), locale));
     }
 }

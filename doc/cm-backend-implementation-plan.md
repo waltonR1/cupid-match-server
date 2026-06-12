@@ -136,7 +136,7 @@ Codex 按以下顺序检查：
 | 阶段四：Account 设置与安全 | 已完成并验收 | 2026-06-11 已通过构建；settings、preferences、身份绑定/解绑、MFA、安全挑战、密码修改、导出和停用链路已接入 |
 | 阶段五：Membership / Entitlement | 已完成并验收 | 2026-06-11 已通过完整构建和真实接口冒烟；套餐、会员、当前周期权益、升级占位及 Profile 权限已验证 |
 | 阶段六：Events | 已完成并验收 | 2026-06-12 已通过完整构建和真实接口冒烟；目录、详情、报名、取消、地址权限、额度返还和账户活动聚合已验证 |
-| 阶段七：Favorite / Private Introduction / Inbox / Dashboard | 未开始 | 依赖 Profile、Membership、Events |
+| 阶段七：Favorite / Private Introduction / Inbox / Dashboard | 已完成并验收 | 2026-06-12 已通过完整构建和真实接口冒烟；收藏幂等、介绍状态、联系方式、Inbox 分页/已读/权限和 Dashboard 聚合已验证 |
 | 阶段八：RuoYi 后台运营 | 未开始 | 前台核心链路稳定后执行 |
 | 阶段九：支付、审计与生产化 | 未开始 | 最后执行 |
 
@@ -602,10 +602,10 @@ Codex 按以下顺序检查：
 
 ## 15. 下一执行入口
 
-下一任务是阶段七：Favorite / Private Introduction / Inbox / Dashboard。
+下一任务是阶段八：RuoYi 后台运营。
 
-1. 先实现 Favorite，复用 Profile 可见性和 owner 判断，不在收藏模块复制资料权限规则。
-2. 实现 Private Introduction，复用阶段五当前会员与 `private_introduction` entitlement，并保证创建申请与扣减额度原子执行。
-3. 实现 Inbox 的 thread ownership、消息游标分页和 read 状态，不提前开放普通用户发消息能力。
-4. 最后实现 Dashboard，只聚合已有 Profile、Membership、Events、Introduction 和 Favorite service 的只读结果。
-5. 阶段七出现真实复用点时再提取共享方法；不因现有 service 文件长度预先拆分。
+1. 先建立后台菜单和权限标识，沿用 RuoYi `sys_menu`、角色与数据权限机制。
+2. 实现 Profile、Photo、Verification 审核，不复制前台 Profile 聚合逻辑。
+3. 实现 Private Introduction 和 Event Registration 的后台确认动作。
+4. 实现 Event 管理、Inbox 通知工具和用户状态管理。
+5. 最后补 Staff task 与后台审计入口，并按阶段八验收矩阵执行验证。
