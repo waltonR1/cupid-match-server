@@ -11,7 +11,8 @@
 - ID 只表达身份，不承载实体类型或业务含义；禁止根据 `u-`、`p-` 等前缀编写判断。
 - `tier`、`slug`、`type`、`entitlement_code` 等稳定业务含义保留在独立字段。
 - 前台产品用户使用 `cm_users`，不复用 RuoYi `sys_user`。
-- 后台员工继续使用 RuoYi `sys_user`，通过 `cm_staff_members.sys_user_id` 桥接业务角色。
+- 后台员工直接使用 RuoYi `sys_user`、`sys_role`、`sys_user_role` 和 `sys_menu` 表达账号、角色与权限，不另建业务 staff 映射。
+- `cm_staff_members` 已判定为冗余表，后续 schema 调整应将其移除。
 - 可查询、筛选、排序、约束、关联的数据使用普通列或关系表。
 - 多语言展示文案使用领域本地化表。
 - JSON 只保留给结构复杂且不用于高频查询的数据。
@@ -159,9 +160,14 @@ Event 主表保留可查询字段，本地化文案拆表。
 
 后台员工不进入 `cm_users`。
 
-- `sys_user`：RuoYi 后台账号、登录、角色、菜单权限。
-- `cm_staff_members`：Cupid Match 业务角色映射，使用 `sys_user_id`。
+- `sys_user`：RuoYi 后台账号、登录状态和启停状态。
+- `sys_role`、`sys_user_role`：Cupid 后台岗位角色与用户授权。
+- `sys_menu`、`sys_role_menu`：Cupid 菜单、按钮和接口权限。
 - `cm_staff_tasks.assignee_sys_user_id`：任务分配给 RuoYi 后台用户。
+
+Cupid 后台可建立 `cupid_admin`、`cupid_operator`、`cupid_reviewer`、`cupid_event_manager`、`cupid_support` 等专用角色。不得同时维护 `cm_staff_members.role/status`，避免角色和启停状态出现两套互相冲突的权威来源。
+
+现有 `cm_*` 表中用于记录 staff actor 的 `varchar(36)` 字段，统一保存 `sys_user.user_id` 的字符串形式；`cm_staff_tasks.assignee_sys_user_id` 已使用 `bigint`，直接保存原始 `sys_user.user_id`。这些字段均不再指向 `cm_staff_members.id`。
 
 前台用户不进入 RuoYi `sys_user`。
 
@@ -176,7 +182,7 @@ Event 主表保留可查询字段，本地化文案拆表。
 - 会员套餐通过唯一 `tier` 查找。业务代码不得依赖具体套餐 UUID。
 - 公共套餐目录和账户可升级套餐必须复用同一套餐查询与本地化组装逻辑。
 - 只有 `cm_events.consumes_membership_quota = 1` 的活动才校验 `event_registration` 余额。
-- `sys_user.user_id` 继续遵守 RuoYi 规则；桥接字段不要求改造 RuoYi 主键。
+- `sys_user.user_id` 继续遵守 RuoYi 规则；`cm_staff_tasks.assignee_sys_user_id` 和审计 actor 引用该 ID 时不要求改造 RuoYi 主键。
 - Java entity 可以先按主表和关系表生成，localized 表单独建 service/helper 聚合 DTO。
 - Profile / Event 的列表查询应先查主表和关系表，再按 locale 批量加载 localized 字段。
 - DTO 不应直接暴露 localized 表结构；service/mapper 应组装为 contract 中定义的扁平字段。

@@ -21,7 +21,8 @@
 - `cupid-match-server` 已完成阶段一至阶段七的前台产品能力。
 - `cupid-match-admin` 是 RuoYi 3.9.2 官方 Vue3 + TypeScript 前端，目前尚未添加 Cupid 业务页面。
 - 后台账号继续使用 RuoYi `sys_user`、角色、菜单、权限和登录态。
-- `cm_staff_members.sys_user_id` 用于将 RuoYi 用户映射为 Cupid 业务 staff。
+- Cupid 后台员工身份、启停状态和授权直接由 `sys_user`、`sys_role`、`sys_user_role` 与 `sys_menu` 表达，不再建立第二套 staff 映射。
+- `cm_staff_members` 已判定为冗余表，应在 Phase 8 开始前从 schema 移除，不为其生成 Domain、Mapper 或管理页面。
 - `cm_staff_tasks` 和 `cm_audit_logs` 已在 schema 中预留。
 - Java 产品后端不开放 `/api/debug/*`。
 
@@ -37,7 +38,7 @@
 - 后台查询、筛选、分页和详情聚合。
 - 状态流转、事务、数据库锁和并发保护。
 - RuoYi 权限注解和操作日志。
-- `cm_staff_members` 业务 staff 校验。
+- 使用 RuoYi 当前登录用户、账号状态和权限体系校验后台操作。
 - 需要业务快照时写入 `cm_audit_logs`。
 - 复用阶段一至阶段七已有 service、mapper 和业务规则。
 
@@ -89,7 +90,9 @@
 
 1. RuoYi 登录态。
 2. `@PreAuthorize("@ss.hasPermi('cupid:模块:动作')")`。
-3. 涉及业务状态修改时校验当前 `sys_user` 在 `cm_staff_members` 中处于 `active` 状态。
+3. 当前 `sys_user` 账号处于正常状态；账号停用和角色权限变更继续沿用 RuoYi 原生机制。
+
+不得在权限注解之外再引入 `cm_staff_members.role/status` 作为第二套授权来源。Cupid 岗位差异通过专用 RuoYi 角色和精确的菜单、按钮权限表达，例如 `cupid_admin`、`cupid_operator`、`cupid_reviewer`、`cupid_event_manager` 和 `cupid_support`。
 
 建议权限标识：
 
@@ -114,7 +117,7 @@
 - 影响 Cupid 核心业务状态的操作，同时写入 `cm_audit_logs`。
 - 审计记录至少包含：
   - `actor_type = staff`
-  - 当前 `sys_user.user_id`
+  - 当前 `sys_user.user_id` 的字符串形式写入 `actor_user_id`
   - `subject_type`
   - `subject_id`
   - 稳定的 `action` code
@@ -126,7 +129,7 @@
 
 ## 5. 数据表与 Domain 建模规则
 
-当前 `cm_schema.sql` 包含 42 张 `cm_` 表，阶段一至阶段七已建立 20 个 Domain。表数量与 Domain 数量不需要一一对应：
+当前 `cm_schema.sql` 暂时包含 42 张 `cm_` 表，其中 `cm_staff_members` 已判定为冗余并待移除；移除后为 41 张。阶段一至阶段七已建立 20 个 Domain。表数量与 Domain 数量不需要一一对应：
 
 - 独立业务实体、独立状态机和后台主要查询对象应建立 Domain。
 - 纯关联表、本地化值表和只被父实体批量读写的附属表不必机械建立 Domain。
@@ -138,7 +141,6 @@
 
 | 表 | Domain | 建立时机 | 原因 |
 | --- | --- | --- | --- |
-| `cm_staff_members` | `CupidStaffMember` | Phase 8.1 | staff 身份、角色和 active 状态校验 |
 | `cm_event_registrations` | `CupidEventRegistration` | Phase 8.4 | 独立审核状态机、行锁、容量和权益事务 |
 | `cm_inbox_threads` | `CupidInboxThread` | Phase 8.5 前 | 后台线程查询和系统通知创建 |
 | `cm_inbox_messages` | `CupidInboxMessage` | Phase 8.5 前 | sender、模板和消息类型需要明确建模 |
@@ -196,7 +198,6 @@ RuoYi 官方生成器支持导入数据库表、单表/树表/主子表模板、
 
 适合生成并保留较多基础结构：
 
-- `cm_staff_members`
 - `cm_staff_tasks`
 - `cm_staff_task_localized_fields`
 - `cm_audit_logs` 的只读列表和详情
@@ -222,7 +223,7 @@ RuoYi 官方生成器支持导入数据库表、单表/树表/主子表模板、
 - 容量并发控制
 - Inbox 系统通知
 - User 停用、恢复及会话失效
-- Staff 身份校验
+- RuoYi 角色和权限之外的业务状态约束
 - 审计快照
 
 生成器不得为这些业务暴露通用 `add/edit/remove` 来绕过状态机。
@@ -236,7 +237,7 @@ RuoYi 官方生成器支持导入数据库表、单表/树表/主子表模板、
 5. 只挑选与本项目职责一致的骨架。
 6. 删除不需要的通用新增、修改、删除和导入导出。
 7. 将状态修改改成明确的业务命令。
-8. 补充权限、staff 校验、事务、锁、通知和审计。
+8. 补充 RuoYi 权限校验、事务、锁、通知和审计。
 9. 编译前后端并执行真实接口冒烟。
 
 若生成结果与当前 Vue3 TypeScript 目录或类型规范不一致，以 `cupid-match-admin` 现有源码风格为准，不修改项目去迁就模板。
@@ -278,17 +279,16 @@ RuoYi 官方生成器支持导入数据库表、单表/树表/主子表模板、
 目标：
 
 - 建立 Cupid 后台一级菜单。
-- 创建权限标识和角色授权方案。
-- 实现 `cm_staff_members` 管理或最小查询能力。
-- 建立 `CupidStaffMember` Domain；只生成 staff 模块需要的最小骨架。
-- 建立统一的 active staff 校验方法。
+- 创建 Cupid 专用 RuoYi 角色、权限标识和授权方案。
+- 从 schema 中移除 `cm_staff_members`，不生成 `CupidStaffMember` 或 staff 管理 CRUD。
+- 确认账号启停、角色分配、菜单权限和按钮权限全部沿用 RuoYi 原生能力。
 - 确认 `cupid-match-admin` 可登录并访问空的 Cupid 菜单。
 
 验收：
 
 - 未授权 RuoYi 用户看不到菜单且接口返回无权限。
-- 有菜单权限但没有 active staff 映射的用户不能执行 Cupid 状态修改。
-- active staff 可以访问被授权模块。
+- 停用的 RuoYi 用户无法登录或调用 Cupid 后台接口。
+- 正常的 RuoYi 用户只能访问其角色被授予的 Cupid 模块和动作。
 
 ### 8.2 Phase 8.2：Profile、Photo、Verification 审核
 
@@ -303,7 +303,7 @@ RuoYi 官方生成器支持导入数据库表、单表/树表/主子表模板、
 - 审核 Profile。
 - 将照片设置为 `approved` 或 `hidden`。
 - 分字段更新 verification 状态。
-- 更新 `verified_at` 和审核 staff。
+- 更新 `verified_at`，并以当前 `sys_user.user_id` 记录审核人。
 - 必要时创建 Inbox 通知。
 
 强制规则：
@@ -450,7 +450,7 @@ RuoYi 官方生成器支持导入数据库表、单表/树表/主子表模板、
 1. 后端编译通过。
 2. `cupid-match-admin` TypeScript 检查和生产构建通过。
 3. 使用真实 RuoYi 登录态验证接口。
-4. 验证无权限、无 staff 映射、非法状态和重复操作。
+4. 验证无权限、停用账号、非法状态和重复操作。
 5. 验证审计和通知副作用。
 6. 检查生成器是否留下绕过业务规则的通用 CRUD。
 7. 检查是否为关联表或本地化表机械创建了无调用点的 Domain。
@@ -463,7 +463,7 @@ RuoYi 官方生成器支持导入数据库表、单表/树表/主子表模板、
 
 - 正式后台能力不依赖 `/api/debug/*`。
 - 所有后台写操作均有 RuoYi 权限校验。
-- 核心状态修改要求 active staff。
+- 核心状态修改要求正常的 RuoYi 后台账号及对应动作权限。
 - 关键操作具有事务、并发保护和审计。
 - Profile、Photo、Verification、Introduction、Event Registration 的状态机通过验收。
 - Event 确认不超卖、不重复扣减权益。
@@ -478,7 +478,7 @@ RuoYi 官方生成器支持导入数据库表、单表/树表/主子表模板、
 下一任务是 Phase 8.1：
 
 1. 用 RuoYi 菜单和权限体系建立 Cupid 后台一级菜单。
-2. 建立 `CupidStaffMember`，确定 `cm_staff_members` 的管理方式和 active staff 校验入口。
-3. 只为 `cm_staff_members` 生成或手写最小骨架，不提前生成其他 `cm_` 表 CRUD 或 Domain。
+2. 定义 Cupid 专用 RuoYi 角色及其菜单、按钮权限矩阵。
+3. 从 `cm_schema.sql` 移除 `cm_staff_members`，不创建对应 Domain、Mapper、Service 或后台页面。
 4. 在第一个需要审计的写操作前建立 `CupidAuditLog`，不要求 Phase 8.1 提前完成审计页面。
 5. 完成权限矩阵和基础登录冒烟后，再进入 Profile 审核模块。

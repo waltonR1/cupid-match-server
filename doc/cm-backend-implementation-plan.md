@@ -26,7 +26,7 @@ RuoYi 原生系统表继续承载后台登录、角色、菜单、权限和系�
 
 - `cm_*` 实体 ID 使用 UUID；业务逻辑通过 `tier`、`slug`、`type`、`code` 等业务键查找，不硬编码 UUID。
 - 前台用户只进入 `cm_users`，不进入 RuoYi `sys_user`。
-- 后台员工仍使用 `sys_user`，通过 `cm_staff_members.sys_user_id` 建立业务身份。
+- 后台员工直接使用 RuoYi `sys_user`、角色、菜单和权限体系；不再通过 `cm_staff_members` 建立第二套业务身份。
 - Java 产品 API 统一返回 RuoYi `code + msg + data?`。
 - controller 只做 HTTP 参数接收、认证主体获取和响应封装。
 - framework 负责认证、JWT、Redis session、验证码以及与 Spring Security 的集成。
@@ -536,7 +536,7 @@ Codex 按以下顺序检查：
 
 ## 12. 阶段八：RuoYi 后台运营
 
-阶段八涉及独立的 `cupid-match-admin`、RuoYi 后台接口、权限菜单、staff 身份和审计，详细实施与验收要求迁移至：
+阶段八涉及独立的 `cupid-match-admin`、RuoYi 后台接口、权限菜单、后台账号和审计，详细实施与验收要求迁移至：
 
 - `doc/cm-admin-implementation-plan.md`
 
@@ -544,7 +544,7 @@ Codex 按以下顺序检查：
 
 - 正式运营能力在 `cupid-match-admin` 和 `controller/cupid/admin` 中实现。
 - 后台沿用 RuoYi 登录态、角色、菜单、权限和操作日志。
-- 通过 `cm_staff_members` 获取 Cupid 业务 staff 身份。
+- Cupid 后台岗位使用 RuoYi 专用角色和精确权限表达，不维护 `cm_staff_members` 映射。
 - Java 产品后端不开放 `/api/debug/*`。
 - `cupid-match-app` Debug 页面继续保留用于 Mock 和开发回归，生产环境通过 `VITE_ENABLE_DEBUG=false` 禁止访问。
 - RuoYi 生成器只生成机械骨架，不负责审核状态机、跨表事务、并发锁、权益扣减或审计。
