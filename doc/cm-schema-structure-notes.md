@@ -6,6 +6,7 @@
 
 - RuoYi 原生 `sys_*`、Quartz 表保持不变。
 - Cupid Match 业务表统一使用 `cm_` 前缀。
+- `cm_*` 表不单独声明字符集或排序规则，统一继承目标数据库的默认 character set 与 collation。
 - `cm_*` 实体表的代理主键及其引用统一使用 36 字符 UUID；Java 运行时使用 `IdUtils.fastUUID()`。
 - seed 生成器把 mock 的可读 ID 确定性映射为 UUIDv5，同一份源数据重复生成时 ID 保持稳定。
 - ID 只表达身份，不承载实体类型或业务含义；禁止根据 `u-`、`p-` 等前缀编写判断。

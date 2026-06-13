@@ -69,7 +69,7 @@ create table cm_users (
   updated_at         datetime      not null default current_timestamp on update current_timestamp comment 'Update time',
   primary key (id),
   key idx_cm_users_status (status)
-) engine=innodb default charset=utf8mb4 comment='Cupid Match users';
+) engine=innodb comment='Cupid Match users';
 
 create table cm_auth_identities (
   id                 varchar(36)   not null comment 'Identity ID',
@@ -83,7 +83,7 @@ create table cm_auth_identities (
   primary key (id),
   unique key uk_cm_auth_provider_identifier (provider, identifier),
   key idx_cm_auth_user_id (user_id)
-) engine=innodb default charset=utf8mb4 comment='Cupid Match auth identities';
+) engine=innodb comment='Cupid Match auth identities';
 
 create table cm_user_security_settings (
   id                 varchar(36)   not null comment 'Security setting ID',
@@ -98,7 +98,7 @@ create table cm_user_security_settings (
   primary key (id),
   unique key uk_cm_user_security_user (user_id),
   key idx_cm_user_security_identity (mfa_identity_id)
-) engine=innodb default charset=utf8mb4 comment='Cupid Match user security settings';
+) engine=innodb comment='Cupid Match user security settings';
 
 create table cm_user_security_challenges (
   id                 varchar(36)   not null comment 'Security challenge ID',
@@ -117,7 +117,7 @@ create table cm_user_security_challenges (
   key idx_cm_security_challenge_user (user_id),
   key idx_cm_security_challenge_token (challenge_token),
   key idx_cm_security_challenge_expires (expires_at)
-) engine=innodb default charset=utf8mb4 comment='Cupid Match sensitive action challenges';
+) engine=innodb comment='Cupid Match sensitive action challenges';
 
 create table cm_user_preferences (
   id                               varchar(36)  not null comment 'Preference ID',
@@ -136,7 +136,7 @@ create table cm_user_preferences (
   primary key (id),
   unique key uk_cm_user_preferences_user (user_id),
   key idx_cm_user_preferences_city (preferred_city_code)
-) engine=innodb default charset=utf8mb4 comment='Cupid Match user preferences';
+) engine=innodb comment='Cupid Match user preferences';
 
 create table cm_legal_documents (
   id                 varchar(36)   not null comment 'Legal document ID',
@@ -150,7 +150,7 @@ create table cm_legal_documents (
   primary key (id),
   unique key uk_cm_legal_type_version (type, version),
   unique key uk_cm_legal_active_type (active_type)
-) engine=innodb default charset=utf8mb4 comment='Cupid Match legal documents';
+) engine=innodb comment='Cupid Match legal documents';
 
 create table cm_legal_document_contents (
   id                 varchar(36)   not null comment 'Legal content ID',
@@ -162,7 +162,7 @@ create table cm_legal_document_contents (
   updated_at         datetime      not null default current_timestamp on update current_timestamp comment 'Update time',
   primary key (id),
   unique key uk_cm_legal_content_document_locale (document_id, locale)
-) engine=innodb default charset=utf8mb4 comment='Cupid Match localized legal document contents';
+) engine=innodb comment='Cupid Match localized legal document contents';
 
 create table cm_user_agreement_acceptances (
   id                 varchar(36)   not null comment 'Agreement acceptance ID',
@@ -173,7 +173,7 @@ create table cm_user_agreement_acceptances (
   created_at         datetime      not null default current_timestamp comment 'Create time',
   primary key (id),
   unique key uk_cm_user_agreement_user_type (user_id, document_type)
-) engine=innodb default charset=utf8mb4 comment='Cupid Match user agreement acceptances';
+) engine=innodb comment='Cupid Match user agreement acceptances';
 
 -- ----------------------------
 -- Profiles
@@ -220,21 +220,21 @@ create table cm_profiles (
   key idx_cm_profiles_degree (degree_level),
   key idx_cm_profiles_last_active (last_active_at),
   key idx_cm_profiles_archived (archived_at)
-) engine=innodb default charset=utf8mb4 comment='Cupid Match profiles';
+) engine=innodb comment='Cupid Match profiles';
 
 create table cm_profile_languages (
   profile_id         varchar(36) not null comment 'cm_profiles.id',
   language_code      varchar(20) not null comment 'Language code',
   primary key (profile_id, language_code),
   key idx_cm_profile_languages_language (language_code)
-) engine=innodb default charset=utf8mb4 comment='Cupid Match profile languages';
+) engine=innodb comment='Cupid Match profile languages';
 
 create table cm_profile_relationship_values (
   profile_id         varchar(36) not null comment 'cm_profiles.id',
   value_code         varchar(40) not null comment 'Relationship value code',
   primary key (profile_id, value_code),
   key idx_cm_profile_relationship_values_code (value_code)
-) engine=innodb default charset=utf8mb4 comment='Cupid Match profile relationship values';
+) engine=innodb comment='Cupid Match profile relationship values';
 
 create table cm_profile_localized_fields (
   id                 varchar(36)   not null comment 'Localized profile field ID',
@@ -250,7 +250,7 @@ create table cm_profile_localized_fields (
   primary key (id),
   unique key uk_cm_profile_localized_field (profile_id, field_name, locale),
   key idx_cm_profile_localized_lookup (field_name, locale, status)
-) engine=innodb default charset=utf8mb4 comment='Cupid Match localized profile fields';
+) engine=innodb comment='Cupid Match localized profile fields';
 
 create table cm_profile_localized_items (
   id                 varchar(36)   not null comment 'Localized profile list item ID',
@@ -267,7 +267,7 @@ create table cm_profile_localized_items (
   primary key (id),
   unique key uk_cm_profile_localized_item (profile_id, field_name, item_order, locale),
   key idx_cm_profile_localized_items_lookup (field_name, locale, status)
-) engine=innodb default charset=utf8mb4 comment='Cupid Match localized profile list items';
+) engine=innodb comment='Cupid Match localized profile list items';
 
 create table cm_profile_photos (
   id                 varchar(36)  not null comment 'Profile photo ID',
@@ -281,7 +281,7 @@ create table cm_profile_photos (
   primary key (id),
   key idx_cm_profile_photos_profile (profile_id),
   key idx_cm_profile_photos_status (status)
-) engine=innodb default charset=utf8mb4 comment='Cupid Match profile photos';
+) engine=innodb comment='Cupid Match profile photos';
 
 create table cm_profile_ownerships (
   id                       varchar(36) not null comment 'Profile ownership ID',
@@ -298,7 +298,7 @@ create table cm_profile_ownerships (
   primary key (id),
   key idx_cm_profile_ownerships_user (user_id),
   key idx_cm_profile_ownerships_profile (profile_id)
-) engine=innodb default charset=utf8mb4 comment='Cupid Match profile ownerships';
+) engine=innodb comment='Cupid Match profile ownerships';
 
 create table cm_profile_internal_records (
   id                 varchar(36) not null comment 'Internal profile record ID',
@@ -311,7 +311,7 @@ create table cm_profile_internal_records (
   primary key (id),
   unique key uk_cm_profile_internal_profile (profile_id),
   key idx_cm_profile_internal_featured (is_featured)
-) engine=innodb default charset=utf8mb4 comment='Cupid Match profile internal records';
+) engine=innodb comment='Cupid Match profile internal records';
 
 create table cm_profile_internal_localized_fields (
   id                 varchar(36) not null comment 'Localized internal profile field ID',
@@ -326,7 +326,7 @@ create table cm_profile_internal_localized_fields (
   updated_at         datetime    not null default current_timestamp on update current_timestamp comment 'Update time',
   primary key (id),
   unique key uk_cm_profile_internal_localized (internal_record_id, field_name, locale)
-) engine=innodb default charset=utf8mb4 comment='Cupid Match localized internal profile fields';
+) engine=innodb comment='Cupid Match localized internal profile fields';
 
 create table cm_profile_verifications (
   id                  varchar(36)  not null comment 'Profile verification ID',
@@ -344,7 +344,7 @@ create table cm_profile_verifications (
   updated_at          datetime     not null default current_timestamp on update current_timestamp comment 'Update time',
   primary key (id),
   unique key uk_cm_profile_verifications_profile (profile_id)
-) engine=innodb default charset=utf8mb4 comment='Cupid Match profile verifications';
+) engine=innodb comment='Cupid Match profile verifications';
 
 create table cm_profile_contacts (
   id                 varchar(36)  not null comment 'Profile contact ID',
@@ -358,7 +358,7 @@ create table cm_profile_contacts (
   updated_at         datetime     not null default current_timestamp on update current_timestamp comment 'Update time',
   primary key (id),
   unique key uk_cm_profile_contacts_profile (profile_id)
-) engine=innodb default charset=utf8mb4 comment='Cupid Match profile contacts';
+) engine=innodb comment='Cupid Match profile contacts';
 
 create table cm_profile_privacy_preferences (
   id                         varchar(36) not null comment 'Profile privacy preference ID',
@@ -373,7 +373,7 @@ create table cm_profile_privacy_preferences (
   updated_at                 datetime    not null default current_timestamp on update current_timestamp comment 'Update time',
   primary key (id),
   unique key uk_cm_profile_privacy_profile (profile_id)
-) engine=innodb default charset=utf8mb4 comment='Cupid Match profile privacy preferences';
+) engine=innodb comment='Cupid Match profile privacy preferences';
 
 -- ----------------------------
 -- Membership
@@ -404,7 +404,7 @@ create table cm_membership_plans (
   primary key (id),
   unique key uk_cm_membership_plans_tier (tier),
   key idx_cm_membership_plans_active_sort (is_active, sort_order)
-) engine=innodb default charset=utf8mb4 comment='Cupid Match membership plans';
+) engine=innodb comment='Cupid Match membership plans';
 
 create table cm_membership_plan_localized_fields (
   id                 varchar(36) not null comment 'Localized membership plan field ID',
@@ -419,7 +419,7 @@ create table cm_membership_plan_localized_fields (
   updated_at         datetime    not null default current_timestamp on update current_timestamp comment 'Update time',
   primary key (id),
   unique key uk_cm_plan_localized_field (plan_id, field_name, locale)
-) engine=innodb default charset=utf8mb4 comment='Cupid Match localized membership plan fields';
+) engine=innodb comment='Cupid Match localized membership plan fields';
 
 create table cm_user_memberships (
   id                 varchar(36) not null comment 'User membership ID',
@@ -434,7 +434,7 @@ create table cm_user_memberships (
   primary key (id),
   key idx_cm_user_memberships_user_status (user_id, status),
   key idx_cm_user_memberships_plan (plan_id)
-) engine=innodb default charset=utf8mb4 comment='Cupid Match user memberships';
+) engine=innodb comment='Cupid Match user memberships';
 
 create table cm_user_entitlement_balances (
   id                 varchar(36) not null comment 'Entitlement balance ID',
@@ -451,7 +451,7 @@ create table cm_user_entitlement_balances (
   primary key (id),
   unique key uk_cm_entitlement_user_code_period (user_id, entitlement_code, period_started_at, period_ends_at),
   key idx_cm_entitlement_membership (membership_id)
-) engine=innodb default charset=utf8mb4 comment='Cupid Match user entitlement balances';
+) engine=innodb comment='Cupid Match user entitlement balances';
 
 -- ----------------------------
 -- Events
@@ -477,7 +477,7 @@ create table cm_events (
   key idx_cm_events_status_date (status, event_date),
   key idx_cm_events_city (city_code),
   key idx_cm_events_visibility (visibility)
-) engine=innodb default charset=utf8mb4 comment='Cupid Match events';
+) engine=innodb comment='Cupid Match events';
 
 create table cm_event_localized_fields (
   id                 varchar(36) not null comment 'Localized event field ID',
@@ -492,7 +492,7 @@ create table cm_event_localized_fields (
   updated_at         datetime    not null default current_timestamp on update current_timestamp comment 'Update time',
   primary key (id),
   unique key uk_cm_event_localized_field (event_id, field_name, locale)
-) engine=innodb default charset=utf8mb4 comment='Cupid Match localized event fields';
+) engine=innodb comment='Cupid Match localized event fields';
 
 create table cm_event_relationship_focuses (
   id                 varchar(36) not null comment 'Event relationship focus ID',
@@ -507,14 +507,14 @@ create table cm_event_relationship_focuses (
   updated_at         datetime    not null default current_timestamp on update current_timestamp comment 'Update time',
   primary key (id),
   unique key uk_cm_event_focus_locale (event_id, focus_order, locale)
-) engine=innodb default charset=utf8mb4 comment='Cupid Match localized event relationship focuses';
+) engine=innodb comment='Cupid Match localized event relationship focuses';
 
 create table cm_event_language_codes (
   event_id           varchar(36) not null comment 'cm_events.id',
   language_code      varchar(20) not null comment 'Language code',
   primary key (event_id, language_code),
   key idx_cm_event_language_codes_language (language_code)
-) engine=innodb default charset=utf8mb4 comment='Cupid Match event language codes';
+) engine=innodb comment='Cupid Match event language codes';
 
 create table cm_event_agenda_items (
   id                 varchar(36) not null comment 'Event agenda item ID',
@@ -525,7 +525,7 @@ create table cm_event_agenda_items (
   updated_at         datetime    not null default current_timestamp on update current_timestamp comment 'Update time',
   primary key (id),
   key idx_cm_event_agenda_event_sort (event_id, sort_order)
-) engine=innodb default charset=utf8mb4 comment='Cupid Match event agenda items';
+) engine=innodb comment='Cupid Match event agenda items';
 
 create table cm_event_agenda_item_localized_fields (
   id                 varchar(36) not null comment 'Localized agenda item field ID',
@@ -540,7 +540,7 @@ create table cm_event_agenda_item_localized_fields (
   updated_at         datetime    not null default current_timestamp on update current_timestamp comment 'Update time',
   primary key (id),
   unique key uk_cm_event_agenda_localized (agenda_item_id, field_name, locale)
-) engine=innodb default charset=utf8mb4 comment='Cupid Match localized event agenda item fields';
+) engine=innodb comment='Cupid Match localized event agenda item fields';
 
 create table cm_event_registrations (
   id                 varchar(36) not null comment 'Event registration ID',
@@ -560,7 +560,7 @@ create table cm_event_registrations (
   primary key (id),
   unique key uk_cm_event_registration_user_event (user_id, event_id),
   key idx_cm_event_registration_event_status (event_id, status)
-) engine=innodb default charset=utf8mb4 comment='Cupid Match event registrations';
+) engine=innodb comment='Cupid Match event registrations';
 
 -- ----------------------------
 -- Relationship actions
@@ -575,7 +575,7 @@ create table cm_favorite_profiles (
   primary key (id),
   unique key uk_cm_favorite_user_profile (user_id, profile_id),
   key idx_cm_favorite_profile (profile_id)
-) engine=innodb default charset=utf8mb4 comment='Cupid Match favorite profiles';
+) engine=innodb comment='Cupid Match favorite profiles';
 
 create table cm_private_introduction_requests (
   id                       varchar(36)  not null comment 'Private introduction request ID',
@@ -597,7 +597,7 @@ create table cm_private_introduction_requests (
   key idx_cm_intro_requester_status (requester_user_id, status),
   key idx_cm_intro_target_status (target_profile_id, status),
   key idx_cm_intro_entitlement (entitlement_balance_id)
-) engine=innodb default charset=utf8mb4 comment='Cupid Match private introduction requests';
+) engine=innodb comment='Cupid Match private introduction requests';
 
 -- ----------------------------
 -- Inbox
@@ -615,7 +615,7 @@ create table cm_inbox_threads (
   primary key (id),
   key idx_cm_inbox_threads_user_status (user_id, status),
   key idx_cm_inbox_threads_subject (subject_type, subject_id)
-) engine=innodb default charset=utf8mb4 comment='Cupid Match inbox threads';
+) engine=innodb comment='Cupid Match inbox threads';
 
 create table cm_inbox_messages (
   id                 varchar(36)  not null comment 'Inbox message ID',
@@ -632,7 +632,7 @@ create table cm_inbox_messages (
   updated_at         datetime     not null default current_timestamp on update current_timestamp comment 'Update time',
   primary key (id),
   key idx_cm_inbox_messages_thread_created (thread_id, created_at)
-) engine=innodb default charset=utf8mb4 comment='Cupid Match inbox messages';
+) engine=innodb comment='Cupid Match inbox messages';
 
 create table cm_inbox_reads (
   id                 varchar(36) not null comment 'Inbox read ID',
@@ -643,7 +643,7 @@ create table cm_inbox_reads (
   updated_at         datetime    not null default current_timestamp on update current_timestamp comment 'Update time',
   primary key (id),
   unique key uk_cm_inbox_reads_thread_user (thread_id, user_id)
-) engine=innodb default charset=utf8mb4 comment='Cupid Match inbox reads';
+) engine=innodb comment='Cupid Match inbox reads';
 
 -- ----------------------------
 -- Staff operations
@@ -659,7 +659,7 @@ create table cm_staff_members (
   updated_at         datetime    not null default current_timestamp on update current_timestamp comment 'Update time',
   primary key (id),
   unique key uk_cm_staff_members_sys_user (sys_user_id)
-) engine=innodb default charset=utf8mb4 comment='Cupid Match staff members';
+) engine=innodb comment='Cupid Match staff members';
 
 create table cm_staff_tasks (
   id                    varchar(36) not null comment 'Staff task ID',
@@ -675,7 +675,7 @@ create table cm_staff_tasks (
   primary key (id),
   key idx_cm_staff_tasks_subject (subject_type, subject_id),
   key idx_cm_staff_tasks_assignee_status (assignee_sys_user_id, status)
-) engine=innodb default charset=utf8mb4 comment='Cupid Match staff tasks';
+) engine=innodb comment='Cupid Match staff tasks';
 
 create table cm_staff_task_localized_fields (
   id                 varchar(36) not null comment 'Localized staff task field ID',
@@ -690,7 +690,7 @@ create table cm_staff_task_localized_fields (
   updated_at         datetime    not null default current_timestamp on update current_timestamp comment 'Update time',
   primary key (id),
   unique key uk_cm_staff_task_localized (staff_task_id, field_name, locale)
-) engine=innodb default charset=utf8mb4 comment='Cupid Match localized staff task fields';
+) engine=innodb comment='Cupid Match localized staff task fields';
 
 -- ----------------------------
 -- Audit and billing
@@ -711,7 +711,7 @@ create table cm_audit_logs (
   key idx_cm_audit_subject (subject_type, subject_id),
   key idx_cm_audit_actor (actor_type, actor_user_id),
   key idx_cm_audit_created (created_at)
-) engine=innodb default charset=utf8mb4 comment='Cupid Match audit logs';
+) engine=innodb comment='Cupid Match audit logs';
 
 create table cm_orders (
   id                 varchar(36) not null comment 'Order ID',
@@ -725,7 +725,7 @@ create table cm_orders (
   primary key (id),
   key idx_cm_orders_user_status (user_id, status),
   key idx_cm_orders_plan (plan_id)
-) engine=innodb default charset=utf8mb4 comment='Cupid Match orders';
+) engine=innodb comment='Cupid Match orders';
 
 create table cm_payments (
   id                   varchar(36)  not null comment 'Payment ID',
@@ -741,4 +741,4 @@ create table cm_payments (
   primary key (id),
   key idx_cm_payments_order (order_id),
   key idx_cm_payments_provider_payment (provider, provider_payment_id)
-) engine=innodb default charset=utf8mb4 comment='Cupid Match payments';
+) engine=innodb comment='Cupid Match payments';
