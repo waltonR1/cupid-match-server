@@ -646,7 +646,23 @@ select role_id, role_key from sys_role where role_key like 'cupid_%';
 - 重新登录后菜单和权限变化生效。
 - 原生系统页面仍只管理 RuoYi 后台账号和后台基础设施。
 
-### 11.2 Phase 8.2：Profile、Photo、Verification 审核
+### 11.2 Phase 8.2：Profile 与 Photo 审核
+
+状态：
+
+- 后端审核接口、Service、Mapper XML 已实现。
+- 前端 `cupid-match-admin` 审核页面和 `src/api/cupid/review.ts` 已实现。
+- `sql/cm_admin_menu.sql` 已追加审核中心动态菜单、按钮权限和角色授权。
+- 已通过 `ruoyi-admin` Maven 编译和 `cupid-match-admin` 生产构建。
+- 已执行 `sql/cm_admin_menu.sql` 后，通过 `/getRouters` 验证审核中心动态路由已返回。
+- 已验证 Profile、Photo、Verification 列表和详情接口返回 200。
+- 已用浏览器验证三张审核页面可打开，无登录跳转和前端运行错误。
+- 已补充审核页可读摘要、短 ID 展示、字段中文标签和重复审核保护。
+- Phase 8.2 的正式验收范围收敛为 Profile 发布审核与 Photo 内容审核。
+- 当前 Verification 页面只作为现有 `cm_profile_verifications` 状态的基础查看与临时操作入口，不视为完整认证审核闭环。
+- Verification 当前表结构只有整体认证记录与四个状态字段，没有独立材料附件、材料来源、拒绝原因回传和分项审核流水；完整认证审核拆入 Phase 8.2.1，不能只在页面上伪造。
+- 多语言资料文案需要后续拆成独立审核队列，审核单元应为 `profile_id + field_name + locale`，例如 `summary/zh`、`summary/fr`、`summary/en` 各自成条。当前 `cm_profile_localized_fields.status` 表达的是生成/翻译可用状态，不应直接复用为审核结论。
+- 待手工选择测试数据执行一次审核动作，确认 `cm_audit_logs` 和 RuoYi `sys_oper_log` 写入。
 
 页面：
 
@@ -660,19 +676,42 @@ API：
 | --- | --- |
 | Profile | `GET /cupid/profile/list`、`GET /cupid/profile/{id}`、`POST /cupid/profile/{id}/review` |
 | Photo | `GET /cupid/photo/list`、`GET /cupid/photo/{id}`、`POST /cupid/photo/{id}/review` |
-| Verification | `GET /cupid/verification/list`、`GET /cupid/verification/{profileId}`、`POST /cupid/verification/{profileId}/review` |
+| Verification | `GET /cupid/verification/list`、`GET /cupid/verification/{profileId}`、`POST /cupid/verification/{profileId}/review`，当前仅为基础状态入口，后续由 Phase 8.2.1 重构 |
 
 要求：
 
 - 列表支持审核状态、用户、时间等必要筛选。
 - Photo 页面提供真实图片预览。
-- Verification 页面按字段展示材料和状态。
 - 审核请求显式包含目标状态与 reason。
-- Profile、Photo、Verification 联动处于同一事务。
+- Profile 和 Photo 各自的状态流转处于明确事务内。
 - 写入审核人、审核时间和业务审计。
 - 后台审核写操作同时使用 RuoYi `@Log`。
 - 页面确实需要可维护的展示枚举时才新增 `cupid_*` 字典，状态机值仍由 Java 和数据库约束。
 - 同步加入对应 `M/C/F` 菜单和角色授权。
+
+### 11.2.1 Phase 8.2.1：Verification 认证审核闭环
+
+定位：
+
+- Phase 8.2.1 专门处理身份、学历、收入、婚姻等认证审核，不并入当前 Profile 发布审核。
+- 当前 `cm_profile_verifications.review_status` 只够表达整体认证状态，不能支撑真实材料审核、拒绝原因回传和重新提交。
+- 本节先作为粗计划占位；等 Phase 8.2 当前修改完成并验收后，再细化数据库、接口、前端页面和迁移方案。
+
+后续需要评估：
+
+- 数据库是否新增认证材料表、材料类型、材料状态、附件地址、提交批次、拒绝原因和审核流水。
+- C 端账号中心如何提交认证材料、展示拒绝原因、重新提交，并与当前资料编辑保存逻辑解耦。
+- 后端如何处理 `unverified / pending / verified / rejected` 与 `review_status` 的职责边界，避免两个状态字段表达同一件事。
+- 后台是否按认证类型拆分审核队列，或者在同一页面中按身份、学历、收入、婚姻分区处理。
+- 认证通过后如何影响公开资料 `isVerified`、账号中心认证面板、后续会员或介绍权限。
+- 拒绝后是否发送 Inbox 通知，以及通知内容是否引用结构化拒绝原因。
+- 是否保留当前 `cupid/verification` 菜单与接口，或在 8.2.1 中重命名、拆分并重新授权。
+
+8.2.1 完成前：
+
+- 不把当前 Verification 页面视为最终认证审核能力。
+- 不要求认证审核具备完整业务闭环。
+- 不为认证材料伪造页面字段或把现有状态字段强行解释成材料审核结果。
 
 ### 11.3 Phase 8.3：Private Introduction
 
@@ -884,7 +923,7 @@ API：
 - 业务页面使用 RuoYi 动态菜单加载。
 - 菜单、按钮与 Controller 权限一致。
 - 普通 Cupid 角色与系统管理权限隔离。
-- Profile、Photo、Verification、Introduction、Event Registration 状态机通过验收。
+- Profile、Photo、Introduction、Event Registration 状态机通过验收；Verification 认证审核闭环按 Phase 8.2.1 独立验收。
 - Event Registration 不超卖且不重复扣减权益。
 - Inbox 通知不能伪造用户聊天。
 - C 端通知不依赖 `sys_notice` 和 `sys_notice_read`。
@@ -898,11 +937,10 @@ API：
 
 ## 15. 当前执行入口
 
-Phase 8.1 已完成。下一任务是 Phase 8.2，严格按以下顺序执行：
+Phase 8.2 已完成 Profile 与 Photo 审核的代码、菜单、列表、详情和页面挂载验收。最后只剩写操作的手工验收：
 
-1. 审计现有 Profile、Photo、Verification Domain、Mapper、Service 和数据库字段。
-2. 明确审核状态流转、权限字符、审计 action code 和事务边界。
-3. 仅为真实后台查询和审核动作补充接口，不复用 C 端接口执行后台操作。
-4. 实现 `src/views/cupid/profile/`、`photo/`、`verification/` 及对应 `src/api/cupid/` 文件。
-5. 页面真实存在后，再向 `sql/cm_admin_menu.sql` 追加审核中心的 `M/C/F` 菜单和角色授权。
-6. 完成构建、权限、状态机、审计和重复操作验收。
+1. 使用可回滚或可接受变更的测试数据，在资料审核和照片审核中各执行一次通过或拒绝。
+2. 验证审核写操作会写入 `cm_audit_logs`，同时被 RuoYi `sys_oper_log` 记录。
+3. 验证 `cupid_auditor` 只能查看，不能看到或执行审核按钮。
+4. Verification 认证审核闭环暂不作为 Phase 8.2 完成条件，后续进入 Phase 8.2.1 单独设计。
+5. 验证通过后，再进入 Phase 8.3：Private Introduction。
