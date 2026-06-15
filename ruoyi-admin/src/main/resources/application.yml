@@ -110,9 +110,9 @@ cupid:
   # 翻译配置
   translation:
     # 是否启用机器翻译链路
-    enabled: true
+    enabled: false
     # 启用后启动时检查翻译器可用性，不可用则终止启动
-    fail-fast: true
+    fail-fast: false
     # LibreTranslate API 地址
     api-url: http://localhost:5000
     # 连接翻译器超时时间
