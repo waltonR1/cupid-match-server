@@ -13,7 +13,7 @@
 - `tier`、`slug`、`type`、`entitlement_code` 等稳定业务含义保留在独立字段。
 - 前台产品用户使用 `cm_users`，不复用 RuoYi `sys_user`。
 - 后台员工直接使用 RuoYi `sys_user`、`sys_role`、`sys_user_role` 和 `sys_menu` 表达账号、角色与权限，不另建业务 staff 映射。
-- `cm_staff_members` 已判定为冗余表，后续 schema 调整应将其移除。
+- 不建立 `cm_staff_members`；后台员工直接复用 RuoYi 原生账号和授权体系。
 - 可查询、筛选、排序、约束、关联的数据使用普通列或关系表。
 - 多语言展示文案使用领域本地化表。
 - JSON 只保留给结构复杂且不用于高频查询的数据。
@@ -166,9 +166,9 @@ Event 主表保留可查询字段，本地化文案拆表。
 - `sys_menu`、`sys_role_menu`：Cupid 菜单、按钮和接口权限。
 - `cm_staff_tasks.assignee_sys_user_id`：任务分配给 RuoYi 后台用户。
 
-Cupid 后台可建立 `cupid_admin`、`cupid_operator`、`cupid_reviewer`、`cupid_event_manager`、`cupid_support` 等专用角色。不得同时维护 `cm_staff_members.role/status`，避免角色和启停状态出现两套互相冲突的权威来源。
+Cupid 后台可建立 `cupid_admin`、`cupid_operator`、`cupid_reviewer`、`cupid_event_manager`、`cupid_support` 等专用角色。不得另建 staff 角色或启停状态表，避免出现两套互相冲突的权威来源。
 
-现有 `cm_*` 表中用于记录 staff actor 的 `varchar(36)` 字段，统一保存 `sys_user.user_id` 的字符串形式；`cm_staff_tasks.assignee_sys_user_id` 已使用 `bigint`，直接保存原始 `sys_user.user_id`。这些字段均不再指向 `cm_staff_members.id`。
+现有 `cm_*` 表中用于记录 staff actor 的 `varchar(36)` 字段，统一保存 `sys_user.user_id` 的字符串形式；`cm_staff_tasks.assignee_sys_user_id` 已使用 `bigint`，直接保存原始 `sys_user.user_id`。
 
 前台用户不进入 RuoYi `sys_user`。
 

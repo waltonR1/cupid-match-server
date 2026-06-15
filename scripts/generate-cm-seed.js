@@ -212,8 +212,6 @@ sql.push('-- Generated from doc/reference-from-app/mock-server/db.json');
 sql.push('-- Entity IDs are deterministic UUIDv5 values; regenerating the same source keeps them stable.');
 sql.push('-- Run after sql/cm_schema.sql.');
 sql.push('-- ----------------------------\n');
-sql.push('set names utf8mb4;\n');
-
 sql.push(insertInto('cm_users', ['id', 'account_name', 'avatar_url', 'preferred_locale', 'status', 'created_at', 'updated_at'],
   db.users.map((row) => ({
     id: row.id,

@@ -5,8 +5,6 @@
 -- Run after sql/cm_schema.sql.
 -- ----------------------------
 
-set names utf8mb4;
-
 insert into cm_users (id, account_name, avatar_url, preferred_locale, status, created_at, updated_at) values
   ('efdca298-c977-5502-ad2e-8ba480ca1ea3', 'Lin', '', 'zh', 'active', '2026-01-18 00:00:00', '2026-05-27 18:33:11');
 
