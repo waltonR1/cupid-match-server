@@ -263,6 +263,78 @@ file:  src/views/index.vue
 - 只有平台管理员或明确需要的技术人员才分配系统菜单。
 - 权限差异通过 `sys_role_menu` 配置，不修改系统菜单源码。
 
+### 5.4 RuoYi 原生功能与 C 端边界
+
+RuoYi 原生系统功能默认只管理后台账号和后台基础设施。不能因为 Cupid 代码位于同一个工程，就认为这些页面已经覆盖 `cm_users`、Cupid JWT 或 Cupid Inbox。
+
+| 原生功能 | 当前数据源或对象 | 是否已经覆盖 C 端 | 处理方式与时机 |
+| --- | --- | --- | --- |
+| 用户管理 | `sys_user` | 否 | 原样保留管理后台账号；Phase 8.6 独立实现 App User 管理 |
+| 角色管理 | `sys_role`、`sys_user_role` | 间接涉及 | Phase 8.1 直接复用，建立 Cupid 后台角色 |
+| 菜单管理 | `sys_menu`、`sys_role_menu` | 只涉及后台 | Phase 8.1 直接复用，管理 Cupid 后台动态路由和按钮权限 |
+| 部门管理 | `sys_dept` | 否 | 保留给后台组织管理；阶段八不要求改造 |
+| 岗位管理 | `sys_post` | 否 | 保留给后台员工岗位；不得表达 App 会员、身份或业务角色 |
+| 字典管理 | `sys_dict_type`、`sys_dict_data` | 当前未接入 | 有真实后台表单需求时按模块接入，不迁移状态机和程序常量 |
+| 参数设置 | `sys_config` | 当前未接入 | 有真实热更新需求时接入，不迁移基础设施和安全配置 |
+| 通知公告 | `sys_notice`、`sys_notice_read`，关联 `sys_user` | 否 | 保留给后台员工；Phase 8.5 使用 Cupid Inbox 独立实现 C 端通知 |
+| 操作日志 | `sys_oper_log`、RuoYi `@Log` | 尚未覆盖 Cupid 后台接口 | Phase 8.2 起所有后台写操作按需接入 |
+| 登录日志 | `sys_logininfor`、RuoYi 后台认证 | 否 | 继续只记录后台登录；C 端安全事件推迟到生产化阶段 |
+| 在线用户 | `login_tokens:*`、`LoginUser` | 否 | 保留后台在线用户；Phase 8.6 独立实现 Cupid 会话查询和强退 |
+| 定时任务 | Quartz、`sys_job` | 当前未接入 | 保留框架；出现真实补偿或清理任务时再接入 |
+| 数据监控 | Druid 数据源统计 | 是，自动覆盖 | 直接保留，Cupid SQL 已包含在同一数据源统计中 |
+| 服务监控 | 当前 Java 进程 | 是，自动覆盖 | 直接保留，Cupid 服务运行在同一进程中 |
+| 缓存监控 | Redis 实例整体统计 | 是，自动计入 | 直接保留，只授权技术管理员 |
+| 缓存列表 | RuoYi 预设 key 前缀 | 否 | 阶段八不改造成 C 端会话管理工具 |
+
+上述功能必须遵守以下边界：
+
+- 原生用户、在线用户、登录日志和通知公告不得通过兼容分支同时承载 `sys_user` 与 `cm_users`。
+- C 端需要同类能力时，可以复用 RuoYi 页面组件、分页模式和权限模式，但必须使用独立 Cupid Controller、Service、数据表或 Redis key。
+- 系统管理、系统监控和系统工具默认只授予平台管理员和技术人员。
+- 普通 Cupid 运营角色不得获得缓存清理、后台在线用户强退、参数修改、字典修改或定时任务管理权限。
+- 原缓存列表中的全量清理能力可能同时删除后台登录、Cupid 会话、验证码和其他缓存，只能由受控技术账号使用。
+
+### 5.5 字典与参数接入规则
+
+字典适合表达后台显示和选择项，例如：
+
+- 审核原因类别。
+- Staff Task 优先级。
+- 后台筛选标签。
+- 不参与状态机判断的展示枚举。
+
+字典不得取代：
+
+- Profile、Verification、Introduction 或 Registration 的合法状态流转。
+- 权益类型和扣减规则。
+- 隐私受限字段集合。
+- `CupidProfileConstants` 中影响程序分支的字段集合。
+- C 端多语言产品文案。
+
+使用 Cupid 字典时，业务代码必须显式读取 RuoYi 字典服务；仅在后台创建 `cupid_*` 字典不会让现有 Java 或 App 自动使用它。
+
+参数设置适合少量需要运行时调整的非安全运营参数，例如推荐数量或运营功能开关。以下配置继续保留在 YAML、环境变量或专用配置类中：
+
+- 数据库、Redis 和翻译服务连接信息。
+- JWT secret 和令牌基础安全配置。
+- 连接超时、启动失败策略等基础设施配置。
+- 状态机、权限和事务规则。
+
+不得为了使用参数管理而让每次业务调用动态读取大量 `sys_config`。只有运营人员确实需要在线修改且修改后可安全立即生效的值才接入。
+
+### 5.6 日志、审计和会话分层
+
+后台与 C 端的观测能力分为：
+
+1. `sys_logininfor`：RuoYi 后台账号登录、退出和失败记录。
+2. `sys_oper_log`：后台 Controller 操作记录，由 RuoYi `@Log` 产生。
+3. `cm_audit_logs`：Cupid 核心业务状态变更的 before、after、reason 和后台操作人。
+4. Cupid 会话：`cupid:session:*` 保存单会话，`cupid:user-sessions:*` 保存用户全部会话 ID。
+
+阶段八不把 C 端登录写入 `sys_logininfor`。若生产化阶段需要记录登录失败、密码重置、身份解绑和异常设备等安全事件，应设计独立的 Cupid 安全事件模型，不复用后台登录日志表。
+
+原缓存监控会统计整个 Redis 实例，因此已经包含 Cupid key 对 Redis 容量和命令量的影响；原缓存列表没有注册 Cupid key，也不得替代业务会话管理。Cupid 会话强退必须调用 `CupidTokenService`，不能由运营页面直接删除 Redis key。
+
 ## 6. Cupid 菜单与页面结构
 
 ### 6.1 一级目录
@@ -538,6 +610,8 @@ select role_id, role_key from sys_role where role_key like 'cupid_%';
 - 删除“若依官网”菜单及其角色关联。
 - 清理演示公告。
 - 不创建尚无页面文件的 `C` 菜单。
+- 不改造原生用户、通知公告、在线用户、登录日志和缓存列表去兼容 C 端。
+- 普通 Cupid 角色不授予字典、参数、定时任务、缓存清理和后台在线用户强退权限。
 
 前端：
 
@@ -555,6 +629,7 @@ select role_id, role_key from sys_role where role_key like 'cupid_%';
 - 超级管理员仍可使用系统菜单。
 - 停用账号无法登录。
 - 重新登录后菜单和权限变化生效。
+- 原生系统页面仍只管理 RuoYi 后台账号和后台基础设施。
 
 ### 11.2 Phase 8.2：Profile、Photo、Verification 审核
 
@@ -580,6 +655,8 @@ API：
 - 审核请求显式包含目标状态与 reason。
 - Profile、Photo、Verification 联动处于同一事务。
 - 写入审核人、审核时间和业务审计。
+- 后台审核写操作同时使用 RuoYi `@Log`。
+- 页面确实需要可维护的展示枚举时才新增 `cupid_*` 字典，状态机值仍由 Java 和数据库约束。
 - 同步加入对应 `M/C/F` 菜单和角色授权。
 
 ### 11.3 Phase 8.3：Private Introduction
@@ -642,6 +719,8 @@ API：
 要求：
 
 - 建立 `CupidInboxThread` 和 `CupidInboxMessage`。
+- 不修改或复用 `sys_notice`、`sys_notice_read` 承载 C 端通知。
+- RuoYi“通知公告”继续只面向 `sys_user` 后台员工。
 - 支持查询系统通知线程、模板、语言和目标用户。
 - 提供发送前预览。
 - 不允许伪造用户聊天消息。
@@ -659,12 +738,20 @@ API：
 - `GET /cupid/user/list`
 - `GET /cupid/user/{id}`
 - `POST /cupid/user/{id}/status`
+- `GET /cupid/user/{id}/sessions`
+- `DELETE /cupid/user/{id}/sessions/{sessionId}`
+- `DELETE /cupid/user/{id}/sessions`
 
 要求：
 
 - 详情聚合身份、会员、Profile 和近期活动摘要。
 - 只提供明确的停用和恢复动作。
 - 停用时注销该用户全部 Cupid Redis 会话。
+- 会话页面读取 `cupid:session:*` 和 `cupid:user-sessions:*` 对应的结构化会话信息。
+- 单会话强退和全部会话强退必须通过 `CupidTokenService` 完成，不能由 Controller 直接删除 Redis key。
+- 单会话强退前必须验证目标 session 属于 URL 中的用户，不能仅凭任意 session ID 删除会话。
+- 原“在线用户”页面继续只扫描 `login_tokens:*` 和 `LoginUser`，不加入 Cupid 兼容分支。
+- 当前 `CupidLoginUser` 只包含会话、身份、用户和时间信息；只有页面确认需要 IP、设备或 User-Agent 时才扩展模型。
 - 不修改 `sys_user` 代替 `cm_users`。
 - 不提供通用删除按钮。
 - 敏感身份信息按权限分级返回。
@@ -688,6 +775,20 @@ API：
 - Task 失败不能回滚已经完成的核心业务动作。
 - Audit 列表和详情只读。
 - before/after JSON 使用结构化展示，不允许后台修改。
+- `sys_oper_log` 用于查询后台接口调用，`cm_audit_logs` 用于查询 Cupid 业务状态变化，两者不合并。
+
+### 11.8 阶段八后与生产化任务
+
+以下能力不阻塞阶段八后台交付，进入生产化阶段后按实际需求实施：
+
+- C 端登录成功、登录失败、密码重置、身份解绑和异常设备等安全事件日志。
+- Cupid Redis key 数量、会话数量和验证码数量的专用只读监控。
+- 翻译失败补偿、过期业务数据清理等 Quartz 定时任务。
+- 将经过验证、确实需要热更新的运营参数接入 `sys_config`。
+- 更完整的会话设备识别、IP、User-Agent 和异常登录检测。
+- 收紧或移除生产环境“清空全部缓存”等高风险运维能力。
+
+这些任务不得通过修改 RuoYi 原生用户模型来缩短实现路径。
 
 ## 12. 每个子阶段的执行顺序
 
@@ -745,6 +846,7 @@ API：
 - App 用户只存在于 `cm_users`。
 - 停用后台账号不影响 App 用户。
 - 停用 App 用户不修改 RuoYi 后台账号。
+- 原通知公告、在线用户和登录日志只识别 RuoYi 后台账号。
 
 ### 13.4 业务安全
 
@@ -753,6 +855,9 @@ API：
 - Registration 并发确认不会超卖。
 - 权益不会重复扣减或重复返还。
 - User 停用后旧 Cupid token 失效。
+- 单个 Cupid 会话可强退且不影响该用户其他会话。
+- 全部会话强退后该用户所有旧 token 均失效。
+- 会话操作通过 `CupidTokenService` 完成。
 - 核心动作均有操作日志和业务审计。
 
 ## 14. 阶段八完成标准
@@ -767,9 +872,12 @@ API：
 - Profile、Photo、Verification、Introduction、Event Registration 状态机通过验收。
 - Event Registration 不超卖且不重复扣减权益。
 - Inbox 通知不能伪造用户聊天。
+- C 端通知不依赖 `sys_notice` 和 `sys_notice_read`。
 - User 停用会注销全部 Cupid 会话。
+- App User 页面可以查询和受控强退 Cupid 会话，原在线用户页面仍只管理后台登录。
 - Staff Task 使用 RuoYi 用户作为 assignee。
 - Audit Log 只读且记录关键业务动作。
+- RuoYi 字典和参数仅在真实调用点接入，没有取代业务常量、状态机或基础设施配置。
 - `cupid-match-admin` 构建通过。
 - 阶段一至阶段七的前台接口未被破坏。
 
