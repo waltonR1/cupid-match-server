@@ -276,7 +276,7 @@ create table cm_profile_photos (
   url                varchar(500) not null comment '地址',
   is_primary         tinyint(1)   not null default 0 comment '是否主照片',
   sort_order         int          not null default 0 comment '排序顺序',
-  status             varchar(20)  not null comment '资料照片状态；可选值：review, approved, hidden',
+  status             varchar(20)  not null comment '资料照片状态；可选值：review, approved, rejected, hidden',
   created_at         datetime     not null default current_timestamp comment '创建时间',
   updated_at         datetime     not null default current_timestamp on update current_timestamp comment '更新时间',
   primary key (id),
