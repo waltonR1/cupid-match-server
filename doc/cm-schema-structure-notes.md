@@ -2,6 +2,8 @@
 
 本文记录 `sql/cm_schema.sql` 的结构设计取舍，尤其是从“较多 JSON 字段”调整为“关系型多表 + 少量 JSON”的规则。
 
+完整数据库初始化、RuoYi 原始 SQL、Quartz、Cupid seed 和后台菜单脚本的执行顺序见 `doc/cm-database-initialization.md`。
+
 ## 总体原则
 
 - RuoYi 原生 `sys_*`、Quartz 表保持不变。
@@ -206,3 +208,15 @@ sql/cm_seed.sql
 ```
 
 `cm_schema.sql` 会删除并重建全部 `cm_*` 表，因此只适用于当前重构期或明确允许重建的环境。不要在已有正式业务数据的环境直接执行。
+
+该流程只重建 Cupid 业务表和样例数据，不修改 RuoYi、Quartz 或 Cupid 后台菜单。完整开发数据库重建顺序为：
+
+```text
+sql/ry_20260417.sql
+sql/quartz.sql
+sql/cm_schema.sql
+sql/cm_seed.sql
+sql/cm_admin_menu.sql
+```
+
+具体环境限制和 Phase 8 增量规则统一以 `doc/cm-database-initialization.md` 为准。

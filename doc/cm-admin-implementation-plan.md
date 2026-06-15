@@ -13,9 +13,10 @@
 1. `doc/cm-backend-implementation-plan.md`
 2. `doc/cm-api-status.md`
 3. `doc/cm-schema-structure-notes.md`
-4. `doc/reference-from-app/final-api-contract.md`
-5. `doc/reference-from-app/final-data-flow-contract.md`
-6. `sql/cm_schema.sql`
+4. `doc/cm-database-initialization.md`
+5. `doc/reference-from-app/final-api-contract.md`
+6. `doc/reference-from-app/final-data-flow-contract.md`
+7. `sql/cm_schema.sql`
 
 发生冲突时：
 
@@ -473,6 +474,8 @@ RuoYi 的菜单树依赖父级节点。不能只分配按钮权限而遗漏父�
 ```text
 sql/cm_admin_menu.sql
 ```
+
+完整数据库初始化顺序、环境限制和只执行后台增量脚本的方式见 `doc/cm-database-initialization.md`。RuoYi 原始 `ry_20260417.sql` 和 `quartz.sql` 保持不变，不复制修改。
 
 ### 8.1 SQL 职责
 
