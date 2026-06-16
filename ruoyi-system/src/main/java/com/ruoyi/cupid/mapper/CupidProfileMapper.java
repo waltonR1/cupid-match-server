@@ -1,6 +1,7 @@
 package com.ruoyi.cupid.mapper;
 
 import java.util.List;
+import java.util.Map;
 import org.apache.ibatis.annotations.Param;
 import com.ruoyi.cupid.domain.CupidProfile;
 import com.ruoyi.cupid.domain.CupidProfileLanguage;
@@ -21,6 +22,43 @@ import com.ruoyi.cupid.domain.CupidUserEntitlementBalance;
  */
 public interface CupidProfileMapper
 {
+    List<Map<String, Object>> selectAdminProfileList(Map<String, Object> params);
+
+    Map<String, Object> selectAdminProfileDetail(@Param("profileId") String profileId);
+
+    List<Map<String, Object>> selectAdminLocalizedFieldsByProfileId(@Param("profileId") String profileId);
+
+    List<Map<String, Object>> selectAdminLocalizedItemsByProfileId(@Param("profileId") String profileId);
+
+    List<Map<String, Object>> selectAdminPhotosByProfileId(@Param("profileId") String profileId);
+
+    int updateAdminProfileReviewStatus(@Param("profileId") String profileId, @Param("status") String status);
+
+    List<Map<String, Object>> selectAdminPhotoList(Map<String, Object> params);
+
+    Map<String, Object> selectAdminPhotoDetail(@Param("photoId") String photoId);
+
+    int updateAdminPhotoReviewStatus(@Param("photoId") String photoId, @Param("status") String status);
+
+    List<Map<String, Object>> selectAdminVerificationList(Map<String, Object> params);
+
+    Map<String, Object> selectAdminVerificationDetail(@Param("profileId") String profileId);
+
+    int updateAdminVerificationReviewStatus(@Param("profileId") String profileId,
+            @Param("reviewStatus") String reviewStatus,
+            @Param("materialStatus") String materialStatus,
+            @Param("reviewerUserId") String reviewerUserId);
+
+    int insertAdminAuditLog(@Param("id") String id,
+            @Param("actorType") String actorType,
+            @Param("actorUserId") String actorUserId,
+            @Param("subjectType") String subjectType,
+            @Param("subjectId") String subjectId,
+            @Param("action") String action,
+            @Param("beforeData") String beforeData,
+            @Param("afterData") String afterData,
+            @Param("reason") String reason);
+
     /**
      * 分页查询自助征婚资料目录
      */

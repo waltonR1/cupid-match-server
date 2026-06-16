@@ -66,6 +66,349 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         p.activity_level, p.weekend_style, p.pets, p.communication_style,
         p.archived_at, p.created_at, p.updated_at
     </sql>
+    <sql id="adminProfileListWhere">
+        <if test="profileId != null and profileId != ''">
+            and p.id like concat('%', #{profileId}, '%')
+        </if>
+        <if test="profileKeyword != null and profileKeyword != ''">
+            and exists (
+                select 1 from cm_profile_localized_fields lf
+                where lf.profile_id = p.id
+                  and lf.field_name = 'profile_name'
+                  and lf.value like concat('%', #{profileKeyword}, '%')
+            )
+        </if>
+        <if test="userId != null and userId != ''">
+            and o.user_id like concat('%', #{userId}, '%')
+        </if>
+        <if test="userKeyword != null and userKeyword != ''">
+            and u.account_name like concat('%', #{userKeyword}, '%')
+        </if>
+        <if test="profileType != null and profileType != ''">
+            and p.profile_type = #{profileType}
+        </if>
+        <if test="profileStatus != null and profileStatus != ''">
+            and p.profile_status = #{profileStatus}
+        </if>
+        <if test="reviewStatus != null and reviewStatus != ''">
+            and v.review_status = #{reviewStatus}
+        </if>
+        <if test="beginTime != null and beginTime != ''">
+            and p.updated_at &gt;= concat(#{beginTime}, ' 00:00:00')
+        </if>
+        <if test="endTime != null and endTime != ''">
+            and p.updated_at &lt;= concat(#{endTime}, ' 23:59:59')
+        </if>
+    </sql>
+
+    <select id="selectAdminProfileList" parameterType="map" resultType="map">
+        select p.id as profileId, p.profile_type as profileType, p.gender,
+               p.birth_year as birthYear, p.height, p.city_code as cityCode,
+               (select lf.value from cm_profile_localized_fields lf
+                where lf.profile_id = p.id and lf.field_name = 'profile_name' and lf.locale = 'zh'
+                limit 1) as profileName,
+               (select lf.value from cm_profile_localized_fields lf
+                where lf.profile_id = p.id and lf.field_name = 'city' and lf.locale = 'zh'
+                limit 1) as cityLabel,
+               (select lf.value from cm_profile_localized_fields lf
+                where lf.profile_id = p.id and lf.field_name = 'industry' and lf.locale = 'zh'
+                limit 1) as industryLabel,
+               (select lf.value from cm_profile_localized_fields lf
+                where lf.profile_id = p.id and lf.field_name = 'career_direction' and lf.locale = 'zh'
+                limit 1) as careerDirectionLabel,
+               (select lf.value from cm_profile_localized_fields lf
+                where lf.profile_id = p.id and lf.field_name = 'summary' and lf.locale = 'zh'
+                limit 1) as summary,
+               (select group_concat(li.value order by li.item_order separator '、')
+                from cm_profile_localized_items li
+                where li.profile_id = p.id and li.field_name = 'tags' and li.locale = 'zh') as tags,
+               p.profile_status as profileStatus, p.updated_at as updatedAt,
+               o.user_id as ownerUserId, u.account_name as ownerAccountName,
+               v.review_status as reviewStatus, v.identity_status as identityStatus,
+               (select count(1) from cm_profile_photos pp where pp.profile_id = p.id) as photoCount,
+               (select count(1) from cm_profile_photos pp where pp.profile_id = p.id and pp.status = 'review') as photoReviewCount
+        from cm_profiles p
+        left join cm_profile_ownerships o on o.profile_id = p.id and o.status = 'active'
+        left join cm_users u on u.id = o.user_id
+        left join cm_profile_verifications v on v.profile_id = p.id
+        where p.archived_at is null
+        <include refid="adminProfileListWhere"/>
+        <choose>
+            <when test="sortBy == 'updatedDesc'">order by p.updated_at desc</when>
+            <when test="sortBy == 'profileNameAsc'">order by profileName asc, p.updated_at desc</when>
+            <when test="sortBy == 'userNameAsc'">order by ownerAccountName asc, p.updated_at desc</when>
+            <otherwise>
+                order by case p.profile_status
+                             when 'review' then 0
+                             when 'draft' then 1
+                             when 'open' then 2
+                             when 'paused' then 3
+                             when 'hidden' then 4
+                             else 9
+                         end,
+                         p.updated_at desc
+            </otherwise>
+        </choose>
+    </select>
+
+    <select id="selectAdminProfileDetail" resultType="map">
+        select p.id as profileId, p.profile_type as profileType, p.gender,
+               p.birth_year as birthYear, p.height, p.city_code as cityCode,
+               p.country_code as countryCode, p.nationality_code as nationalityCode,
+               p.profile_status as profileStatus, p.family_visible as familyVisible,
+               p.degree_level as degreeLevel, p.education_code as educationCode,
+               p.industry_code as industryCode, p.marital_status as maritalStatus,
+               p.has_children as hasChildren, p.children_plan as childrenPlan,
+               p.accepts_long_distance as acceptsLongDistance,
+               p.dating_intention_code as datingIntentionCode, p.relocation,
+               p.preferred_age_min as preferredAgeMin, p.preferred_age_max as preferredAgeMax,
+               p.preferred_location as preferredLocation, p.smoking, p.drinking,
+               p.activity_level as activityLevel, p.weekend_style as weekendStyle,
+               p.pets, p.communication_style as communicationStyle,
+               p.last_active_at as lastActiveAt, p.created_at as createdAt, p.updated_at as updatedAt,
+               o.user_id as ownerUserId, u.account_name as ownerAccountName
+        from cm_profiles p
+        left join cm_profile_ownerships o on o.profile_id = p.id and o.status = 'active'
+        left join cm_users u on u.id = o.user_id
+        where p.id = #{profileId}
+        limit 1
+    </select>
+
+    <select id="selectAdminLocalizedFieldsByProfileId" resultType="map">
+        select field_name as fieldName, locale, value, status, source, provider, updated_at as updatedAt
+        from cm_profile_localized_fields
+        where profile_id = #{profileId}
+        order by field_name, locale
+    </select>
+
+    <select id="selectAdminLocalizedItemsByProfileId" resultType="map">
+        select field_name as fieldName, item_order as itemOrder, locale, value, status, source, provider, updated_at as updatedAt
+        from cm_profile_localized_items
+        where profile_id = #{profileId}
+        order by field_name, item_order, locale
+    </select>
+
+    <select id="selectAdminPhotosByProfileId" resultType="map">
+        select id, profile_id as profileId, url, is_primary as isPrimary, sort_order as sortOrder,
+               status, created_at as createdAt, updated_at as updatedAt
+        from cm_profile_photos
+        where profile_id = #{profileId}
+        order by sort_order asc
+    </select>
+
+    <update id="updateAdminProfileReviewStatus">
+        update cm_profiles
+        set profile_status = #{status}, updated_at = now()
+        where id = #{profileId}
+    </update>
+
+    <select id="selectAdminPhotoList" parameterType="map" resultType="map">
+        select pp.id as photoId, pp.profile_id as profileId, pp.url, pp.is_primary as isPrimary,
+               pp.sort_order as sortOrder, pp.status, pp.created_at as createdAt, pp.updated_at as updatedAt,
+               p.profile_type as profileType, p.profile_status as profileStatus,
+               p.gender, p.birth_year as birthYear, p.city_code as cityCode,
+               (select lf.value from cm_profile_localized_fields lf
+                where lf.profile_id = p.id and lf.field_name = 'profile_name' and lf.locale = 'zh'
+                limit 1) as profileName,
+               (select lf.value from cm_profile_localized_fields lf
+                where lf.profile_id = p.id and lf.field_name = 'city' and lf.locale = 'zh'
+                limit 1) as cityLabel,
+               (select lf.value from cm_profile_localized_fields lf
+                where lf.profile_id = p.id and lf.field_name = 'summary' and lf.locale = 'zh'
+                limit 1) as summary,
+               o.user_id as ownerUserId, u.account_name as ownerAccountName
+        from cm_profile_photos pp
+        inner join cm_profiles p on p.id = pp.profile_id
+        left join cm_profile_ownerships o on o.profile_id = p.id and o.status = 'active'
+        left join cm_users u on u.id = o.user_id
+        where p.archived_at is null
+        <if test="photoId != null and photoId != ''">
+            and pp.id like concat('%', #{photoId}, '%')
+        </if>
+        <if test="profileId != null and profileId != ''">
+            and pp.profile_id like concat('%', #{profileId}, '%')
+        </if>
+        <if test="profileKeyword != null and profileKeyword != ''">
+            and exists (
+                select 1 from cm_profile_localized_fields lf
+                where lf.profile_id = p.id
+                  and lf.field_name = 'profile_name'
+                  and lf.value like concat('%', #{profileKeyword}, '%')
+            )
+        </if>
+        <if test="userId != null and userId != ''">
+            and o.user_id like concat('%', #{userId}, '%')
+        </if>
+        <if test="userKeyword != null and userKeyword != ''">
+            and u.account_name like concat('%', #{userKeyword}, '%')
+        </if>
+        <if test="status != null and status != ''">
+            and pp.status = #{status}
+        </if>
+        <if test="beginTime != null and beginTime != ''">
+            and pp.updated_at &gt;= concat(#{beginTime}, ' 00:00:00')
+        </if>
+        <if test="endTime != null and endTime != ''">
+            and pp.updated_at &lt;= concat(#{endTime}, ' 23:59:59')
+        </if>
+        <choose>
+            <when test="sortBy == 'updatedDesc'">order by pp.updated_at desc</when>
+            <when test="sortBy == 'profileNameAsc'">order by profileName asc, pp.updated_at desc</when>
+            <when test="sortBy == 'userNameAsc'">order by ownerAccountName asc, pp.updated_at desc</when>
+            <otherwise>
+                order by case pp.status
+                             when 'review' then 0
+                             when 'approved' then 1
+                             when 'rejected' then 2
+                             when 'hidden' then 3
+                             else 9
+                         end,
+                         pp.updated_at desc
+            </otherwise>
+        </choose>
+    </select>
+
+    <select id="selectAdminPhotoDetail" resultType="map">
+        select pp.id as photoId, pp.profile_id as profileId, pp.url, pp.is_primary as isPrimary,
+               pp.sort_order as sortOrder, pp.status, pp.created_at as createdAt, pp.updated_at as updatedAt,
+               p.profile_type as profileType, p.profile_status as profileStatus,
+               p.gender, p.birth_year as birthYear, p.city_code as cityCode,
+               (select lf.value from cm_profile_localized_fields lf
+                where lf.profile_id = p.id and lf.field_name = 'profile_name' and lf.locale = 'zh'
+                limit 1) as profileName,
+               (select lf.value from cm_profile_localized_fields lf
+                where lf.profile_id = p.id and lf.field_name = 'city' and lf.locale = 'zh'
+                limit 1) as cityLabel,
+               (select lf.value from cm_profile_localized_fields lf
+                where lf.profile_id = p.id and lf.field_name = 'summary' and lf.locale = 'zh'
+                limit 1) as summary,
+               o.user_id as ownerUserId, u.account_name as ownerAccountName
+        from cm_profile_photos pp
+        inner join cm_profiles p on p.id = pp.profile_id
+        left join cm_profile_ownerships o on o.profile_id = p.id and o.status = 'active'
+        left join cm_users u on u.id = o.user_id
+        where pp.id = #{photoId}
+        limit 1
+    </select>
+
+    <update id="updateAdminPhotoReviewStatus">
+        update cm_profile_photos
+        set status = #{status}, updated_at = now()
+        where id = #{photoId}
+    </update>
+
+    <select id="selectAdminVerificationList" parameterType="map" resultType="map">
+        select v.profile_id as profileId, v.legal_name as legalName, v.date_of_birth as dateOfBirth,
+               v.identity_status as identityStatus, v.education_status as educationStatus,
+               v.income_status as incomeStatus, v.marital_status as maritalVerificationStatus,
+               v.review_status as reviewStatus, v.verified_at as verifiedAt,
+               v.verified_by_user_id as verifiedByUserId, v.updated_at as updatedAt,
+               p.profile_type as profileType, p.profile_status as profileStatus,
+               p.gender, p.birth_year as birthYear, p.city_code as cityCode,
+               (select lf.value from cm_profile_localized_fields lf
+                where lf.profile_id = p.id and lf.field_name = 'profile_name' and lf.locale = 'zh'
+                limit 1) as profileName,
+               (select lf.value from cm_profile_localized_fields lf
+                where lf.profile_id = p.id and lf.field_name = 'city' and lf.locale = 'zh'
+                limit 1) as cityLabel,
+               o.user_id as ownerUserId, u.account_name as ownerAccountName
+        from cm_profile_verifications v
+        inner join cm_profiles p on p.id = v.profile_id
+        left join cm_profile_ownerships o on o.profile_id = p.id and o.status = 'active'
+        left join cm_users u on u.id = o.user_id
+        where p.archived_at is null
+        <if test="profileId != null and profileId != ''">
+            and v.profile_id like concat('%', #{profileId}, '%')
+        </if>
+        <if test="profileKeyword != null and profileKeyword != ''">
+            and exists (
+                select 1 from cm_profile_localized_fields lf
+                where lf.profile_id = p.id
+                  and lf.field_name = 'profile_name'
+                  and lf.value like concat('%', #{profileKeyword}, '%')
+            )
+        </if>
+        <if test="userId != null and userId != ''">
+            and o.user_id like concat('%', #{userId}, '%')
+        </if>
+        <if test="userKeyword != null and userKeyword != ''">
+            and u.account_name like concat('%', #{userKeyword}, '%')
+        </if>
+        <if test="reviewStatus != null and reviewStatus != ''">
+            and v.review_status = #{reviewStatus}
+        </if>
+        <if test="identityStatus != null and identityStatus != ''">
+            and v.identity_status = #{identityStatus}
+        </if>
+        <if test="beginTime != null and beginTime != ''">
+            and v.updated_at &gt;= concat(#{beginTime}, ' 00:00:00')
+        </if>
+        <if test="endTime != null and endTime != ''">
+            and v.updated_at &lt;= concat(#{endTime}, ' 23:59:59')
+        </if>
+        <choose>
+            <when test="sortBy == 'updatedDesc'">order by v.updated_at desc</when>
+            <when test="sortBy == 'profileNameAsc'">order by profileName asc, v.updated_at desc</when>
+            <when test="sortBy == 'userNameAsc'">order by ownerAccountName asc, v.updated_at desc</when>
+            <otherwise>
+                order by case v.review_status
+                             when 'pending' then 0
+                             when 'unreviewed' then 1
+                             when 'approved' then 2
+                             when 'rejected' then 3
+                             else 9
+                         end,
+                         v.updated_at desc
+            </otherwise>
+        </choose>
+    </select>
+
+    <select id="selectAdminVerificationDetail" resultType="map">
+        select v.id, v.profile_id as profileId, v.legal_name as legalName, v.date_of_birth as dateOfBirth,
+               v.identity_status as identityStatus, v.education_status as educationStatus,
+               v.income_status as incomeStatus, v.marital_status as maritalVerificationStatus,
+               v.review_status as reviewStatus, v.verified_at as verifiedAt,
+               v.verified_by_user_id as verifiedByUserId, v.created_at as createdAt, v.updated_at as updatedAt,
+               p.profile_type as profileType, p.profile_status as profileStatus,
+               p.gender, p.birth_year as birthYear, p.city_code as cityCode,
+               (select lf.value from cm_profile_localized_fields lf
+                where lf.profile_id = p.id and lf.field_name = 'profile_name' and lf.locale = 'zh'
+                limit 1) as profileName,
+               (select lf.value from cm_profile_localized_fields lf
+                where lf.profile_id = p.id and lf.field_name = 'city' and lf.locale = 'zh'
+                limit 1) as cityLabel,
+               o.user_id as ownerUserId, u.account_name as ownerAccountName
+        from cm_profile_verifications v
+        inner join cm_profiles p on p.id = v.profile_id
+        left join cm_profile_ownerships o on o.profile_id = p.id and o.status = 'active'
+        left join cm_users u on u.id = o.user_id
+        where v.profile_id = #{profileId}
+        limit 1
+    </select>
+
+    <update id="updateAdminVerificationReviewStatus">
+        update cm_profile_verifications
+        set review_status = #{reviewStatus},
+            identity_status = #{materialStatus},
+            education_status = #{materialStatus},
+            income_status = #{materialStatus},
+            marital_status = #{materialStatus},
+            verified_at = if(#{reviewStatus} = 'approved', now(), null),
+            verified_by_user_id = #{reviewerUserId},
+            updated_at = now()
+        where profile_id = #{profileId}
+    </update>
+
+    <insert id="insertAdminAuditLog">
+        insert into cm_audit_logs (
+            id, actor_type, actor_user_id, subject_type, subject_id,
+            action, before_data, after_data, reason, created_at
+        ) values (
+            #{id}, #{actorType}, #{actorUserId}, #{subjectType}, #{subjectId},
+            #{action}, #{beforeData}, #{afterData}, #{reason}, now()
+        )
+    </insert>
+
     <sql id="selfProfileWhere">
         p.profile_status in ('open', 'review')
         and p.archived_at is null

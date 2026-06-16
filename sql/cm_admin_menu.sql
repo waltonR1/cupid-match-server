@@ -106,11 +106,39 @@ where not exists (
 -- ----------------------------
 -- 3. Cupid 菜单和角色授权
 -- ----------------------------
--- Phase 8.1 不创建空业务菜单。
--- 后续模块必须在对应 src/views/cupid/**/index.vue 存在后，才追加：
--- 1. 一级 M 目录；
--- 2. 对应 C 页面菜单；
--- 3. 对应 F 按钮权限；
--- 4. 通过 role_key 查询 role_id 后写入 sys_role_menu。
+-- Phase 8.2：审核中心菜单。
+-- 对应页面已存在：
+-- - cupid-match-admin/src/views/cupid/profile/index.vue
+-- - cupid-match-admin/src/views/cupid/photo/index.vue
+-- - cupid-match-admin/src/views/cupid/verification/index.vue
+
+delete from sys_role_menu where menu_id between 2000 and 2039;
+delete from sys_menu where menu_id between 2000 and 2039;
+
+insert into sys_menu values
+('2000', '审核中心', '0', '10', 'cupid', null, '', 'Cupid', 1, 0, 'M', '0', '0', '', 'clipboard', 'admin', sysdate(), '', null, 'Cupid 审核中心目录'),
+('2010', '资料审核', '2000', '1', 'profile', 'cupid/profile/index', '', 'CupidProfile', 1, 0, 'C', '0', '0', 'cupid:profile:list', 'user', 'admin', sysdate(), '', null, 'Cupid 资料审核页面'),
+('2011', '资料查询', '2010', '1', '', '', '', '', 1, 0, 'F', '0', '0', 'cupid:profile:query', '#', 'admin', sysdate(), '', null, ''),
+('2012', '资料审核', '2010', '2', '', '', '', '', 1, 0, 'F', '0', '0', 'cupid:profile:review', '#', 'admin', sysdate(), '', null, ''),
+('2020', '照片审核', '2000', '2', 'photo', 'cupid/photo/index', '', 'CupidPhoto', 1, 0, 'C', '0', '0', 'cupid:photo:list', 'eye', 'admin', sysdate(), '', null, 'Cupid 照片审核页面'),
+('2021', '照片查询', '2020', '1', '', '', '', '', 1, 0, 'F', '0', '0', 'cupid:photo:query', '#', 'admin', sysdate(), '', null, ''),
+('2022', '照片审核', '2020', '2', '', '', '', '', 1, 0, 'F', '0', '0', 'cupid:photo:review', '#', 'admin', sysdate(), '', null, ''),
+('2030', '认证审核', '2000', '3', 'verification', 'cupid/verification/index', '', 'CupidVerification', 1, 0, 'C', '0', '0', 'cupid:verification:list', 'education', 'admin', sysdate(), '', null, 'Cupid 认证审核页面'),
+('2031', '认证查询', '2030', '1', '', '', '', '', 1, 0, 'F', '0', '0', 'cupid:verification:query', '#', 'admin', sysdate(), '', null, ''),
+('2032', '认证审核', '2030', '2', '', '', '', '', 1, 0, 'F', '0', '0', 'cupid:verification:review', '#', 'admin', sysdate(), '', null, '');
+
+insert into sys_role_menu (role_id, menu_id)
+select r.role_id, m.menu_id
+from sys_role r
+join sys_menu m on m.menu_id between 2000 and 2039
+where r.role_key in ('cupid_admin', 'cupid_reviewer')
+  and r.del_flag = '0';
+
+insert into sys_role_menu (role_id, menu_id)
+select r.role_id, m.menu_id
+from sys_role r
+join sys_menu m on m.menu_id in (2000, 2010, 2011, 2020, 2021, 2030, 2031)
+where r.role_key = 'cupid_auditor'
+  and r.del_flag = '0';
 
 commit;

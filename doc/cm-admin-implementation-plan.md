@@ -660,9 +660,9 @@ select role_id, role_key from sys_role where role_key like 'cupid_%';
 - 已补充审核页可读摘要、短 ID 展示、字段中文标签和重复审核保护。
 - Phase 8.2 的正式验收范围收敛为 Profile 发布审核与 Photo 内容审核。
 - 当前 Verification 页面只作为现有 `cm_profile_verifications` 状态的基础查看与临时操作入口，不视为完整认证审核闭环。
-- Verification 当前表结构只有整体认证记录与四个状态字段，没有独立材料附件、材料来源、拒绝原因回传和分项审核流水；完整认证审核拆入 Phase 8.2.1，不能只在页面上伪造。
+- Verification 当前表结构只有整体认证记录与四个状态字段，没有独立材料附件、材料来源、拒绝原因回传和分项审核流水；完整认证审核拆入 Phase 8.2.2，不能只在页面上伪造。
 - 多语言资料文案需要后续拆成独立审核队列，审核单元应为 `profile_id + field_name + locale`，例如 `summary/zh`、`summary/fr`、`summary/en` 各自成条。当前 `cm_profile_localized_fields.status` 表达的是生成/翻译可用状态，不应直接复用为审核结论。
-- 待手工选择测试数据执行一次审核动作，确认 `cm_audit_logs` 和 RuoYi `sys_oper_log` 写入。
+- 已手工执行 Profile 与 Photo 审核写操作，确认状态流转、重复审核保护、`cm_audit_logs` 和 RuoYi `sys_oper_log` 写入。
 
 页面：
 
@@ -676,7 +676,7 @@ API：
 | --- | --- |
 | Profile | `GET /cupid/profile/list`、`GET /cupid/profile/{id}`、`POST /cupid/profile/{id}/review` |
 | Photo | `GET /cupid/photo/list`、`GET /cupid/photo/{id}`、`POST /cupid/photo/{id}/review` |
-| Verification | `GET /cupid/verification/list`、`GET /cupid/verification/{profileId}`、`POST /cupid/verification/{profileId}/review`，当前仅为基础状态入口，后续由 Phase 8.2.1 重构 |
+| Verification | `GET /cupid/verification/list`、`GET /cupid/verification/{profileId}`、`POST /cupid/verification/{profileId}/review`，当前仅为基础状态入口，后续由 Phase 8.2.2 重构 |
 
 要求：
 
@@ -689,11 +689,34 @@ API：
 - 页面确实需要可维护的展示枚举时才新增 `cupid_*` 字典，状态机值仍由 Java 和数据库约束。
 - 同步加入对应 `M/C/F` 菜单和角色授权。
 
-### 11.2.1 Phase 8.2.1：Verification 认证审核闭环
+### 11.2.1 Phase 8.2.1：Profile 内部运营字段与后台补录
 
 定位：
 
-- Phase 8.2.1 专门处理身份、学历、收入、婚姻等认证审核，不并入当前 Profile 发布审核。
+- Phase 8.2.1 专门处理 Profile 的后台运营字段、后台补录字段和内部备注，不并入当前 Profile 发布审核页。
+- 当前 Profile 发布审核页只审核面向 C 端展示的资料内容，不增加独立“展示控制”区。`familyVisible`、隐私偏好和联系方式可见范围保留为资料管理能力，后续如需展示应进入本节或资料管理页，而不是塞入发布审核详情。
+- 内部字段默认不面向 C 端展示，必须先确认字段用途、可见边界和权限后再做后台页面。
+
+后续需要评估：
+
+- `cm_profile_internal_records` 是否在后台提供维护入口，包括 `is_featured`、`source`、`updated_by_user_id`。
+- `cm_profile_internal_localized_fields` 是否作为后台补录资料维护，包括 `employer`、`income_range`、`staff_notes`。
+- 哪些内部字段未来会进入 C 端展示、哪些只服务运营判断，避免内部备注泄露到 App API。
+- 后台补录字段是否需要多语言、翻译状态、审核状态和业务审计。
+- 是否新增独立 Profile 管理页，还是在 Profile 审核通过后提供只读入口跳转到资料管理。
+- 字段修改后是否需要触发资料重新进入待审核，或仅记录业务审计。
+
+8.2.1 完成前：
+
+- 不把内部字段塞入当前 Profile 发布审核页。
+- 不在发布审核页展示 `staff_notes`、收入、雇主等内部/敏感字段。
+- 不让内部字段绕过 C 端资料展示边界直接进入 App profile detail。
+
+### 11.2.2 Phase 8.2.2：Verification 认证审核闭环
+
+定位：
+
+- Phase 8.2.2 专门处理身份、学历、收入、婚姻等认证审核，不并入当前 Profile 发布审核。
 - 当前 `cm_profile_verifications.review_status` 只够表达整体认证状态，不能支撑真实材料审核、拒绝原因回传和重新提交。
 - 本节先作为粗计划占位；等 Phase 8.2 当前修改完成并验收后，再细化数据库、接口、前端页面和迁移方案。
 
@@ -705,9 +728,9 @@ API：
 - 后台是否按认证类型拆分审核队列，或者在同一页面中按身份、学历、收入、婚姻分区处理。
 - 认证通过后如何影响公开资料 `isVerified`、账号中心认证面板、后续会员或介绍权限。
 - 拒绝后是否发送 Inbox 通知，以及通知内容是否引用结构化拒绝原因。
-- 是否保留当前 `cupid/verification` 菜单与接口，或在 8.2.1 中重命名、拆分并重新授权。
+- 是否保留当前 `cupid/verification` 菜单与接口，或在 8.2.2 中重命名、拆分并重新授权。
 
-8.2.1 完成前：
+8.2.2 完成前：
 
 - 不把当前 Verification 页面视为最终认证审核能力。
 - 不要求认证审核具备完整业务闭环。
@@ -923,7 +946,7 @@ API：
 - 业务页面使用 RuoYi 动态菜单加载。
 - 菜单、按钮与 Controller 权限一致。
 - 普通 Cupid 角色与系统管理权限隔离。
-- Profile、Photo、Introduction、Event Registration 状态机通过验收；Verification 认证审核闭环按 Phase 8.2.1 独立验收。
+- Profile、Photo、Introduction、Event Registration 状态机通过验收；Verification 认证审核闭环按 Phase 8.2.2 独立验收。
 - Event Registration 不超卖且不重复扣减权益。
 - Inbox 通知不能伪造用户聊天。
 - C 端通知不依赖 `sys_notice` 和 `sys_notice_read`。
@@ -937,10 +960,13 @@ API：
 
 ## 15. 当前执行入口
 
-Phase 8.2 已完成 Profile 与 Photo 审核的代码、菜单、列表、详情和页面挂载验收。最后只剩写操作的手工验收：
+Phase 8.2 已完成 Profile 与 Photo 审核的代码、菜单、列表、详情、页面挂载和写操作验收。
 
-1. 使用可回滚或可接受变更的测试数据，在资料审核和照片审核中各执行一次通过或拒绝。
-2. 验证审核写操作会写入 `cm_audit_logs`，同时被 RuoYi `sys_oper_log` 记录。
-3. 验证 `cupid_auditor` 只能查看，不能看到或执行审核按钮。
-4. Verification 认证审核闭环暂不作为 Phase 8.2 完成条件，后续进入 Phase 8.2.1 单独设计。
-5. 验证通过后，再进入 Phase 8.3：Private Introduction。
+已确认：
+
+1. 资料审核和照片审核可执行通过或拒绝。
+2. 审核写操作会写入 `cm_audit_logs`，同时被 RuoYi `sys_oper_log` 记录。
+3. 重复审核会被阻止，并提示已处理。
+4. Verification 认证审核闭环暂不作为 Phase 8.2 完成条件，后续进入 Phase 8.2.2 单独设计。
+5. `cupid_auditor` 只读权限作为角色矩阵复验项保留，不阻塞 Phase 8.2 完成。
+6. Phase 8.2 完成后，可进入 Phase 8.3：Private Introduction。
