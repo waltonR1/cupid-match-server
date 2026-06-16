@@ -697,14 +697,72 @@ API：
 - 当前 Profile 发布审核页只审核面向 C 端展示的资料内容，不增加独立“展示控制”区。`familyVisible`、隐私偏好和联系方式可见范围保留为资料管理能力，后续如需展示应进入本节或资料管理页，而不是塞入发布审核详情。
 - 内部字段默认不面向 C 端展示，必须先确认字段用途、可见边界和权限后再做后台页面。
 
-后续需要评估：
+目标：
 
-- `cm_profile_internal_records` 是否在后台提供维护入口，包括 `is_featured`、`source`、`updated_by_user_id`。
-- `cm_profile_internal_localized_fields` 是否作为后台补录资料维护，包括 `employer`、`income_range`、`staff_notes`。
-- 哪些内部字段未来会进入 C 端展示、哪些只服务运营判断，避免内部备注泄露到 App API。
-- 后台补录字段是否需要多语言、翻译状态、审核状态和业务审计。
-- 是否新增独立 Profile 管理页，还是在 Profile 审核通过后提供只读入口跳转到资料管理。
-- 字段修改后是否需要触发资料重新进入待审核，或仅记录业务审计。
+- 建立面向运营人员的 Profile 管理入口，用于维护不会直接进入发布审核页的运营字段。
+- 明确区分“C 端展示资料”“C 端展示控制”“后台内部资料”和“后台备注”。
+- 后台补录的字段必须有权限控制和审计记录，不能绕过现有 App API 字段白名单。
+
+数据边界：
+
+| 数据 | 当前表 | 用途 | C 端可见性 |
+| --- | --- | --- | --- |
+| 精选状态 | `cm_profile_internal_records.is_featured` | 推荐、首页精选、运营排序判断 | 可间接影响推荐，不直接作为详情字段展示 |
+| 资料来源 | `cm_profile_internal_records.source` | 区分自提交、家庭提交、员工采集 | 不直接展示 |
+| 更新人 | `cm_profile_internal_records.updated_by_user_id` | 记录后台或用户操作来源 | 不展示 |
+| 雇主 | `cm_profile_internal_localized_fields.employer` | 后台补录的职业背景 | 默认不展示，若未来展示必须先改 C 端契约 |
+| 收入范围 | `cm_profile_internal_localized_fields.income_range` | 后台补录/认证参考 | 不展示；与认证审核保持边界 |
+| 内部备注 | `cm_profile_internal_localized_fields.staff_notes` | 运营备注、服务记录摘要 | 永不进入 App profile detail |
+
+页面规划：
+
+- 新增或复用独立页面 `cupid/profile-manage/index`，不要塞进 `cupid/profile/index` 发布审核页。
+- 列表可复用 Profile 审核页的查询条件：资料 ID、资料名称、用户 ID、用户名称、类型、状态、更新时间。
+- 列表额外显示运营字段摘要：是否精选、资料来源、最近内部更新时间。
+- 详情页分区：
+  - 基础资料只读摘要：资料名称、用户、资料类型、资料状态、基本信息。
+  - 运营字段：`is_featured`、`source`。
+  - 后台补录字段：`employer`、`income_range`，如保留多语言则使用 `zh/fr/en` 标签切换。
+  - 内部备注：`staff_notes`，仅授权角色可见。
+  - 审计信息：最近更新人、更新时间。
+
+权限规划：
+
+| 能力 | 权限 |
+| --- | --- |
+| 列表 | `cupid:profileManage:list` |
+| 详情 | `cupid:profileManage:query` |
+| 编辑运营字段 | `cupid:profileManage:edit` |
+| 查看内部备注 | `cupid:profileManage:notes` |
+| 编辑内部备注 | `cupid:profileManage:editNotes` |
+
+实现顺序：
+
+1. 先确认是否沿用 `cm_profile_internal_records` 和 `cm_profile_internal_localized_fields`，若字段足够则不新增表。
+2. 在后端新增独立 Controller/Service 方法，不复用发布审核的 `reviewProfile` 写操作。
+3. Mapper 查询 Profile 基础摘要时只挑选后台需要字段，不把 domain 整体序列化。
+4. 写操作更新 `cm_profile_internal_records` 或 `cm_profile_internal_localized_fields`。
+5. 写操作必须写入 `cm_audit_logs`，action 建议使用：
+   - `cupid.profile.internal.update`
+   - `cupid.profile.internal.notes.update`
+6. Controller 写操作接入 RuoYi `@Log`。
+7. `sql/cm_admin_menu.sql` 新增菜单和按钮权限，并授权给需要的运营角色。
+8. 前端新增页面，列表和详情沿用 RuoYi 表格、抽屉或弹窗模式。
+
+重新审核规则：
+
+- 修改 `is_featured`、`source`、`staff_notes` 不触发资料重新进入 `review`。
+- 修改 `employer`、`income_range` 默认不触发重新审核，因为当前不进入 C 端展示。
+- 若未来某个内部补录字段进入 C 端 profile detail，必须先把该字段迁移到正式展示契约，并定义是否触发发布审核。
+
+验收：
+
+- 后台可查看和编辑运营字段。
+- 内部备注只对具备备注权限的角色可见。
+- 修改内部字段后，App profile detail 响应不新增内部字段。
+- 修改写入 `cm_audit_logs` 和 `sys_oper_log`。
+- 发布审核页不出现内部字段。
+- `cupid_auditor` 仍只读业务审计，不具备编辑能力。
 
 8.2.1 完成前：
 
@@ -718,17 +776,154 @@ API：
 
 - Phase 8.2.2 专门处理身份、学历、收入、婚姻等认证审核，不并入当前 Profile 发布审核。
 - 当前 `cm_profile_verifications.review_status` 只够表达整体认证状态，不能支撑真实材料审核、拒绝原因回传和重新提交。
-- 本节先作为粗计划占位；等 Phase 8.2 当前修改完成并验收后，再细化数据库、接口、前端页面和迁移方案。
+- 认证审核必须形成“C 端提交材料、后台分项审核、拒绝原因回传、C 端重新提交”的闭环。
 
-后续需要评估：
+目标：
 
-- 数据库是否新增认证材料表、材料类型、材料状态、附件地址、提交批次、拒绝原因和审核流水。
-- C 端账号中心如何提交认证材料、展示拒绝原因、重新提交，并与当前资料编辑保存逻辑解耦。
-- 后端如何处理 `unverified / pending / verified / rejected` 与 `review_status` 的职责边界，避免两个状态字段表达同一件事。
-- 后台是否按认证类型拆分审核队列，或者在同一页面中按身份、学历、收入、婚姻分区处理。
-- 认证通过后如何影响公开资料 `isVerified`、账号中心认证面板、后续会员或介绍权限。
-- 拒绝后是否发送 Inbox 通知，以及通知内容是否引用结构化拒绝原因。
-- 是否保留当前 `cupid/verification` 菜单与接口，或在 8.2.2 中重命名、拆分并重新授权。
+- 支持身份、学历、收入、婚姻四类认证材料的提交、查看、通过、拒绝和重新提交。
+- 后台审核以材料和认证类型为单位，不再把一条 `cm_profile_verifications` 记录伪装成完整审核材料。
+- 认证通过后稳定影响 C 端 `isVerified`、账号中心认证状态和后续业务权限。
+- 拒绝后 C 端能看到结构化拒绝原因，并可重新提交对应类型材料。
+
+推荐数据模型：
+
+保留 `cm_profile_verifications` 作为 Profile 的认证汇总表：
+
+- `identity_status`
+- `education_status`
+- `income_status`
+- `marital_status`
+- `review_status`
+- `verified_at`
+- `verified_by_user_id`
+
+新增认证材料表，建议命名 `cm_profile_verification_materials`：
+
+| 字段 | 用途 |
+| --- | --- |
+| `id` | 材料 ID |
+| `profile_id` | 关联 Profile |
+| `material_type` | `identity`、`education`、`income`、`marital` |
+| `batch_no` | 提交批次，用于拒绝后重新提交 |
+| `file_url` | 附件地址或材料图片地址 |
+| `file_name` | 原始文件名 |
+| `mime_type` | 文件类型 |
+| `status` | `pending`、`approved`、`rejected`、`superseded` |
+| `reject_reason_code` | 结构化拒绝原因 |
+| `reject_reason_text` | 补充说明 |
+| `submitted_by_user_id` | 提交人 |
+| `reviewed_by_user_id` | 审核人 |
+| `reviewed_at` | 审核时间 |
+| `created_at`、`updated_at` | 时间戳 |
+
+如需要保留多条审核动作流水，可新增 `cm_profile_verification_audit_logs`；否则先复用 `cm_audit_logs` 记录 before/after/reason。
+
+状态职责：
+
+- 材料表 `status` 表达单份材料的审核结果。
+- `cm_profile_verifications.*_status` 表达该认证类型的当前汇总结果。
+- `cm_profile_verifications.review_status` 表达整体验证状态：
+  - 全部关键认证未提交：`unreviewed`
+  - 任一材料待审：`pending`
+  - 必要认证全部通过：`approved`
+  - 任一必要认证被拒且无新待审材料：`rejected`
+- C 端公开资料 `isVerified` 只在身份认证通过且整体规则满足时为 true，具体规则由后端统一计算。
+
+C 端账号中心：
+
+- 账号中心资料认证卡片继续展示身份、学历、收入、婚姻和平台审核五个状态。
+- 身份、学历、收入、婚姻四类认证无论当前状态是 `unverified`、`pending`、`verified` 还是 `rejected`，点击后都打开详情弹窗或内联面板，不再只有未认证时可展开。
+- 已认证状态复用现有只读展示组件：
+  - 身份认证展示脱敏真实姓名、出生日期等可展示摘要。
+  - 学历、收入、婚姻若没有可公开给用户复核的字段，则展示“该认证由平台工作人员审核与维护”。
+  - 已认证内容默认只读，不允许直接改资料字段。
+- 未认证状态展示提交表单：
+  - 身份认证表单至少包含真实姓名、出生日期和材料上传入口。
+  - 学历、收入、婚姻表单按认证类型展示材料上传入口和必要说明。
+  - 保存后进入 `pending`，前端按钮文案改为待审核。
+- 待审核状态展示已提交材料摘要、提交时间和“审核中”提示；是否允许撤回或替换材料需单独定义，默认先不支持撤回。
+- 已拒绝状态展示结构化拒绝原因、补充说明和重新提交入口。
+- 重新提交同类型材料时，旧的 rejected 材料保留，新材料进入 `pending`；如需要，只把旧 pending 标记为 `superseded`。
+- 新增或扩展 API 传输认证材料，不复用资料编辑保存接口：
+  - `GET /account/profiles/{profileId}/verification` 返回四类认证状态、材料摘要、拒绝原因和可操作状态。
+  - `POST /account/profiles/{profileId}/verification/materials` 新增认证材料提交。
+  - 如文件上传已由通用上传接口处理，则提交接口只传材料 URL、文件元信息和认证类型。
+- 认证材料提交不应触发 Profile 发布审核状态变化。
+- 平台审核 `reviewStatus` 只作为整体认证汇总展示，不在 C 端表单中直接编辑。
+
+后台页面：
+
+- 当前 `cupid/verification/index` 可以保留路径，但必须重构为真实材料审核页面。
+- 列表筛选：
+  - 资料 ID、资料名称、用户 ID、用户名称
+  - 认证类型
+  - 材料状态
+  - 提交时间、审核时间
+  - 排序：待审优先、提交时间最新、审核时间最新
+- 列表列：
+  - 资料摘要
+  - 用户
+  - 认证类型
+  - 当前材料状态
+  - 拒绝原因摘要
+  - 提交时间
+  - 审核时间
+- 详情页：
+  - 资料和用户摘要
+  - 当前认证类型的材料预览
+  - 历史提交批次
+  - 已有拒绝原因
+  - 审核操作区：通过、拒绝、拒绝原因快捷选项、补充说明
+- 四类认证是否拆页：
+  - 初期建议同一页面用认证类型筛选和标签区分，减少菜单复杂度。
+  - 如果材料字段差异变大，再拆成身份、学历、收入、婚姻四个子页面。
+
+权限规划：
+
+| 能力 | 权限 |
+| --- | --- |
+| 列表 | `cupid:verification:list` |
+| 详情 | `cupid:verification:query` |
+| 审核 | `cupid:verification:review` |
+| 查看材料附件 | `cupid:verification:material` |
+
+接口规划：
+
+| 端 | 接口 | 用途 |
+| --- | --- | --- |
+| App | `GET /account/profiles/{profileId}/verification` | 查看四类认证状态、材料摘要、拒绝原因和是否可提交 |
+| App | `POST /account/profiles/{profileId}/verification/materials` | 提交认证材料；payload 包含 `materialType`、材料 URL、文件元信息和身份认证补充字段 |
+| Admin | `GET /cupid/verification/list` | 查询材料审核队列 |
+| Admin | `GET /cupid/verification/{materialId}` | 查看材料详情 |
+| Admin | `POST /cupid/verification/{materialId}/review` | 审核材料 |
+
+审计与通知：
+
+- 后台审核写操作必须写入 `cm_audit_logs`，action 建议使用：
+  - `cupid.verification.material.approve`
+  - `cupid.verification.material.reject`
+- Controller 写操作接入 RuoYi `@Log`。
+- 拒绝后建议发送 Cupid Inbox 通知，内容引用结构化拒绝原因。
+- 通过后是否通知用户可配置，默认可以先不发，账号中心状态即时更新即可。
+
+迁移与兼容：
+
+- 现有 `cm_profile_verifications` 数据保留为汇总状态。
+- 若没有历史材料，不伪造材料记录。
+- 当前基础 Verification 页面在 8.2.2 开始时可继续作为临时入口，但完成后必须改为真实材料队列。
+- `sql/cm_admin_menu.sql` 可保留现有 `cupid/verification` 菜单和权限名，减少动态路由迁移成本。
+
+验收：
+
+- C 端可提交四类认证材料。
+- 后台可按认证类型和状态筛选待审材料。
+- 后台可查看材料附件并通过或拒绝。
+- 拒绝原因能回到 C 端账号中心。
+- 重新提交后新材料进入待审，旧材料不丢失。
+- 汇总状态与材料状态一致，不出现材料已拒绝但汇总仍 pending 的不一致状态。
+- 公开资料 `isVerified` 与后端认证规则一致。
+- 审核写入 `cm_audit_logs` 和 `sys_oper_log`。
+- Verification 认证审核闭环通过后，Phase 8.2.2 才算完成。
 
 8.2.2 完成前：
 
