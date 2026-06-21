@@ -779,6 +779,7 @@ API：
 - 已新增资料运营后台接口 `GET /cupid/profile-manage/list`、`GET /cupid/profile-manage/{id}`、`GET /cupid/profile-manage/{id}/notes`、`POST /cupid/profile-manage/{id}/internal`、`POST /cupid/profile-manage/{id}/notes`。
 - 已新增前端页面 `cupid/profile-library/index` 和 `cupid/profile-manage/index`，分别作为只读“资料库”和可操作“资料运营”，不混入 Profile 发布审核页。
 - 资料库详情已只读展示 `cm_profile_internal_records` 和 `cm_profile_internal_localized_fields` 的内部字段，不提供编辑入口。
+- 资料审核、资料库和资料运营详情已只读展示归属关系、联系方式、联系方式开放策略、隐私偏好、家庭可见和最后活跃时间；资料运营仍不提供联系方式或隐私偏好编辑入口。
 - 已接入 `cm_profile_internal_records` 的 `is_featured`、`updated_by_user_id`，以及 `cm_profile_internal_localized_fields` 的 `staff_notes`；`employer`、`income_range` 仅作为只读认证参考展示，`cm_profile_internal_records.source` 仅保留为内部流程预留字段，当前页面不展示、不筛选、不编辑。
 - 内部备注通过独立 notes 接口读取和保存，权限与普通运营字段分离。
 - 写操作已写入 `cm_audit_logs`，操作动作为 `cupid.profile.internal.update` 和 `cupid.profile.internal.notes.update`，同时由 RuoYi `@Log` 写入 `sys_oper_log`。

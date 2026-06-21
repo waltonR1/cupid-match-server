@@ -227,7 +227,9 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
                p.activity_level as activityLevel, p.weekend_style as weekendStyle,
                p.pets, p.communication_style as communicationStyle,
                p.last_active_at as lastActiveAt, p.created_at as createdAt, p.updated_at as updatedAt,
-               o.user_id as ownerUserId, u.account_name as ownerAccountName
+               o.user_id as ownerUserId, o.relationship_to_profile as relationshipToProfile,
+               o.permission as ownershipPermission, o.status as ownershipStatus,
+               u.account_name as ownerAccountName
         from cm_profiles p
         left join cm_profile_ownerships o on o.profile_id = p.id and o.status = 'active'
         left join cm_users u on u.id = o.user_id
@@ -254,7 +256,9 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
                (select lf.value from cm_profile_localized_fields lf
                 where lf.profile_id = p.id and lf.field_name = 'career_direction' and lf.locale = 'zh'
                 limit 1) as careerDirectionLabel,
-               o.user_id as ownerUserId, u.account_name as ownerAccountName,
+               o.user_id as ownerUserId, o.relationship_to_profile as relationshipToProfile,
+               o.permission as ownershipPermission, o.status as ownershipStatus,
+               u.account_name as ownerAccountName,
                ir.id as internalRecordId, coalesce(ir.is_featured, 0) as isFeatured,
                ir.updated_by_user_id as internalUpdatedByUserId, ir.updated_at as internalUpdatedAt
         from cm_profiles p
