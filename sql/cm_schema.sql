@@ -305,7 +305,7 @@ create table cm_profile_internal_records (
   id                 varchar(36) not null comment '资料内部记录ID',
   profile_id         varchar(36) not null comment '资料ID，关联 cm_profiles.id',
   is_featured        tinyint(1)  not null default 0 comment '是否精选',
-  source             varchar(30) default null comment '来源；可选值：self_submitted, family_submitted, staff_collected',
+  source             varchar(30) default null comment '内部记录来源，预留给资料采集或自动精选流程；可选值：self_submitted, family_submitted, staff_collected',
   updated_by_user_id varchar(36) default null comment '更新人用户ID（用户操作人保存 cm_users.id，后台操作人保存 sys_user.user_id 字符串）',
   created_at         datetime    not null default current_timestamp comment '创建时间',
   updated_at         datetime    not null default current_timestamp on update current_timestamp comment '更新时间',

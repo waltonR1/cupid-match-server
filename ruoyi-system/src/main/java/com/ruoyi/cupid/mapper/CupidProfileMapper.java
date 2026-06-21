@@ -59,6 +59,48 @@ public interface CupidProfileMapper
             @Param("afterData") String afterData,
             @Param("reason") String reason);
 
+    List<Map<String, Object>> selectAdminProfileManageList(Map<String, Object> params);
+
+    Map<String, Object> selectAdminProfileManageDetail(@Param("profileId") String profileId);
+
+    Map<String, Object> selectAdminInternalRecordByProfileId(@Param("profileId") String profileId);
+
+    List<Map<String, Object>> selectAdminInternalLocalizedFieldsByProfileId(@Param("profileId") String profileId);
+
+    List<Map<String, Object>> selectAdminInternalLocalizedFieldsByRecordId(@Param("internalRecordId") String internalRecordId);
+
+    int upsertAdminInternalRecord(@Param("id") String id,
+            @Param("profileId") String profileId,
+            @Param("isFeatured") Integer isFeatured,
+            @Param("source") String source,
+            @Param("updatedByUserId") String updatedByUserId);
+
+    int upsertAdminInternalLocalizedField(@Param("id") String id,
+            @Param("internalRecordId") String internalRecordId,
+            @Param("fieldName") String fieldName,
+            @Param("locale") String locale,
+            @Param("value") String value);
+
+    int upsertAdminInternalLocalizedFieldWithMeta(@Param("id") String id,
+            @Param("internalRecordId") String internalRecordId,
+            @Param("fieldName") String fieldName,
+            @Param("locale") String locale,
+            @Param("value") String value,
+            @Param("source") String source,
+            @Param("provider") String provider,
+            @Param("status") String status);
+
+    int upsertPendingAdminInternalLocalizedField(@Param("id") String id,
+            @Param("internalRecordId") String internalRecordId,
+            @Param("fieldName") String fieldName,
+            @Param("locale") String locale);
+
+    int updatePendingAdminInternalLocalizedFieldStatus(
+            @Param("internalRecordId") String internalRecordId,
+            @Param("fieldName") String fieldName,
+            @Param("locale") String locale,
+            @Param("status") String status);
+
     /**
      * 分页查询自助征婚资料目录
      */

@@ -572,7 +572,7 @@ select role_id, role_key from sys_role where role_key like 'cupid_%';
 
 ### 10.2 按真实需要建立
 
-- `cm_profile_internal_records`：后台开始管理 featured、source 或内部字段时建立。
+- `cm_profile_internal_records`：后台开始管理 featured 或内部字段时建立；`source` 仅作为内部流程归因预留字段。
 - `cm_event_agenda_items`：后台开始编辑议程时建立。
 - `cm_staff_task_localized_fields`：页面确实维护多语言 note 时建立。
 - `cm_user_preferences`：后台独立编辑偏好时建立。
@@ -689,40 +689,44 @@ API：
 - 页面确实需要可维护的展示枚举时才新增 `cupid_*` 字典，状态机值仍由 Java 和数据库约束。
 - 同步加入对应 `M/C/F` 菜单和角色授权。
 
-### 11.2.1 Phase 8.2.1：Profile 内部运营字段与后台补录
+### 11.2.1 Phase 8.2.1：Profile 内部运营字段与后台内部资料
 
 定位：
 
-- Phase 8.2.1 专门处理 Profile 的后台运营字段、后台补录字段和内部备注，不并入当前 Profile 发布审核页。
-- 当前 Profile 发布审核页只审核面向 C 端展示的资料内容，不增加独立“展示控制”区。`familyVisible`、隐私偏好和联系方式可见范围保留为资料管理能力，后续如需展示应进入本节或资料管理页，而不是塞入发布审核详情。
+- Phase 8.2.1 专门处理已开放 Profile 的运营控制和内部备注，不并入当前 Profile 发布审核页。
+- 当前 Profile 发布审核页只审核面向 C 端展示的资料内容，不增加独立“展示控制”区。`familyVisible`、隐私偏好和联系方式可见范围保留为资料中心能力，后续如需展示应进入资料库或资料运营页，而不是塞入发布审核详情。
 - 内部字段默认不面向 C 端展示，必须先确认字段用途、可见边界和权限后再做后台页面。
 
 目标：
 
-- 建立面向运营人员的 Profile 管理入口，用于维护不会直接进入发布审核页的运营字段。
+- 建立面向运营人员的 Profile 管理入口，用于维护已开放资料的精选状态和内部备注。
 - 明确区分“C 端展示资料”“C 端展示控制”“后台内部资料”和“后台备注”。
-- 后台补录的字段必须有权限控制和审计记录，不能绕过现有 App API 字段白名单。
+- 后台内部资料字段必须有权限控制和审计记录，不能绕过现有 App API 字段白名单。
 
 数据边界：
 
 | 数据 | 当前表 | 用途 | C 端可见性 |
 | --- | --- | --- | --- |
 | 精选状态 | `cm_profile_internal_records.is_featured` | 推荐、首页精选、运营排序判断 | 可间接影响推荐，不直接作为详情字段展示 |
-| 资料来源 | `cm_profile_internal_records.source` | 区分自提交、家庭提交、员工采集 | 不直接展示 |
+| 内部记录来源 | `cm_profile_internal_records.source` | 预留给资料采集、自动精选等内部流程归因 | 不在 8.2.1 资料运营页展示或编辑 |
 | 更新人 | `cm_profile_internal_records.updated_by_user_id` | 记录后台或用户操作来源 | 不展示 |
-| 雇主 | `cm_profile_internal_localized_fields.employer` | 后台补录的职业背景 | 默认不展示，若未来展示必须先改 C 端契约 |
-| 收入范围 | `cm_profile_internal_localized_fields.income_range` | 后台补录/认证参考 | 不展示；与认证审核保持边界 |
+| 雇主信息 | `cm_profile_internal_localized_fields.employer` | 后台维护的职业背景参考 | 8.2.1 只读；后续进入 8.2.2 认证审核 |
+| 收入范围 | `cm_profile_internal_localized_fields.income_range` | 后台维护的收入/认证参考 | 8.2.1 只读；后续进入 8.2.2 收入认证 |
 | 内部备注 | `cm_profile_internal_localized_fields.staff_notes` | 运营备注、服务记录摘要 | 永不进入 App profile detail |
 
 页面规划：
 
-- 新增或复用独立页面 `cupid/profile-manage/index`，不要塞进 `cupid/profile/index` 发布审核页。
-- 列表可复用 Profile 审核页的查询条件：资料 ID、资料名称、用户 ID、用户名称、类型、状态、更新时间。
-- 列表额外显示运营字段摘要：是否精选、资料来源、最近内部更新时间。
-- 详情页分区：
+- 一级菜单使用“资料中心”，下挂两个页面：
+  - `cupid/profile-library/index`：资料库，只读查看 C 端资料本体、已通过照片和后台内部资料。
+  - `cupid/profile-manage/index`：资料运营，仅展示已开放资料，维护精选和内部备注。
+- 两个页面都不要塞进 `cupid/profile/index` 发布审核页。
+- 资料库列表可复用 Profile 审核页的查询条件：资料 ID、资料名称、用户 ID、用户名称、类型、状态、更新时间。
+- 资料库详情展示完整只读档案：基础资料、婚恋与偏好、生活方式、已通过照片、精选状态、雇主信息、收入范围和内部备注；不提供运营编辑动作。
+- 资料运营列表只进入 `profile_status = open` 的资料，额外显示是否精选、最近内部更新时间、内部备注状态，并可只读显示雇主信息和收入范围作为认证参考。
+- 资料运营详情页分区：
   - 基础资料只读摘要：资料名称、用户、资料类型、资料状态、基本信息。
-  - 运营字段：`is_featured`、`source`。
-  - 后台补录字段：`employer`、`income_range`，如保留多语言则使用 `zh/fr/en` 标签切换。
+  - 运营字段：`is_featured`。
+  - 认证参考：`employer`、`income_range` 只读展示，不在资料运营页编辑。
   - 内部备注：`staff_notes`，仅授权角色可见。
   - 审计信息：最近更新人、更新时间。
 
@@ -730,8 +734,10 @@ API：
 
 | 能力 | 权限 |
 | --- | --- |
-| 列表 | `cupid:profileManage:list` |
-| 详情 | `cupid:profileManage:query` |
+| 资料库列表 | `cupid:profileLibrary:list` |
+| 资料库详情 | `cupid:profileLibrary:query` |
+| 资料运营列表 | `cupid:profileManage:list` |
+| 资料运营详情 | `cupid:profileManage:query` |
 | 编辑运营字段 | `cupid:profileManage:edit` |
 | 查看内部备注 | `cupid:profileManage:notes` |
 | 编辑内部备注 | `cupid:profileManage:editNotes` |
@@ -741,7 +747,7 @@ API：
 1. 先确认是否沿用 `cm_profile_internal_records` 和 `cm_profile_internal_localized_fields`，若字段足够则不新增表。
 2. 在后端新增独立 Controller/Service 方法，不复用发布审核的 `reviewProfile` 写操作。
 3. Mapper 查询 Profile 基础摘要时只挑选后台需要字段，不把 domain 整体序列化。
-4. 写操作更新 `cm_profile_internal_records` 或 `cm_profile_internal_localized_fields`。
+4. 资料运营写操作只更新 `cm_profile_internal_records.is_featured` 或 `staff_notes`。
 5. 写操作必须写入 `cm_audit_logs`，action 建议使用：
    - `cupid.profile.internal.update`
    - `cupid.profile.internal.notes.update`
@@ -751,23 +757,37 @@ API：
 
 重新审核规则：
 
-- 修改 `is_featured`、`source`、`staff_notes` 不触发资料重新进入 `review`。
-- 修改 `employer`、`income_range` 默认不触发重新审核，因为当前不进入 C 端展示。
-- 若未来某个内部补录字段进入 C 端 profile detail，必须先把该字段迁移到正式展示契约，并定义是否触发发布审核。
+- 修改 `is_featured`、`staff_notes` 不触发资料重新进入 `review`。
+- `employer`、`income_range` 不在 8.2.1 编辑；收入范围归入 8.2.2 收入认证，雇主信息随认证资料一起评估。
+- 若未来某个后台内部资料字段进入 C 端 profile detail，必须先把该字段迁移到正式展示契约，并定义是否触发发布审核。
 
 验收：
 
-- 后台可查看和编辑运营字段。
+- 资料运营只展示已开放资料。
+- 资料库可只读查看后台内部字段。
+- 后台可编辑精选状态，资料运营页采用开关切换即保存，不额外放保存按钮。
 - 内部备注只对具备备注权限的角色可见。
-- 修改内部字段后，App profile detail 响应不新增内部字段。
+- 资料运营不能编辑雇主信息和收入范围。
+- 修改精选或内部备注后，App profile detail 响应不新增内部字段。
 - 修改写入 `cm_audit_logs` 和 `sys_oper_log`。
 - 发布审核页不出现内部字段。
 - `cupid_auditor` 仍只读业务审计，不具备编辑能力。
 
-8.2.1 完成前：
+当前实现状态：
+
+- 已新增资料库后台接口 `GET /cupid/profile-library/list`、`GET /cupid/profile-library/{id}`。
+- 已新增资料运营后台接口 `GET /cupid/profile-manage/list`、`GET /cupid/profile-manage/{id}`、`GET /cupid/profile-manage/{id}/notes`、`POST /cupid/profile-manage/{id}/internal`、`POST /cupid/profile-manage/{id}/notes`。
+- 已新增前端页面 `cupid/profile-library/index` 和 `cupid/profile-manage/index`，分别作为只读“资料库”和可操作“资料运营”，不混入 Profile 发布审核页。
+- 资料库详情已只读展示 `cm_profile_internal_records` 和 `cm_profile_internal_localized_fields` 的内部字段，不提供编辑入口。
+- 已接入 `cm_profile_internal_records` 的 `is_featured`、`updated_by_user_id`，以及 `cm_profile_internal_localized_fields` 的 `staff_notes`；`employer`、`income_range` 仅作为只读认证参考展示，`cm_profile_internal_records.source` 仅保留为内部流程预留字段，当前页面不展示、不筛选、不编辑。
+- 内部备注通过独立 notes 接口读取和保存，权限与普通运营字段分离。
+- 写操作已写入 `cm_audit_logs`，操作动作为 `cupid.profile.internal.update` 和 `cupid.profile.internal.notes.update`，同时由 RuoYi `@Log` 写入 `sys_oper_log`。
+- `sql/cm_admin_menu.sql` 已新增独立一级菜单 `资料中心`，下挂二级 `资料库` 与 `资料运营`；`cupid_admin` 默认拥有完整资料中心权限，`cupid_support` 默认只拥有资料库只读权限。
+
+8.2.1 完成后仍需遵守：
 
 - 不把内部字段塞入当前 Profile 发布审核页。
-- 不在发布审核页展示 `staff_notes`、收入、雇主等内部/敏感字段。
+- 资料库可以只读查看 `staff_notes`、收入、雇主等内部/敏感字段；发布审核页不展示这些字段。
 - 不让内部字段绕过 C 端资料展示边界直接进入 App profile detail。
 
 ### 11.2.2 Phase 8.2.2：Verification 认证审核闭环

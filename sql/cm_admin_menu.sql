@@ -106,14 +106,16 @@ where not exists (
 -- ----------------------------
 -- 3. Cupid 菜单和角色授权
 -- ----------------------------
--- Phase 8.2：审核中心菜单。
+-- Phase 8.2：审核中心菜单与资料中心菜单。
 -- 对应页面已存在：
 -- - cupid-match-admin/src/views/cupid/profile/index.vue
 -- - cupid-match-admin/src/views/cupid/photo/index.vue
 -- - cupid-match-admin/src/views/cupid/verification/index.vue
+-- - cupid-match-admin/src/views/cupid/profile-library/index.vue
+-- - cupid-match-admin/src/views/cupid/profile-manage/index.vue
 
-delete from sys_role_menu where menu_id between 2000 and 2039;
-delete from sys_menu where menu_id between 2000 and 2039;
+delete from sys_role_menu where menu_id between 2000 and 2049;
+delete from sys_menu where menu_id between 2000 and 2049;
 
 insert into sys_menu values
 ('2000', '审核中心', '0', '10', 'cupid', null, '', 'Cupid', 1, 0, 'M', '0', '0', '', 'clipboard', 'admin', sysdate(), '', null, 'Cupid 审核中心目录'),
@@ -125,13 +127,28 @@ insert into sys_menu values
 ('2022', '照片审核', '2020', '2', '', '', '', '', 1, 0, 'F', '0', '0', 'cupid:photo:review', '#', 'admin', sysdate(), '', null, ''),
 ('2030', '认证审核', '2000', '3', 'verification', 'cupid/verification/index', '', 'CupidVerification', 1, 0, 'C', '0', '0', 'cupid:verification:list', 'education', 'admin', sysdate(), '', null, 'Cupid 认证审核页面'),
 ('2031', '认证查询', '2030', '1', '', '', '', '', 1, 0, 'F', '0', '0', 'cupid:verification:query', '#', 'admin', sysdate(), '', null, ''),
-('2032', '认证审核', '2030', '2', '', '', '', '', 1, 0, 'F', '0', '0', 'cupid:verification:review', '#', 'admin', sysdate(), '', null, '');
+('2032', '认证审核', '2030', '2', '', '', '', '', 1, 0, 'F', '0', '0', 'cupid:verification:review', '#', 'admin', sysdate(), '', null, ''),
+('2040', '资料中心', '0', '11', 'profile-center', null, '', 'CupidProfileCenterRoot', 1, 0, 'M', '0', '0', '', 'user', 'admin', sysdate(), '', null, 'Cupid 资料中心目录'),
+('2041', '资料库', '2040', '1', 'library', 'cupid/profile-library/index', '', 'CupidProfileLibrary', 1, 0, 'C', '0', '0', 'cupid:profileLibrary:list', 'list', 'admin', sysdate(), '', null, 'Cupid 资料库只读页面'),
+('2042', '资料库查询', '2041', '1', '', '', '', '', 1, 0, 'F', '0', '0', 'cupid:profileLibrary:query', '#', 'admin', sysdate(), '', null, ''),
+('2043', '资料运营', '2040', '2', 'manage', 'cupid/profile-manage/index', '', 'CupidProfileManage', 1, 0, 'C', '0', '0', 'cupid:profileManage:list', 'edit', 'admin', sysdate(), '', null, 'Cupid 资料运营管理页面'),
+('2044', '资料运营查询', '2043', '1', '', '', '', '', 1, 0, 'F', '0', '0', 'cupid:profileManage:query', '#', 'admin', sysdate(), '', null, ''),
+('2045', '运营字段编辑', '2043', '2', '', '', '', '', 1, 0, 'F', '0', '0', 'cupid:profileManage:edit', '#', 'admin', sysdate(), '', null, ''),
+('2046', '内部备注查看', '2043', '3', '', '', '', '', 1, 0, 'F', '0', '0', 'cupid:profileManage:notes', '#', 'admin', sysdate(), '', null, ''),
+('2047', '内部备注编辑', '2043', '4', '', '', '', '', 1, 0, 'F', '0', '0', 'cupid:profileManage:editNotes', '#', 'admin', sysdate(), '', null, '');
+
+insert into sys_role_menu (role_id, menu_id)
+select r.role_id, m.menu_id
+from sys_role r
+join sys_menu m on m.menu_id between 2000 and 2049
+where r.role_key = 'cupid_admin'
+  and r.del_flag = '0';
 
 insert into sys_role_menu (role_id, menu_id)
 select r.role_id, m.menu_id
 from sys_role r
 join sys_menu m on m.menu_id between 2000 and 2039
-where r.role_key in ('cupid_admin', 'cupid_reviewer')
+where r.role_key = 'cupid_reviewer'
   and r.del_flag = '0';
 
 insert into sys_role_menu (role_id, menu_id)
@@ -139,6 +156,13 @@ select r.role_id, m.menu_id
 from sys_role r
 join sys_menu m on m.menu_id in (2000, 2010, 2011, 2020, 2021, 2030, 2031)
 where r.role_key = 'cupid_auditor'
+  and r.del_flag = '0';
+
+insert into sys_role_menu (role_id, menu_id)
+select r.role_id, m.menu_id
+from sys_role r
+join sys_menu m on m.menu_id in (2040, 2041, 2042)
+where r.role_key = 'cupid_support'
   and r.del_flag = '0';
 
 commit;

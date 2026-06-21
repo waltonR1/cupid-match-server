@@ -151,6 +151,67 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         </choose>
     </select>
 
+    <select id="selectAdminProfileManageList" parameterType="map" resultType="map">
+        select p.id as profileId, p.profile_type as profileType, p.gender,
+               p.birth_year as birthYear, p.height, p.city_code as cityCode,
+               (select lf.value from cm_profile_localized_fields lf
+                where lf.profile_id = p.id and lf.field_name = 'profile_name' and lf.locale = 'zh'
+                limit 1) as profileName,
+               (select lf.value from cm_profile_localized_fields lf
+                where lf.profile_id = p.id and lf.field_name = 'city' and lf.locale = 'zh'
+                limit 1) as cityLabel,
+               (select lf.value from cm_profile_localized_fields lf
+                where lf.profile_id = p.id and lf.field_name = 'industry' and lf.locale = 'zh'
+                limit 1) as industryLabel,
+               (select lf.value from cm_profile_localized_fields lf
+                where lf.profile_id = p.id and lf.field_name = 'career_direction' and lf.locale = 'zh'
+                limit 1) as careerDirectionLabel,
+               (select lf.value from cm_profile_localized_fields lf
+                where lf.profile_id = p.id and lf.field_name = 'summary' and lf.locale = 'zh'
+                limit 1) as summary,
+               (select group_concat(li.value order by li.item_order separator '、')
+                from cm_profile_localized_items li
+                where li.profile_id = p.id and li.field_name = 'tags' and li.locale = 'zh') as tags,
+               p.profile_status as profileStatus, p.updated_at as updatedAt,
+               o.user_id as ownerUserId, u.account_name as ownerAccountName,
+               (select count(1) from cm_profile_photos pp where pp.profile_id = p.id) as photoCount,
+               (select count(1) from cm_profile_photos pp where pp.profile_id = p.id and pp.status = 'review') as photoReviewCount,
+               ir.id as internalRecordId, coalesce(ir.is_featured, 0) as isFeatured,
+               ir.updated_by_user_id as internalUpdatedByUserId, su.nick_name as internalUpdatedByName,
+               ir.updated_at as internalUpdatedAt,
+               (select count(distinct ilf.locale) from cm_profile_internal_localized_fields ilf
+                where ilf.internal_record_id = ir.id and ilf.field_name = 'employer' and ilf.value != '') as employerLocaleCount,
+               (select count(distinct ilf.locale) from cm_profile_internal_localized_fields ilf
+                where ilf.internal_record_id = ir.id and ilf.field_name = 'income_range' and ilf.value != '') as incomeRangeLocaleCount,
+               (select count(distinct ilf.locale) from cm_profile_internal_localized_fields ilf
+                where ilf.internal_record_id = ir.id and ilf.field_name = 'staff_notes' and ilf.value != '') as staffNotesLocaleCount,
+               (select ilf.value from cm_profile_internal_localized_fields ilf
+                where ilf.internal_record_id = ir.id and ilf.field_name = 'employer' and ilf.locale = 'zh'
+                limit 1) as employer,
+               (select ilf.value from cm_profile_internal_localized_fields ilf
+                where ilf.internal_record_id = ir.id and ilf.field_name = 'income_range' and ilf.locale = 'zh'
+                limit 1) as incomeRange
+        from cm_profiles p
+        left join cm_profile_ownerships o on o.profile_id = p.id and o.status = 'active'
+        left join cm_users u on u.id = o.user_id
+        left join cm_profile_verifications v on v.profile_id = p.id
+        left join cm_profile_internal_records ir on ir.profile_id = p.id
+        left join sys_user su on cast(su.user_id as char) = ir.updated_by_user_id
+        where p.archived_at is null
+          and p.profile_status = 'open'
+        <include refid="adminProfileListWhere"/>
+        <if test="featured != null and featured != ''">
+            and coalesce(ir.is_featured, 0) = #{featured}
+        </if>
+        <choose>
+            <when test="sortBy == 'internalUpdatedDesc'">order by ir.updated_at desc, p.updated_at desc</when>
+            <when test="sortBy == 'featuredFirst'">order by coalesce(ir.is_featured, 0) desc, p.updated_at desc</when>
+            <when test="sortBy == 'profileNameAsc'">order by profileName asc, p.updated_at desc</when>
+            <when test="sortBy == 'userNameAsc'">order by ownerAccountName asc, p.updated_at desc</when>
+            <otherwise>order by p.updated_at desc</otherwise>
+        </choose>
+    </select>
+
     <select id="selectAdminProfileDetail" resultType="map">
         select p.id as profileId, p.profile_type as profileType, p.gender,
                p.birth_year as birthYear, p.height, p.city_code as cityCode,
@@ -173,6 +234,131 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         where p.id = #{profileId}
         limit 1
     </select>
+
+    <select id="selectAdminProfileManageDetail" resultType="map">
+        select p.id as profileId, p.profile_type as profileType, p.gender,
+               p.birth_year as birthYear, p.height, p.city_code as cityCode,
+               p.country_code as countryCode, p.nationality_code as nationalityCode,
+               p.profile_status as profileStatus, p.family_visible as familyVisible,
+               p.degree_level as degreeLevel, p.education_code as educationCode,
+               p.industry_code as industryCode, p.created_at as createdAt, p.updated_at as updatedAt,
+               (select lf.value from cm_profile_localized_fields lf
+                where lf.profile_id = p.id and lf.field_name = 'profile_name' and lf.locale = 'zh'
+                limit 1) as profileName,
+               (select lf.value from cm_profile_localized_fields lf
+                where lf.profile_id = p.id and lf.field_name = 'city' and lf.locale = 'zh'
+                limit 1) as cityLabel,
+               (select lf.value from cm_profile_localized_fields lf
+                where lf.profile_id = p.id and lf.field_name = 'industry' and lf.locale = 'zh'
+                limit 1) as industryLabel,
+               (select lf.value from cm_profile_localized_fields lf
+                where lf.profile_id = p.id and lf.field_name = 'career_direction' and lf.locale = 'zh'
+                limit 1) as careerDirectionLabel,
+               o.user_id as ownerUserId, u.account_name as ownerAccountName,
+               ir.id as internalRecordId, coalesce(ir.is_featured, 0) as isFeatured,
+               ir.updated_by_user_id as internalUpdatedByUserId, ir.updated_at as internalUpdatedAt
+        from cm_profiles p
+        left join cm_profile_ownerships o on o.profile_id = p.id and o.status = 'active'
+        left join cm_users u on u.id = o.user_id
+        left join cm_profile_internal_records ir on ir.profile_id = p.id
+        where p.id = #{profileId}
+          and p.archived_at is null
+          and p.profile_status = 'open'
+        limit 1
+    </select>
+
+    <select id="selectAdminInternalRecordByProfileId" resultType="map">
+        select id as internalRecordId, profile_id as profileId, is_featured as isFeatured,
+               source, updated_by_user_id as internalUpdatedByUserId,
+               created_at as createdAt, updated_at as updatedAt
+        from cm_profile_internal_records
+        where profile_id = #{profileId}
+        limit 1
+    </select>
+
+    <select id="selectAdminInternalLocalizedFieldsByProfileId" resultType="map">
+        select ilf.id, ilf.field_name as fieldName, ilf.locale, ilf.value, ilf.source,
+               ilf.provider, ilf.status, ilf.updated_at as updatedAt
+        from cm_profile_internal_records ir
+        inner join cm_profile_internal_localized_fields ilf on ilf.internal_record_id = ir.id
+        where ir.profile_id = #{profileId}
+        order by ilf.field_name, ilf.locale
+    </select>
+
+    <select id="selectAdminInternalLocalizedFieldsByRecordId" resultType="map">
+        select id, field_name as fieldName, locale, value, source,
+               provider, status, updated_at as updatedAt
+        from cm_profile_internal_localized_fields
+        where internal_record_id = #{internalRecordId}
+        order by field_name, locale
+    </select>
+
+    <insert id="upsertAdminInternalRecord">
+        insert into cm_profile_internal_records (
+            id, profile_id, is_featured, source, updated_by_user_id, created_at, updated_at
+        )
+        values (
+            #{id}, #{profileId}, #{isFeatured}, #{source}, #{updatedByUserId}, now(), now()
+        )
+        on duplicate key update
+            is_featured = values(is_featured),
+            updated_by_user_id = values(updated_by_user_id),
+            updated_at = now()
+    </insert>
+
+    <insert id="upsertAdminInternalLocalizedField">
+        insert into cm_profile_internal_localized_fields (
+            id, internal_record_id, field_name, locale, value, source, provider, status, created_at, updated_at
+        )
+        values (
+            #{id}, #{internalRecordId}, #{fieldName}, #{locale}, #{value}, 'manual', 'human', 'ready', now(), now()
+        )
+        on duplicate key update
+            value = values(value),
+            source = values(source),
+            provider = values(provider),
+            status = values(status),
+            updated_at = now()
+    </insert>
+
+    <insert id="upsertAdminInternalLocalizedFieldWithMeta">
+        insert into cm_profile_internal_localized_fields (
+            id, internal_record_id, field_name, locale, value, source, provider, status, created_at, updated_at
+        )
+        values (
+            #{id}, #{internalRecordId}, #{fieldName}, #{locale}, #{value}, #{source}, #{provider}, #{status}, now(), now()
+        )
+        on duplicate key update
+            value = values(value),
+            source = values(source),
+            provider = values(provider),
+            status = values(status),
+            updated_at = now()
+    </insert>
+
+    <insert id="upsertPendingAdminInternalLocalizedField">
+        insert into cm_profile_internal_localized_fields (
+            id, internal_record_id, field_name, locale, value, source, provider, status, created_at, updated_at
+        )
+        values (
+            #{id}, #{internalRecordId}, #{fieldName}, #{locale}, '', 'machine', 'libretranslate', 'pending', now(), now()
+        )
+        on duplicate key update
+            value = if(status in ('pending', 'failed') or trim(value) = '', values(value), value),
+            source = if(status in ('pending', 'failed') or trim(value) = '', values(source), source),
+            provider = if(status in ('pending', 'failed') or trim(value) = '', values(provider), provider),
+            status = if(status in ('pending', 'failed') or trim(value) = '', values(status), status),
+            updated_at = if(status in ('pending', 'failed') or trim(value) = '', now(), updated_at)
+    </insert>
+
+    <update id="updatePendingAdminInternalLocalizedFieldStatus">
+        update cm_profile_internal_localized_fields
+        set status = #{status}, updated_at = now()
+        where internal_record_id = #{internalRecordId}
+          and field_name = #{fieldName}
+          and locale = #{locale}
+          and status = 'pending'
+    </update>
 
     <select id="selectAdminLocalizedFieldsByProfileId" resultType="map">
         select field_name as fieldName, locale, value, status, source, provider, updated_at as updatedAt

@@ -138,6 +138,79 @@ public class CupidTranslationServiceImpl implements ICupidTranslationService, In
         }
     }
 
+    @Override
+    public void prepareInternalTranslations(String internalRecordId, String sourceLocale, List<String> fieldNames)
+    {
+        if (!enabled || fieldNames == null || fieldNames.isEmpty())
+        {
+            return;
+        }
+
+        for (String fieldName : fieldNames)
+        {
+            String sourceText = findInternalLocalizedFieldValue(internalRecordId, fieldName, sourceLocale);
+            if (!StringUtils.hasText(sourceText))
+            {
+                continue;
+            }
+
+            for (String targetLocale : ALL_LOCALES)
+            {
+                if (targetLocale.equals(sourceLocale)
+                        || StringUtils.hasText(findInternalLocalizedFieldValue(internalRecordId, fieldName, targetLocale)))
+                {
+                    continue;
+                }
+                profileMapper.upsertPendingAdminInternalLocalizedField(
+                        IdUtils.fastUUID(), internalRecordId, fieldName, targetLocale);
+            }
+        }
+    }
+
+    @Override
+    @Async("threadPoolTaskExecutor")
+    public void requestInternalTranslations(String internalRecordId, String sourceLocale, List<String> fieldNames)
+    {
+        if (!enabled || fieldNames == null || fieldNames.isEmpty())
+        {
+            return;
+        }
+
+        for (String fieldName : fieldNames)
+        {
+            String sourceText = findInternalLocalizedFieldValue(internalRecordId, fieldName, sourceLocale);
+            if (!StringUtils.hasText(sourceText))
+            {
+                continue;
+            }
+
+            for (String targetLocale : ALL_LOCALES)
+            {
+                if (targetLocale.equals(sourceLocale))
+                {
+                    continue;
+                }
+
+                if (StringUtils.hasText(findInternalLocalizedFieldValue(internalRecordId, fieldName, targetLocale)))
+                {
+                    continue;
+                }
+
+                String translated = callLibreTranslate(sourceText, sourceLocale, targetLocale);
+                if (translated == null)
+                {
+                    profileMapper.updatePendingAdminInternalLocalizedFieldStatus(
+                            internalRecordId, fieldName, targetLocale, "failed");
+                    continue;
+                }
+
+                profileMapper.upsertAdminInternalLocalizedFieldWithMeta(
+                        IdUtils.fastUUID(), internalRecordId, fieldName, targetLocale,
+                        translated, "machine", "libretranslate", "ready");
+            }
+        }
+    }
+
     private RestTemplate createRestTemplate()
     {
         SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
@@ -184,6 +257,23 @@ public class CupidTranslationServiceImpl implements ICupidTranslationService, In
                     && StringUtils.hasText(row.getValue()))
             {
                 return row.getValue();
+            }
+        }
+        return "";
+    }
+
+    private String findInternalLocalizedFieldValue(String internalRecordId, String fieldName, String locale)
+    {
+        List<Map<String, Object>> rows =
+                profileMapper.selectAdminInternalLocalizedFieldsByRecordId(internalRecordId);
+        for (Map<String, Object> row : rows)
+        {
+            if (fieldName.equals(row.get("fieldName"))
+                    && locale.equals(row.get("locale"))
+                    && "ready".equals(row.get("status"))
+                    && StringUtils.hasText(String.valueOf(row.get("value"))))
+            {
+                return String.valueOf(row.get("value"));
             }
         }
         return "";
