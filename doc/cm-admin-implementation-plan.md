@@ -794,8 +794,9 @@ API：
 
 定位：
 
-- Phase 8.2.2 专门处理身份、学历、收入、婚姻等认证审核，不并入当前 Profile 发布审核。
-- 当前 `cm_profile_verifications.review_status` 只够表达整体认证状态，不能支撑真实材料审核、拒绝原因回传和重新提交。
+- Phase 8.2.2 专门处理身份、学历、收入、婚姻四类认证材料审核，不并入当前 Profile 发布审核。
+- 平台审核归属于 Profile 发布审核，对应 `cm_profiles.profile_status`，不再归属于 Verification。
+- 当前 `cm_profile_verifications.review_status` 只能作为历史兼容或派生汇总字段，不能继续伪装成独立“平台审核”。
 - 认证审核必须形成“C 端提交材料、后台分项审核、拒绝原因回传、C 端重新提交”的闭环。
 
 目标：
@@ -804,6 +805,7 @@ API：
 - 后台审核以材料和认证类型为单位，不再把一条 `cm_profile_verifications` 记录伪装成完整审核材料。
 - 认证通过后稳定影响 C 端 `isVerified`、账号中心认证状态和后续业务权限。
 - 拒绝后 C 端能看到结构化拒绝原因，并可重新提交对应类型材料。
+- C 端账号中心继续展示五个状态，但“平台审核”直接读取 Profile 发布审核状态。
 
 推荐数据模型：
 
@@ -813,7 +815,7 @@ API：
 - `education_status`
 - `income_status`
 - `marital_status`
-- `review_status`
+- `review_status`：兼容字段或派生汇总字段，不能作为平台审核来源
 - `verified_at`
 - `verified_by_user_id`
 
@@ -842,16 +844,24 @@ API：
 
 - 材料表 `status` 表达单份材料的审核结果。
 - `cm_profile_verifications.*_status` 表达该认证类型的当前汇总结果。
-- `cm_profile_verifications.review_status` 表达整体验证状态：
+- `cm_profile_verifications.review_status` 只表达四类认证材料的整体汇总状态，或后续考虑废弃；它不表达平台审核：
   - 全部关键认证未提交：`unreviewed`
   - 任一材料待审：`pending`
   - 必要认证全部通过：`approved`
   - 任一必要认证被拒且无新待审材料：`rejected`
+- `cm_profiles.profile_status` 表达平台审核：
+  - `review`：平台审核中
+  - `open`：平台审核通过，资料可进入 C 端公开展示范围
+  - `hidden`：平台审核未通过或资料被隐藏
+  - 其他状态按 Profile 生命周期语义展示，不挪到 Verification 解释
 - C 端公开资料 `isVerified` 只在身份认证通过且整体规则满足时为 true，具体规则由后端统一计算。
 
 C 端账号中心：
 
 - 账号中心资料认证卡片继续展示身份、学历、收入、婚姻和平台审核五个状态。
+- 身份、学历、收入、婚姻四项来自 Verification 四个认证汇总字段。
+- 平台审核来自 Profile 发布审核状态，不读取 `cm_profile_verifications.review_status`。
+- 平台审核点击后只展示资料发布审核说明和当前状态，不提交认证材料；资料内容修改和重新提交仍走 Profile 资料编辑/发布审核链路。
 - 身份、学历、收入、婚姻四类认证无论当前状态是 `unverified`、`pending`、`verified` 还是 `rejected`，点击后都打开详情弹窗或内联面板，不再只有未认证时可展开。
 - 已认证状态复用现有只读展示组件：
   - 身份认证展示脱敏真实姓名、出生日期等可展示摘要。
@@ -867,13 +877,16 @@ C 端账号中心：
 - 新增或扩展 API 传输认证材料，不复用资料编辑保存接口：
   - `GET /account/profiles/{profileId}/verification` 返回四类认证状态、材料摘要、拒绝原因和可操作状态。
   - `POST /account/profiles/{profileId}/verification/materials` 新增认证材料提交。
+  - Profile 详情或账号概览接口需要返回平台审核状态，供账号中心“平台审核”使用。
   - 如文件上传已由通用上传接口处理，则提交接口只传材料 URL、文件元信息和认证类型。
 - 认证材料提交不应触发 Profile 发布审核状态变化。
-- 平台审核 `reviewStatus` 只作为整体认证汇总展示，不在 C 端表单中直接编辑。
+- Verification 接口不再返回一个可被前端解释为“平台审核”的 `reviewStatus`；如保留该字段，只能命名或注释为认证汇总状态。
 
 后台页面：
 
 - 当前 `cupid/verification/index` 可以保留路径，但必须重构为真实材料审核页面。
+- 后台不再保留一个“认证审核”总审核操作；页面只处理身份、学历、收入、婚姻四类材料。
+- 平台审核继续由 `cupid/profile/index` 资料审核页承担。
 - 列表筛选：
   - 资料 ID、资料名称、用户 ID、用户名称
   - 认证类型
@@ -897,6 +910,7 @@ C 端账号中心：
 - 四类认证是否拆页：
   - 初期建议同一页面用认证类型筛选和标签区分，减少菜单复杂度。
   - 如果材料字段差异变大，再拆成身份、学历、收入、婚姻四个子页面。
+- 当前粗粒度 `POST /cupid/verification/{profileId}/review` 完成 8.2.2 后应移除、废弃或仅保留兼容转发，不能继续一次性修改四类认证状态。
 
 权限规划：
 
@@ -913,6 +927,7 @@ C 端账号中心：
 | --- | --- | --- |
 | App | `GET /account/profiles/{profileId}/verification` | 查看四类认证状态、材料摘要、拒绝原因和是否可提交 |
 | App | `POST /account/profiles/{profileId}/verification/materials` | 提交认证材料；payload 包含 `materialType`、材料 URL、文件元信息和身份认证补充字段 |
+| App | 账号概览或 Profile 详情接口 | 返回 `profileStatus` 或派生的 `platformReviewStatus`，用于展示平台审核 |
 | Admin | `GET /cupid/verification/list` | 查询材料审核队列 |
 | Admin | `GET /cupid/verification/{materialId}` | 查看材料详情 |
 | Admin | `POST /cupid/verification/{materialId}/review` | 审核材料 |
@@ -932,16 +947,20 @@ C 端账号中心：
 - 若没有历史材料，不伪造材料记录。
 - 当前基础 Verification 页面在 8.2.2 开始时可继续作为临时入口，但完成后必须改为真实材料队列。
 - `sql/cm_admin_menu.sql` 可保留现有 `cupid/verification` 菜单和权限名，减少动态路由迁移成本。
+- C 端账号中心需要迁移平台审核取值来源：从 Verification 的 `reviewStatus` 改为 Profile 的 `profileStatus` 或后端派生字段。
+- 后端需要检查所有 `reviewStatus` 命名，避免前端继续把认证汇总状态误解为平台审核。
 
 验收：
 
 - C 端可提交四类认证材料。
+- C 端五个状态来源清晰：四类认证来自 Verification，平台审核来自 Profile。
 - 后台可按认证类型和状态筛选待审材料。
 - 后台可查看材料附件并通过或拒绝。
 - 拒绝原因能回到 C 端账号中心。
 - 重新提交后新材料进入待审，旧材料不丢失。
 - 汇总状态与材料状态一致，不出现材料已拒绝但汇总仍 pending 的不一致状态。
 - 公开资料 `isVerified` 与后端认证规则一致。
+- 资料审核通过或拒绝只影响平台审核展示，不会批量修改四类认证状态。
 - 审核写入 `cm_audit_logs` 和 `sys_oper_log`。
 - Verification 认证审核闭环通过后，Phase 8.2.2 才算完成。
 
@@ -950,6 +969,7 @@ C 端账号中心：
 - 不把当前 Verification 页面视为最终认证审核能力。
 - 不要求认证审核具备完整业务闭环。
 - 不为认证材料伪造页面字段或把现有状态字段强行解释成材料审核结果。
+- 不再把 `cm_profile_verifications.review_status` 称为平台审核。
 
 ### 11.3 Phase 8.3：Private Introduction
 
