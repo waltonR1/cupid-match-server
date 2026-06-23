@@ -1027,7 +1027,7 @@ C 端账号中心：
 
 ### 11.2.3 Phase 8.2.3：Verification 安全与 Profile 编辑边界补强
 
-Phase 8.2.3 位于 Phase 8.2.2 和 Phase 8.3 之间。它不阻塞认证审核闭环完成，只承接认证材料安全治理、后台材料补录、认证重置和 Profile 后台编辑边界，不再扩展成完整认证重构。
+Phase 8.2.3 位于 Phase 8.2.2 和 Phase 8.2.4 之间。它不阻塞认证审核闭环完成，只承接认证材料安全治理、后台材料补录、认证重置和 Profile 后台编辑边界，不再扩展成完整认证重构。
 
 - 为认证材料补充病毒/内容扫描。
 - 如后续迁移对象存储，可将当前后端流式响应替换为短期签名地址，但仍不能裸露直连敏感材料。
@@ -1057,6 +1057,254 @@ Phase 8.2.3 位于 Phase 8.2.2 和 Phase 8.3 之间。它不阻塞认证审核�
 - 后台页面可重置某个资料的某类认证状态，使用 `cupid:verification:reset`，重置后 C 端可重新提交。
 - C 端仍不支持替换 pending 材料；被拒绝后重新提交新材料。
 - 当前安全检查是基础签名检查，不等同于完整外部杀毒引擎；如上线需要更强扫描，可在此阶段继续接入外部扫描服务。
+
+### 11.2.4 Phase 8.2.4：后端统一枚举语义
+
+Phase 8.2.4 位于 Phase 8.2.3 和 Phase 8.3 之间。它不新增主要业务流程，目标是把前端零散维护的枚举、状态和可选项语义收回后端，由后端统一输出 code、label 和 options。C 端与 Admin 后台都是消费方，不能再各自维护同一批业务 code 的翻译。
+
+总体原则：
+
+- 数据库业务表只保存稳定 code，不保存中文、英文、法文展示名。
+- 保存接口只接收 code，不接收 label。
+- 后端按请求 `lang` 或后台默认语言统一输出 label。
+- C 端和 Admin 不再各自维护同一字段的翻译逻辑。
+- 先复用现有 App、Account、Admin 接口，不为了 8.2.4.1 强行新增独立字典接口。
+- 表单 options 如需统一来源，优先挂载在现有详情或编辑相关接口返回中；后续复用压力变大时再拆只读字典接口。
+- 动态管理不进入 8.2.4.1 和 8.2.4.2，避免把小重构扩展成字典中心建设。
+- 只要字段值是后端返回的稳定 code，且页面要展示给用户或运营人员，就应在 8.2.4.1 统一映射；不再因为它属于 membership、event、message 或 introduction 就推迟。
+- 8.2.4.2 只处理有写入或筛选交互的地方；C 端目前主要是 Account Profile 和 Account Settings，Admin 目前主要是 Profile、Photo、Verification、资料库、资料运营相关页面。
+
+#### 11.2.4.1 后端返回枚举与状态统一映射
+
+目标：
+
+- 整理当前所有由后端返回、且需要展示的枚举 code、状态 code 和原因 code。
+- 新增后端统一枚举映射层，例如 `CupidDictionaryResolver` / `CupidEnumResolver`，不要局限在 Profile 命名。
+- App 与 Admin DTO 在返回前统一经过映射层，输出 code 和对应 label。
+- 原字段继续保留 code，新增或补齐对应 label 字段，避免破坏前端保存和筛选逻辑。
+
+覆盖字段：
+
+以下字段按模块登记。执行时如果发现同一 code 在多个模块复用，应收敛到同一个枚举组；如果发现后端新增 code，也必须同步补 label 和前端类型。
+
+Profile / Account Profile：
+
+- `profileType`：`self`、`family`
+- `profileStatus`：`draft`、`review`、`open`、`paused`、`hidden`
+- `profilePermission`：`owner`、`manager`
+- `ownershipStatus`：`active`
+- `gender`
+- `languages`
+- `degreeLevel`
+- `maritalStatus`
+- `hasChildren`
+- `childrenPlan`
+- `acceptsLongDistance`
+- `datingIntentionCode`
+- `relocation`
+- `relationshipValues`
+- `preferredLocation`
+- `smoking`
+- `drinking`
+- `activityLevel`
+- `pets`
+- `weekendStyle`
+- `communicationStyle`
+- `familyVisible`
+- `relationshipToProfile`
+- `preferredChannel`
+- `contactVisibility`
+- `contactUnavailableReason`
+- `familyMode` / `familySupport`
+- `photoStatus`
+
+Profile Directory：
+
+- `sort`：`recentActive`、`priorityFirst`、`ageAsc`、`ageDesc`
+- `ageRange`：`under25`、`25to29`、`30to34`、`35to39`、`40plus`
+- `heightRange`：`under165`、`165to169`、`170to174`、`175to179`、`180plus`
+- `education`：`bachelor`、`master`、`phd`
+- `verified`：`verified`、`unverified`
+- `hasChildren` filter：`yes`、`no`
+- `acceptsLongDistance` filter：`yes`、`no`
+- `familyMode` filter：`context_only`、`contact_ready`、`priority`
+
+Account Settings：
+
+- `accountStatus`
+- `preferredLocale`
+- `preferredContactChannel`
+- `preferredCity`
+- `staffContactEnabled`
+- `familyAssistEnabled`
+- `introductionUpdatesEnabled`
+- `eventRemindersEnabled`
+- `serviceAnnouncementsEnabled`
+- `marketingEmailsEnabled`
+- `analyticsConsentEnabled`
+- `identityProvider` / `mfaMethod`：`email`、`phone`
+- `securityChallengeAction`：`change_password`、`deactivate_account`、`export_data`、`unbind_identity`
+
+Verification：
+
+- `verificationStatus`：`unverified`、`pending`、`verified`、`rejected`
+- `verificationMaterialType`：`identity`、`education`、`income`、`marital`
+- `verificationMaterialStatus`：`pending`、`approved`、`rejected`
+- `reviewStatus`：`pending`、`approved`、`rejected`
+- `scanStatus`：`passed`、`failed`、`pending`
+
+Membership：
+
+- `membershipTier`：`free`、`silver`、`gold`、`diamond`
+- `membershipStatus`
+- `entitlementCode`：`private_introduction`、`event_registration`、`event_priority`、`staff_review`、`profile_detail_access`
+- `upgradeStatus`：`pending_external_flow`
+
+Events：
+
+- `eventStatus`
+- `registrationStatus`
+- `addressLockReason`：`login_required`、`registration_required`、`confirmation_required`
+- `eventLanguageCode`
+- `eventFormat`
+- `audience`
+- `relationshipFocus`
+
+Event 相关字段在 C 端不走自由输入。只要接口返回稳定 code，8.2.4.1 必须输出对应 label；如果后续 Event Admin 提供写入或筛选入口，再在对应阶段消费同一套 options。
+
+Private Introduction / Relationship：
+
+- `introductionStatus`
+- `introductionContactReason`：`not_found`、`forbidden`、`not_accepted`、`contact_unavailable`、`visibility_restricted`
+- `inboxSubjectType`：`profile`、`event`、`private_introduction_request`、`membership`、`legal_document`
+
+Admin Profile / Photo / Verification：
+
+- `profileType`
+- `profileStatus`
+- `photoStatus`
+- `verificationMaterialType`
+- `verificationMaterialStatus`
+- `reviewStatus`
+- `scanStatus`
+- `isFeatured`
+- `source` 等后台内部流程字段如果展示给运营，也必须由后端输出 label。
+
+已定判断与仍需保留的争议字段：
+
+- `country` / `nationality`：后端数据库已有 `country_code` / `nationality_code` 语义，8.2.4.2 优先收敛为稳定 code。
+- `city`：C 端当前为文本；如果没有城市库，8.2.4.2 可先保留文本，仅保证展示 label 不与 `city_code` 混乱。
+- `preferredCity`：Account Settings 当前为自由输入，但属于服务偏好城市，应在 8.2.4.2 与 Profile `city` 一起评估是否共用城市 options；城市库未成熟时允许先保留输入。
+- `degreeLevel` 是枚举；`education` 是教育经历/描述，先保留文本或多语言文本，不与目录筛选里的 `education` 枚举混用。
+- `industry` 可进入枚举化；`careerDirection` 先保留职业方向文本，避免把具体职位/方向过早收窄。
+- `relationshipGoal` / `residencePlan` / `preferredEducation` / `familyLife` / `exercise`：8.2.4.2 按枚举字段改造，即使初始选项不完整，也先由后端 options 统一维护，后续通过 8.2.4.3 完善值管理。
+- `relationshipValues`：当前在 C 端存在本地枚举文案，但表单选项未完全走统一 options，8.2.4.2 必须修正。
+- `membershipTier` / `entitlementCode`、`eventStatus` / `registrationStatus`、`profileStatus` / `verificationStatus` / `photoStatus`：8.2.4.1 只统一 label/resolver，不进入动态管理，不替代现有状态机。
+- `dealBreakers` / `personalityTraits` / `interests` / `tags`：C 端当前为列表文本，不在 8.2.4.1 强行枚举化。
+- 独立 options 接口不是 8.2.4.1 必需项；8.2.4.2 执行时如果多个页面重复消费同一组 options，再考虑拆只读字典接口。
+
+接口要求：
+
+- C 端详情、Account 资料详情、Account Settings、Membership、Events、Messages、Relationship 页面中后端传来的 code 都应显示后端 label。
+- Admin 资料审核、照片审核、认证审核、资料库、资料运营中后端传来的 code 都应显示后端 label。
+- Account Settings 返回服务偏好时，应对 `preferredCity`、`preferredContactChannel` 等返回可展示 label；保存仍只提交 code 或稳定值。
+- 原始 code 继续返回，便于编辑、筛选和调试。
+- Admin 接口如果暂时没有语言参数，默认使用 `zh`，但仍必须调用同一套 resolver。
+- 多值字段要统一输出 label 数组或可展示字符串，不能由页面自行拼接 code。
+- 未识别 code 的 fallback 为原始 code，并在后端保留集中排查入口。
+- 字段命名以 C 端契约为准；后端内部字段如 `country_code`、`nationality_code` 可映射到 C 端现有 `country`、`nationality`，也可在 8.2.4.2 中迁移为更明确的 code 字段，但不能让前端继续提交展示 label。
+
+不做：
+
+- 不新增后台枚举管理页面。
+- 不改 account profile detail 表单交互。
+- 不新增动态字典表，除非发现当前数据已经无法表达稳定 code。
+
+验收：
+
+- C 端和 Admin 对同一 code 显示一致。
+- C 端不再通过 `t(\`xxx.${code}\`)` 直接翻译后端返回的业务 code；只保留 UI 文案和 fallback。
+- Admin 页面不再裸显示 `master`、`public_policy`、`flexible` 等业务 code。
+- 前端零散枚举翻译逻辑被移除或降级为兼容 fallback。
+
+#### 11.2.4.2 写入端 options 与页面优化
+
+目标：
+
+- 将有写入或筛选交互的页面改为消费后端统一 options。
+- C 端当前主要覆盖 Account Profile Detail 和 Account Settings。
+- Admin 当前主要覆盖 Profile、Photo、Verification、资料库、资料运营相关页面的筛选项、表单项和状态操作入口。
+- 必填项放在选填项之前，降低用户第一次建资料时的填写成本。
+- 表单提交继续只提交 code。
+
+范围：
+
+- 盘点 account profile detail 现有 input 字段，区分自由文本、多语言文本、单选枚举、多选枚举和数值字段。
+- 单选枚举使用 picker/select，多个枚举使用 checkbox/multi-select。
+- 国家、国籍、语言、学历层级、婚恋偏好、生活方式、联系方式可见性等字段优先枚举化。
+- `relationshipValues` 当前在 C 端存在本地枚举文案，但表单选项未完全走统一 options，应在 8.2.4.2 一并修正。
+- Account Settings 的 `preferred_city` 当前是文本输入，应作为服务偏好城市纳入 8.2.4.2；若城市 options 尚未成熟，可先做后端 label/fallback，再决定是否强制选择。
+- Account Settings 的 `preferred_contact_channel` 当前由前端本地维护 `email/phone/wechat` options，应改为后端统一 options。
+- Account Settings 的布尔偏好项可继续用开关，但 label 和 code 说明由后端统一返回，前端只负责渲染。
+- Admin Profile 相关筛选项和操作入口必须使用后端统一 options，当前至少包括：
+  - 资料审核：`profileType`、`profileStatus`、`gender`、`degreeLevel`、`maritalStatus`、`photoStatus`。
+  - 照片审核：`photoStatus`、`profileType`、`profileStatus`。
+  - 认证审核：`verificationMaterialType`、`verificationMaterialStatus`、`reviewStatus`、`scanStatus`。
+  - 资料库：`profileType`、`profileStatus`、`isFeatured`。
+  - 资料运营：`isFeatured`、`profileStatus`。
+- 简介、标签、不可接受项、性格特质、兴趣等仍按现有多语言文本/列表规则处理，不强行改成固定枚举。
+- 行业、关系目标、居住计划、期望学历、家庭生活、运动习惯按枚举字段处理；初始 options 不完整时也先接入后端统一 options，后续通过动态管理补齐。
+- 职业方向、教育描述继续按文本或多语言文本处理，不在 8.2.4.2 强行改为枚举。
+- Event C 端不做自由输入；Event 页面如存在筛选或报名相关 options，也应消费后端统一 options。Event Admin 的写入端 options 可在 Event Admin 阶段补齐。
+- 表单 options 优先复用 8.2.4.1 后端映射层，通过现有 account/profile/admin 接口附带返回。
+- 保存前校验枚举值是否合法，避免用户手写非法 code。
+
+页面优化：
+
+- 必填项集中前置。
+- 选填项分组展示。
+- 当前 C 端必填项为 `profileName`、`gender`、`birthYear`、`height`、`city`、`country`、`degreeLevel`、`education`、`industry`、`maritalStatus`、`datingIntentionCode`、`relationshipGoal`、`summary`；8.2.4.2 调整页面顺序时以这组字段为准。
+- 已审核、待审核、草稿和隐藏状态下的可编辑性继续遵守现有 Profile 状态规则。
+- 不让 label 写回数据库。
+
+不做：
+
+- 不实现后台可编辑枚举。
+- 不重构整个 account 页面路由。
+- 不把所有自由文本字段改成枚举。
+
+验收：
+
+- 新建或编辑资料时，枚举字段不再需要用户手动输入 code。
+- 保存 payload 仍然只包含 code。
+- 保存后详情返回的 label 与选择器展示一致。
+- 必填项位于所有选填项之前。
+- Admin 相关筛选和操作不再在前端硬编码同一批业务枚举 label。
+
+#### 11.2.4.3 枚举值动态管理
+
+目标：
+
+- 在 8.2.4.1 和 8.2.4.2 稳定后，再评估是否让部分业务枚举支持后台动态维护。
+
+评估项：
+
+- 复用 RuoYi `sys_dict_type` / `sys_dict_data`，还是新增 `cm_dictionary_*` 表。
+- 是否需要多语言 label、排序、禁用状态、前端可见状态和缓存刷新。
+- 哪些枚举允许运营维护，哪些必须保留为代码级常量。
+- 国家和语言等标准枚举是否继续由代码或标准库维护，而不进入业务字典后台。
+- Admin 权限粒度、审计日志和误改回滚策略。
+
+不做：
+
+- 不在 8.2.4.1/8.2.4.2 提前实现。
+- 不让动态字典取代状态机字段，例如 `profile_status`、审核状态、订单状态、材料状态。
+
+验收：
+
+- 只有被明确列入动态管理范围的业务枚举可以被后台维护。
+- 动态修改后，C 端和 Admin 仍通过同一套 resolver 输出 label/options。
+- 修改记录写入业务审计日志或 RuoYi 操作日志。
 
 ### 11.3 Phase 8.3：Private Introduction
 
@@ -1286,6 +1534,8 @@ API：
 Phase 8.2 已完成 Profile 与 Photo 审核的代码、菜单、列表、详情、页面挂载和写操作验收。
 Phase 8.2.1 已完成资料库与资料运营的拆分、内部字段展示和精选/备注运营。
 Phase 8.2.2 已完成 Verification 认证审核业务闭环，并已接入真实文件上传、鉴权预览和鉴权下载；拒绝原因继续使用快捷文本和备注，不规划结构化 reason code。
+Phase 8.2.3 已完成认证材料安全、后台补录材料、认证重置和 Profile 后台编辑边界补强。
+Phase 8.2.4 已规划为后端统一枚举语义，拆分为后端返回枚举与状态统一映射、写入端 options 与页面优化、枚举动态管理三步。
 
 已确认：
 
@@ -1294,4 +1544,4 @@ Phase 8.2.2 已完成 Verification 认证审核业务闭环，并已接入真实
 3. 重复审核会被阻止，并提示已处理。
 4. Verification 已按身份、学历、收入、婚姻拆分为四个材料审核队列。
 5. `cupid_auditor` 只读权限作为角色矩阵复验项保留，不阻塞 Phase 8.2 完成。
-6. Phase 8.2 完成后，可进入 Phase 8.3：Private Introduction。
+6. Phase 8.2.4 完成后，再进入 Phase 8.3：Private Introduction。
