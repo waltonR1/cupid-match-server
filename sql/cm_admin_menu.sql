@@ -136,6 +136,8 @@ insert into sys_menu values
 ('2035', '认证列表', '2030', '5', '', '', '', '', 1, 0, 'F', '0', '0', 'cupid:verification:list', '#', 'admin', sysdate(), '', null, ''),
 ('2036', '认证查询', '2030', '6', '', '', '', '', 1, 0, 'F', '0', '0', 'cupid:verification:query', '#', 'admin', sysdate(), '', null, ''),
 ('2037', '认证审核', '2030', '7', '', '', '', '', 1, 0, 'F', '0', '0', 'cupid:verification:review', '#', 'admin', sysdate(), '', null, ''),
+('2038', '材料预览', '2030', '8', '', '', '', '', 1, 0, 'F', '0', '0', 'cupid:verification:material:preview', '#', 'admin', sysdate(), '', null, ''),
+('2039', '材料下载', '2030', '9', '', '', '', '', 1, 0, 'F', '0', '0', 'cupid:verification:material:download', '#', 'admin', sysdate(), '', null, ''),
 ('2040', '资料中心', '0', '11', 'profile-center', null, '', 'CupidProfileCenterRoot', 1, 0, 'M', '0', '0', '', 'user', 'admin', sysdate(), '', null, 'Cupid 资料中心目录'),
 ('2041', '资料库', '2040', '1', 'library', 'cupid/profile-library/index', '', 'CupidProfileLibrary', 1, 0, 'C', '0', '0', 'cupid:profileLibrary:list', 'list', 'admin', sysdate(), '', null, 'Cupid 资料库只读页面'),
 ('2042', '资料库查询', '2041', '1', '', '', '', '', 1, 0, 'F', '0', '0', 'cupid:profileLibrary:query', '#', 'admin', sysdate(), '', null, ''),

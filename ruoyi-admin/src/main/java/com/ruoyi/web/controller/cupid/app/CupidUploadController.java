@@ -9,7 +9,6 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 import com.ruoyi.common.core.domain.AjaxResult;
 import com.ruoyi.common.utils.file.FileUploadUtils;
-import com.ruoyi.common.utils.file.MimeTypeUtils;
 
 /**
  * Cupid Match 上传接口
@@ -18,6 +17,8 @@ import com.ruoyi.common.utils.file.MimeTypeUtils;
 @RequestMapping("/api")
 public class CupidUploadController
 {
+    private static final String[] IMAGE_EXTENSIONS = { "jpg", "jpeg", "png", "webp" };
+
     /**
      * 上传图片
      */
@@ -31,14 +32,18 @@ public class CupidUploadController
         try
         {
             String path = FileUploadUtils.upload(FileUploadUtils.getDefaultBaseDir() + "/upload",
-                    file, MimeTypeUtils.IMAGE_EXTENSION, true);
+                    file, IMAGE_EXTENSIONS, true);
             Map<String, Object> result = new LinkedHashMap<>();
             result.put("url", path);
             return AjaxResult.success(result);
         }
+        catch (IllegalArgumentException e)
+        {
+            return AjaxResult.error(400, e.getMessage());
+        }
         catch (Exception e)
         {
-            return AjaxResult.error(400, "upload_failed");
+            return AjaxResult.error(400, e.getMessage());
         }
     }
 }

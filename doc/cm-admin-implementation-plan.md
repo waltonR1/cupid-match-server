@@ -800,6 +800,8 @@ API：
 - 不把内部字段塞入当前 Profile 发布审核页。
 - 资料库可以只读查看 `staff_notes`、收入、雇主等内部/敏感字段；发布审核页不展示这些字段。
 - 不让内部字段绕过 C 端资料展示边界直接进入 App profile detail。
+- 后台若未来需要编辑面向 C 端展示的资料字段，必须从资料库或独立资料编辑能力进入，不混入审核按钮或资料运营内部字段接口。
+- 面向 C 端展示字段的后台编辑必须使用独立权限、写入 `cm_audit_logs` 的 before/after/operator/reason，并明确编辑后是直接生效还是重新进入发布审核。
 
 ### 11.2.2 Phase 8.2.2：Verification 认证审核闭环
 
@@ -815,7 +817,7 @@ API：
 - 支持身份、学历、收入、婚姻四类认证材料的提交、查看、通过、拒绝和重新提交。
 - 后台审核以材料和认证类型为单位，不再把一条 `cm_profile_verifications` 记录伪装成完整审核材料。
 - 认证通过后稳定影响 C 端 `isVerified`、账号中心认证状态和后续业务权限。
-- 拒绝后 C 端能看到结构化拒绝原因，并可重新提交对应类型材料。
+- 拒绝后 C 端能看到拒绝原因文本，并可重新提交对应类型材料。
 - C 端账号中心继续展示五个状态，但“平台审核”直接读取 Profile 发布审核状态。
 
 当前实现状态（2026-06-23）：
@@ -828,7 +830,8 @@ API：
   - 已保存资料可调用 `POST /account/profiles/{profileId}/submit-review`，将 `draft` 或被拒后的 `hidden` 资料提交为 `review`。
   - 身份认证提交 `legalName`、`dateOfBirth`、`materialUrl`、补充说明。
   - 学历、收入、婚姻提交 `materialName`、`materialUrl`、补充说明。
-  - `materialUrl` 当前作为私有对象 Key 或受控文件地址保存，提交端和服务端都限制为 PDF/JPG/JPEG/PNG/WEBP。
+  - `materialUrl` 当前作为私有对象 Key 保存；C 端选择文件时只保留本地文件信息，提交认证材料时先上传取得私有 Key，再提交材料记录。
+  - 上传端和服务端都限制为 PDF/JPG/JPEG/PNG/WEBP，服务端单文件上限为 10MB。
   - 提交成功后刷新资料详情，状态进入 `pending`。
 - Admin 已将认证材料队列拆为四个页面，共用同一个材料审核组件：
   - `cupid/verification/identity/index`：身份认证材料。
@@ -840,12 +843,15 @@ API：
   - 审核只影响该材料对应的一个认证类型。
 - 后端接口已按材料语义实现：
   - `GET /account/profiles/{profileId}/verification`
+  - `POST /account/profiles/{profileId}/verification/materials/upload`
   - `POST /account/profiles/{profileId}/verification/materials`
   - `GET /cupid/verification/list`
   - `GET /cupid/verification/{materialId}`
+  - `GET /cupid/verification/{materialId}/material/preview`
+  - `GET /cupid/verification/{materialId}/material/download`
   - `POST /cupid/verification/{materialId}/review`
-- 当前材料附件仍使用 `materialUrl` 文本字段保存私有凭证；Admin 不直接打开裸链，后续通过鉴权预览/下载接口换取短期可访问地址。
-- 当前拒绝原因先保存为 `rejection_reason` 文本；Admin 提供快捷拒绝原因，结构化拒绝原因码后续再补。
+- 材料附件保存为 `private://verification/...` 私有 Key；Admin 不直接打开裸链，只能通过鉴权预览/下载接口由后端流式返回。
+- 当前拒绝原因保存为 `rejection_reason` 文本；Admin 提供快捷拒绝原因和补充备注，不规划结构化 reason code。
 
 推荐数据模型：
 
@@ -911,14 +917,15 @@ C 端账号中心：
   - 身份认证表单至少包含真实姓名、出生日期和材料上传入口。
   - 学历、收入、婚姻表单按认证类型展示材料上传入口和必要说明。
   - 保存后进入 `pending`，前端按钮文案改为待审核。
-- 待审核状态展示已提交材料摘要、提交时间和“审核中”提示；是否允许撤回或替换材料需单独定义，默认先不支持撤回。
-- 已拒绝状态展示结构化拒绝原因、补充说明和重新提交入口。
+- 待审核状态展示已提交材料摘要、提交时间和“审核中”提示；C 端默认不支持撤回或替换 pending 材料。
+- 已拒绝状态展示拒绝原因文本、补充说明和重新提交入口。
 - 重新提交同类型材料时，旧的 rejected 材料保留，新材料进入 `pending`；当前不允许同类型存在未处理 pending 重复提交。
 - 新增或扩展 API 传输认证材料，不复用资料编辑保存接口：
   - `GET /account/profiles/{profileId}/verification` 返回四类认证状态、材料摘要、拒绝原因和可操作状态。
+  - `POST /account/profiles/{profileId}/verification/materials/upload` 上传认证材料文件，返回私有 `materialUrl`、原文件名、Content-Type 和大小。
   - `POST /account/profiles/{profileId}/verification/materials` 新增认证材料提交。
   - Profile 详情或账号概览接口需要返回平台审核状态，供账号中心“平台审核”使用。
-  - 如文件上传已由通用上传接口处理，则提交接口只传材料 URL、文件元信息和认证类型。
+  - 提交接口只传材料 URL、文件元信息和认证类型，不接收裸露公网附件地址。
 - 认证材料提交不应触发 Profile 发布审核状态变化。
 - Verification 接口不再返回一个可被前端解释为“平台审核”的 `reviewStatus`；如保留该字段，只能命名或注释为认证汇总状态。
 
@@ -960,17 +967,21 @@ C 端账号中心：
 | 接口列表 | `cupid:verification:list` |
 | 详情 | `cupid:verification:query` |
 | 审核 | `cupid:verification:review` |
-| 查看材料附件 | `cupid:verification:material` |
+| 预览材料附件 | `cupid:verification:material:preview` |
+| 下载材料附件 | `cupid:verification:material:download` |
 
 接口规划：
 
 | 端 | 接口 | 用途 |
 | --- | --- | --- |
 | App | `GET /account/profiles/{profileId}/verification` | 查看四类认证状态、材料摘要、拒绝原因和是否可提交 |
+| App | `POST /account/profiles/{profileId}/verification/materials/upload` | 上传认证材料文件，返回后端私有文件 Key |
 | App | `POST /account/profiles/{profileId}/verification/materials` | 提交认证材料；payload 包含 `materialType`、材料 URL、文件元信息和身份认证补充字段 |
 | App | 账号概览或 Profile 详情接口 | 返回 `profileStatus` 或派生的 `platformReviewStatus`，用于展示平台审核 |
 | Admin | `GET /cupid/verification/list` | 查询材料审核队列 |
 | Admin | `GET /cupid/verification/{materialId}` | 查看材料详情 |
+| Admin | `GET /cupid/verification/{materialId}/material/preview` | 点击材料凭证后弹窗预览，由后端流式返回，受 `cupid:verification:material:preview` 控制 |
+| Admin | `GET /cupid/verification/{materialId}/material/download` | 鉴权下载材料文件，由后端流式返回，受 `cupid:verification:material:download` 控制 |
 | Admin | `POST /cupid/verification/{materialId}/review` | 审核材料 |
 
 审计与通知：
@@ -979,7 +990,7 @@ C 端账号中心：
   - 当前实现：`cupid.verification.review`
   - 后续可细化为 `cupid.verification.material.approve`、`cupid.verification.material.reject`
 - Controller 写操作接入 RuoYi `@Log`。
-- 拒绝后建议发送 Cupid Inbox 通知，内容引用结构化拒绝原因。
+- 审核通知不在 Phase 8.2.2 实现；等 Phase 8.5 Cupid Inbox 完成后，再统一接入认证、资料和照片审核结果通知。
 - 通过后是否通知用户可配置，默认可以先不发，账号中心状态即时更新即可。
 
 迁移与兼容：
@@ -997,23 +1008,36 @@ C 端账号中心：
 - C 端五个状态来源清晰：四类认证来自 Verification，平台审核来自 Profile。
 - 后台四个认证页面分别固定身份、学历、收入、婚姻材料队列。
 - 后台可按状态、资料、用户和时间筛选待审材料。
-- 后台可查看材料凭证并通过或拒绝；真实材料内容后续通过鉴权预览/下载接口访问。
+- 后台可查看材料凭证并通过或拒绝；真实材料内容通过点击材料凭证弹窗预览，下载由独立权限控制。
 - 拒绝原因能回到 C 端账号中心。
 - 重新提交后新材料进入待审，旧材料不丢失。
 - 汇总状态与材料状态一致，不出现材料已拒绝但汇总仍 pending 的不一致状态。
 - 公开资料 `isVerified` 与后端认证规则一致。
 - 资料审核通过或拒绝只影响平台审核展示，不会批量修改四类认证状态。
 - 审核写入 `cm_audit_logs` 和 `sys_oper_log`。
-- Verification 认证审核业务闭环已完成；真实上传、材料预览和材料下载不阻塞 8.2.2 收口，进入后续补强。
+- Verification 认证审核业务闭环已完成；真实上传、材料预览和材料下载已接入。
+- C 端认证材料使用提交时上传，避免用户选择文件后取消提交产生新的私有孤儿文件。
 
-8.2.2 后续补强：
+### 11.2.3 Phase 8.2.3：Verification 安全与 Profile 编辑边界补强
 
-- 接入真实附件上传、大小限制、病毒/内容扫描和材料预览，替代当前 `materialUrl` 文本输入。
-- 为材料访问增加鉴权预览/下载接口，返回短期签名地址或后端流式响应，避免裸露直连敏感材料。
-- 为拒绝原因增加结构化 reason code。
+Phase 8.2.3 位于 Phase 8.2.2 和 Phase 8.3 之间。它不阻塞认证审核闭环完成，只承接认证材料安全治理、后台补传和 Profile 后台编辑边界，不再扩展成完整认证重构。
+
+- 为认证材料补充病毒/内容扫描。
+- 如后续迁移对象存储，可将当前后端流式响应替换为短期签名地址，但仍不能裸露直连敏感材料。
 - C 端平台审核状态需要继续从 `profileStatus` 派生，不再使用 `cm_profile_verifications.review_status`。
-- 如后续存在替换待审材料需求，再引入 `superseded` 或撤回状态。
-- 审核通知可接入 Cupid Inbox。
+- C 端不提供替换待审材料能力；同类型存在 `pending` 材料时继续禁止重复提交，被拒绝后再提交新材料。
+- 如确有运营协助需求，仅在后台提供受独立权限控制的材料补传或替换能力，旧材料必须保留审计链路。
+- 后台可继续完善 Profile 内部字段、精选和备注；面向 C 端展示的资料字段如需后台编辑，必须进入独立资料编辑能力，不混入审核中心。
+- 拒绝原因继续使用快捷文本和备注，不引入结构化 reason code。
+- 审核通知等待 Phase 8.5 Cupid Inbox 完成后统一接入，不在 8.2.3 提前实现。
+
+验收口径：
+
+- 认证材料上传、预览和下载仍必须走后端鉴权接口，不得回退为公开 URL。
+- 扫描失败、扫描中和扫描通过的状态处理必须明确，不得让未扫描材料直接进入通过流程。
+- 后台补传或替换材料必须具备独立权限、操作原因和审计日志；不得允许 C 端替换 pending 材料。
+- 后台编辑面向 C 端展示字段时，必须记录 before/after/operator/reason，并明确是否触发发布审核。
+- 通知能力只在 Phase 8.5 之后作为业务消息进入 Cupid Inbox，不复用 RuoYi 后台通知公告。
 
 ### 11.3 Phase 8.3：Private Introduction
 
@@ -1082,6 +1106,7 @@ API：
 - 不允许伪造用户聊天消息。
 - 模板 code、locale、用户和消息类型必须校验。
 - 自定义正文权限与模板发送权限需要分开时，再增加更细权限，不提前拆分。
+- Phase 8.5 完成后，再统一接入资料审核、照片审核和认证审核结果通知；不在 Phase 8.2.x 提前实现审核通知。
 
 ### 11.6 Phase 8.6：App User 管理
 
@@ -1241,7 +1266,7 @@ API：
 
 Phase 8.2 已完成 Profile 与 Photo 审核的代码、菜单、列表、详情、页面挂载和写操作验收。
 Phase 8.2.1 已完成资料库与资料运营的拆分、内部字段展示和精选/备注运营。
-Phase 8.2.2 已完成 Verification 认证审核业务闭环；真实文件上传、鉴权预览/下载和结构化拒绝 reason code 作为后续补强。
+Phase 8.2.2 已完成 Verification 认证审核业务闭环，并已接入真实文件上传、鉴权预览和鉴权下载；拒绝原因继续使用快捷文本和备注，不规划结构化 reason code。
 
 已确认：
 

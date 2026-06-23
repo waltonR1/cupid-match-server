@@ -1,8 +1,10 @@
 package com.ruoyi.web.controller.cupid.app;
 
+import java.util.LinkedHashMap;
 import java.util.Map;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -18,6 +20,8 @@ import com.ruoyi.cupid.service.ICupidDashboardService;
 import com.ruoyi.cupid.service.ICupidUserService;
 import com.ruoyi.framework.web.service.CupidAuthService;
 import com.ruoyi.framework.web.service.CupidVerificationCodeService;
+import com.ruoyi.web.controller.cupid.support.CupidVerificationMaterialStorage;
+import com.ruoyi.web.controller.cupid.support.CupidVerificationMaterialStorage.StoredMaterial;
 
 /**
  * Cupid Match 前台账户接口
@@ -31,6 +35,9 @@ public class CupidAccountController
 
     @Autowired
     private ICupidProfileService profileService;
+
+    @Autowired
+    private CupidVerificationMaterialStorage materialStorage;
 
     @Autowired
     private ICupidDashboardService dashboardService;
@@ -368,6 +375,35 @@ public class CupidAccountController
     {
         return AjaxResult.success(
                 profileService.getVerificationMaterials(profileId, principal.getUserId()));
+    }
+
+    /**
+     * 上传资料认证材料到私有存储
+     */
+    @PostMapping("/profiles/{profileId}/verification/materials/upload")
+    public AjaxResult uploadProfileVerificationMaterial(@PathVariable String profileId,
+            @RequestParam("file") MultipartFile file,
+            @AuthenticationPrincipal CupidLoginUser principal)
+    {
+        profileService.getVerificationMaterials(profileId, principal.getUserId());
+        try
+        {
+            StoredMaterial material = materialStorage.upload(profileId, file);
+            Map<String, Object> result = new LinkedHashMap<>();
+            result.put("materialUrl", material.materialUrl());
+            result.put("originalFilename", material.originalFilename());
+            result.put("contentType", material.contentType());
+            result.put("size", material.size());
+            return AjaxResult.success(result);
+        }
+        catch (IllegalArgumentException e)
+        {
+            return AjaxResult.error(400, e.getMessage());
+        }
+        catch (Exception e)
+        {
+            return AjaxResult.error(400, "upload_failed");
+        }
     }
 
     /**
