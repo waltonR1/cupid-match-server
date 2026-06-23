@@ -22,7 +22,7 @@ public interface ICupidAdminReviewService
 
     List<Map<String, Object>> selectVerificationList(Map<String, Object> params);
 
-    Map<String, Object> selectVerificationDetail(String profileId);
+    Map<String, Object> selectVerificationDetail(String materialId);
 
-    void reviewVerification(String profileId, String status, String reason, String reviewerUserId);
+    void reviewVerification(String materialId, String status, String reason, String reviewerUserId);
 }

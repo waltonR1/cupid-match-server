@@ -110,7 +110,10 @@ where not exists (
 -- 对应页面已存在：
 -- - cupid-match-admin/src/views/cupid/profile/index.vue
 -- - cupid-match-admin/src/views/cupid/photo/index.vue
--- - cupid-match-admin/src/views/cupid/verification/index.vue
+-- - cupid-match-admin/src/views/cupid/verification/identity/index.vue
+-- - cupid-match-admin/src/views/cupid/verification/education/index.vue
+-- - cupid-match-admin/src/views/cupid/verification/income/index.vue
+-- - cupid-match-admin/src/views/cupid/verification/marital/index.vue
 -- - cupid-match-admin/src/views/cupid/profile-library/index.vue
 -- - cupid-match-admin/src/views/cupid/profile-manage/index.vue
 
@@ -125,9 +128,14 @@ insert into sys_menu values
 ('2020', '照片审核', '2000', '2', 'photo', 'cupid/photo/index', '', 'CupidPhoto', 1, 0, 'C', '0', '0', 'cupid:photo:list', 'eye', 'admin', sysdate(), '', null, 'Cupid 照片审核页面'),
 ('2021', '照片查询', '2020', '1', '', '', '', '', 1, 0, 'F', '0', '0', 'cupid:photo:query', '#', 'admin', sysdate(), '', null, ''),
 ('2022', '照片审核', '2020', '2', '', '', '', '', 1, 0, 'F', '0', '0', 'cupid:photo:review', '#', 'admin', sysdate(), '', null, ''),
-('2030', '认证审核', '2000', '3', 'verification', 'cupid/verification/index', '', 'CupidVerification', 1, 0, 'C', '0', '0', 'cupid:verification:list', 'education', 'admin', sysdate(), '', null, 'Cupid 认证审核页面'),
-('2031', '认证查询', '2030', '1', '', '', '', '', 1, 0, 'F', '0', '0', 'cupid:verification:query', '#', 'admin', sysdate(), '', null, ''),
-('2032', '认证审核', '2030', '2', '', '', '', '', 1, 0, 'F', '0', '0', 'cupid:verification:review', '#', 'admin', sysdate(), '', null, ''),
+('2030', '认证审核', '2000', '3', 'verification', null, '', 'CupidVerificationRoot', 1, 0, 'M', '0', '0', '', 'education', 'admin', sysdate(), '', null, 'Cupid 四类认证材料审核目录'),
+('2031', '身份认证审核', '2030', '1', 'identity', 'cupid/verification/identity/index', '', 'CupidIdentityVerification', 1, 0, 'C', '0', '0', 'cupid:verification:identity:list', 'peoples', 'admin', sysdate(), '', null, 'Cupid 身份认证材料审核页面'),
+('2032', '学历认证审核', '2030', '2', 'education', 'cupid/verification/education/index', '', 'CupidEducationVerification', 1, 0, 'C', '0', '0', 'cupid:verification:education:list', 'education', 'admin', sysdate(), '', null, 'Cupid 学历认证材料审核页面'),
+('2033', '收入认证审核', '2030', '3', 'income', 'cupid/verification/income/index', '', 'CupidIncomeVerification', 1, 0, 'C', '0', '0', 'cupid:verification:income:list', 'money', 'admin', sysdate(), '', null, 'Cupid 收入认证材料审核页面'),
+('2034', '婚姻认证审核', '2030', '4', 'marital', 'cupid/verification/marital/index', '', 'CupidMaritalVerification', 1, 0, 'C', '0', '0', 'cupid:verification:marital:list', 'people', 'admin', sysdate(), '', null, 'Cupid 婚姻认证材料审核页面'),
+('2035', '认证列表', '2030', '5', '', '', '', '', 1, 0, 'F', '0', '0', 'cupid:verification:list', '#', 'admin', sysdate(), '', null, ''),
+('2036', '认证查询', '2030', '6', '', '', '', '', 1, 0, 'F', '0', '0', 'cupid:verification:query', '#', 'admin', sysdate(), '', null, ''),
+('2037', '认证审核', '2030', '7', '', '', '', '', 1, 0, 'F', '0', '0', 'cupid:verification:review', '#', 'admin', sysdate(), '', null, ''),
 ('2040', '资料中心', '0', '11', 'profile-center', null, '', 'CupidProfileCenterRoot', 1, 0, 'M', '0', '0', '', 'user', 'admin', sysdate(), '', null, 'Cupid 资料中心目录'),
 ('2041', '资料库', '2040', '1', 'library', 'cupid/profile-library/index', '', 'CupidProfileLibrary', 1, 0, 'C', '0', '0', 'cupid:profileLibrary:list', 'list', 'admin', sysdate(), '', null, 'Cupid 资料库只读页面'),
 ('2042', '资料库查询', '2041', '1', '', '', '', '', 1, 0, 'F', '0', '0', 'cupid:profileLibrary:query', '#', 'admin', sysdate(), '', null, ''),
@@ -154,7 +162,7 @@ where r.role_key = 'cupid_reviewer'
 insert into sys_role_menu (role_id, menu_id)
 select r.role_id, m.menu_id
 from sys_role r
-join sys_menu m on m.menu_id in (2000, 2010, 2011, 2020, 2021, 2030, 2031)
+join sys_menu m on m.menu_id in (2000, 2010, 2011, 2020, 2021, 2030, 2031, 2032, 2033, 2034, 2035, 2036)
 where r.role_key = 'cupid_auditor'
   and r.del_flag = '0';
 

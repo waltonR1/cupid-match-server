@@ -38,7 +38,7 @@ public class CupidAdminReviewServiceImpl implements ICupidAdminReviewService
             profile.put("photos", profileMapper.selectAdminPhotosByProfileId(profileId));
             profile.put("localizedFields", profileMapper.selectAdminLocalizedFieldsByProfileId(profileId));
             profile.put("localizedItems", profileMapper.selectAdminLocalizedItemsByProfileId(profileId));
-            profile.put("verification", profileMapper.selectAdminVerificationDetail(profileId));
+            profile.put("verification", profileMapper.selectVerificationByProfileId(profileId));
             profile.put("languages", profileMapper.selectLanguagesByProfileId(profileId));
             profile.put("relationshipValues", profileMapper.selectRelationshipValuesByProfileId(profileId));
             profile.put("privacyPreferences", profileMapper.selectPrivacyPreferenceByProfileId(profileId));
@@ -91,22 +91,27 @@ public class CupidAdminReviewServiceImpl implements ICupidAdminReviewService
     }
 
     @Override
-    public Map<String, Object> selectVerificationDetail(String profileId)
+    public Map<String, Object> selectVerificationDetail(String materialId)
     {
-        return profileMapper.selectAdminVerificationDetail(profileId);
+        return profileMapper.selectAdminVerificationDetail(materialId);
     }
 
     @Override
     @Transactional
-    public void reviewVerification(String profileId, String status, String reason, String reviewerUserId)
+    public void reviewVerification(String materialId, String status, String reason, String reviewerUserId)
     {
         assertReviewStatus(status);
-        Map<String, Object> before = require(profileMapper.selectAdminVerificationDetail(profileId), "认证资料不存在");
-        assertCurrentStatus(before, "reviewStatus", "pending", "该认证已处理，不能重复审核");
+        Map<String, Object> before = require(profileMapper.selectAdminVerificationDetail(materialId), "认证材料不存在");
+        assertCurrentStatus(before, "status", "pending", "该认证材料已处理，不能重复审核");
+        String profileId = String.valueOf(before.get("profileId"));
+        String materialType = String.valueOf(before.get("materialType"));
         String materialStatus = "approved".equals(status) ? "verified" : "rejected";
-        profileMapper.updateAdminVerificationReviewStatus(profileId, status, materialStatus, reviewerUserId);
-        Map<String, Object> after = profileMapper.selectAdminVerificationDetail(profileId);
-        insertAudit("profile_verification", profileId, "cupid.verification.review", reviewerUserId, before, after, reason);
+        profileMapper.updateAdminVerificationMaterialStatus(materialId, status, reviewerUserId, reason);
+        profileMapper.updateVerificationStatusByMaterial(profileId, materialType, materialStatus, reviewerUserId);
+        profileMapper.refreshVerificationReviewStatus(profileId);
+        Map<String, Object> after = profileMapper.selectAdminVerificationDetail(materialId);
+        insertAudit("profile_verification_material", materialId,
+                "cupid.verification.review", reviewerUserId, before, after, reason);
     }
 
     private void assertReviewStatus(String status)

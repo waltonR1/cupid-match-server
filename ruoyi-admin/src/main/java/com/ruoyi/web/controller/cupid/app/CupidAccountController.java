@@ -336,6 +336,18 @@ public class CupidAccountController
     }
 
     /**
+     * 提交资料进入发布审核
+     */
+    @PostMapping("/profiles/{profileId}/submit-review")
+    public AjaxResult submitProfileReview(@PathVariable String profileId,
+            @AuthenticationPrincipal CupidLoginUser principal,
+            @RequestParam(value = "lang", defaultValue = "zh") String locale)
+    {
+        return AjaxResult.success(
+                profileService.submitProfileForReview(profileId, principal.getUserId(), locale));
+    }
+
+    /**
      * 更新资料隐私偏好
      */
     @PostMapping("/profiles/{profileId}/privacy-preferences")
@@ -346,6 +358,30 @@ public class CupidAccountController
         return AjaxResult.success(
                 profileService.updatePrivacyPreferences(profileId, principal.getUserId(), prefs));
     }
+
+    /**
+     * 查询资料认证材料状态
+     */
+    @GetMapping("/profiles/{profileId}/verification")
+    public AjaxResult profileVerification(@PathVariable String profileId,
+            @AuthenticationPrincipal CupidLoginUser principal)
+    {
+        return AjaxResult.success(
+                profileService.getVerificationMaterials(profileId, principal.getUserId()));
+    }
+
+    /**
+     * 提交资料认证材料
+     */
+    @PostMapping("/profiles/{profileId}/verification/materials")
+    public AjaxResult submitProfileVerificationMaterial(@PathVariable String profileId,
+            @RequestBody Map<String, Object> payload,
+            @AuthenticationPrincipal CupidLoginUser principal)
+    {
+        return AjaxResult.success(
+                profileService.submitVerificationMaterial(profileId, principal.getUserId(), payload));
+    }
+
     /**
      * 聚合账户首页所需的只读领域数据。
      */

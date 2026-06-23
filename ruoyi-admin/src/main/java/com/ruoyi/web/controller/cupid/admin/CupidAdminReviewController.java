@@ -84,18 +84,18 @@ public class CupidAdminReviewController extends BaseController
     }
 
     @PreAuthorize("@ss.hasPermi('cupid:verification:query')")
-    @GetMapping("/verification/{profileId}")
-    public AjaxResult verificationDetail(@PathVariable String profileId)
+    @GetMapping("/verification/{materialId}")
+    public AjaxResult verificationDetail(@PathVariable String materialId)
     {
-        return AjaxResult.success(reviewService.selectVerificationDetail(profileId));
+        return AjaxResult.success(reviewService.selectVerificationDetail(materialId));
     }
 
     @Log(title = "Cupid认证审核", businessType = BusinessType.UPDATE)
     @PreAuthorize("@ss.hasPermi('cupid:verification:review')")
-    @PostMapping("/verification/{profileId}/review")
-    public AjaxResult reviewVerification(@PathVariable String profileId, @RequestBody Map<String, String> body)
+    @PostMapping("/verification/{materialId}/review")
+    public AjaxResult reviewVerification(@PathVariable String materialId, @RequestBody Map<String, String> body)
     {
-        reviewService.reviewVerification(profileId, body.get("status"), body.get("reason"), String.valueOf(getUserId()));
+        reviewService.reviewVerification(materialId, body.get("status"), body.get("reason"), String.valueOf(getUserId()));
         return success();
     }
 }

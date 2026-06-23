@@ -368,7 +368,10 @@ perms = ''
 | --- | --- | --- | --- | --- |
 | Profile 审核 | 审核中心 | `profile` | `cupid/profile/index` | `cupid:profile:list` |
 | Photo 审核 | 审核中心 | `photo` | `cupid/photo/index` | `cupid:photo:list` |
-| Verification 审核 | 审核中心 | `verification` | `cupid/verification/index` | `cupid:verification:list` |
+| 身份认证审核 | 审核中心 / 认证审核 | `identity` | `cupid/verification/identity/index` | `cupid:verification:identity:list` |
+| 学历认证审核 | 审核中心 / 认证审核 | `education` | `cupid/verification/education/index` | `cupid:verification:education:list` |
+| 收入认证审核 | 审核中心 / 认证审核 | `income` | `cupid/verification/income/index` | `cupid:verification:income:list` |
+| 婚姻认证审核 | 审核中心 / 认证审核 | `marital` | `cupid/verification/marital/index` | `cupid:verification:marital:list` |
 | 私人介绍处理 | 关系服务 | `introduction` | `cupid/introduction/index` | `cupid:introduction:list` |
 | 活动管理 | 活动运营 | `event` | `cupid/event/index` | `cupid:event:list` |
 | 报名审核 | 活动运营 | `registration` | `cupid/event-registration/index` | `cupid:eventRegistration:list` |
@@ -392,7 +395,10 @@ query = ''
 
 - `CupidProfile`
 - `CupidPhoto`
-- `CupidVerification`
+- `CupidIdentityVerification`
+- `CupidEducationVerification`
+- `CupidIncomeVerification`
+- `CupidMaritalVerification`
 - `CupidIntroduction`
 - `CupidEvent`
 - `CupidEventRegistration`
@@ -407,7 +413,7 @@ query = ''
 | --- | --- |
 | Profile | `cupid:profile:query`、`cupid:profile:review` |
 | Photo | `cupid:photo:query`、`cupid:photo:review` |
-| Verification | `cupid:verification:query`、`cupid:verification:review` |
+| Verification | `cupid:verification:list`、`cupid:verification:query`、`cupid:verification:review` |
 | Introduction | `cupid:introduction:query`、`cupid:introduction:accept`、`cupid:introduction:decline` |
 | Event | `cupid:event:query`、`cupid:event:edit`、`cupid:event:changeStatus` |
 | Event Registration | `cupid:eventRegistration:query`、`cupid:eventRegistration:review` |
@@ -422,6 +428,7 @@ query = ''
 - 前端按钮使用相同权限执行 `v-hasPermi`。
 - Controller 使用完全一致的 `@PreAuthorize` 字符串。
 - 页面权限和接口权限必须同时存在，不能只实现其中一层。
+- Verification 四个页面可以使用分项页面权限控制菜单可见性；底层列表、详情和审核接口仍使用通用 `cupid:verification:*` 权限。
 - Audit 不提供修改和删除权限。
 - User 不提供通用删除权限。
 - 审核模块不暴露通用 `add/edit/remove`。
@@ -658,9 +665,9 @@ select role_id, role_key from sys_role where role_key like 'cupid_%';
 - 已验证 Profile、Photo、Verification 列表和详情接口返回 200。
 - 已用浏览器验证三张审核页面可打开，无登录跳转和前端运行错误。
 - 已补充审核页可读摘要、短 ID 展示、字段中文标签和重复审核保护。
-- Phase 8.2 的正式验收范围收敛为 Profile 发布审核与 Photo 内容审核。
-- 当前 Verification 页面只作为现有 `cm_profile_verifications` 状态的基础查看与临时操作入口，不视为完整认证审核闭环。
-- Verification 当前表结构只有整体认证记录与四个状态字段，没有独立材料附件、材料来源、拒绝原因回传和分项审核流水；完整认证审核拆入 Phase 8.2.2，不能只在页面上伪造。
+- Phase 8.2 的正式验收范围收敛为 Profile 发布审核与 Photo 内容审核；Verification 已在 Phase 8.2.2 单独改造为材料审核闭环。
+- Verification 已从 `cm_profile_verifications` 汇总状态入口改为 `cm_profile_verification_materials` 材料队列入口，并拆为身份、学历、收入、婚姻四个后台页面。
+- Verification 后台接口仍保留 `/cupid/verification/...` 路径，但 `{id}` 语义已从 `profileId` 改为 `materialId`。
 - 多语言资料文案需要后续拆成独立审核队列，审核单元应为 `profile_id + field_name + locale`，例如 `summary/zh`、`summary/fr`、`summary/en` 各自成条。当前 `cm_profile_localized_fields.status` 表达的是生成/翻译可用状态，不应直接复用为审核结论。
 - 已手工执行 Profile 与 Photo 审核写操作，确认状态流转、重复审核保护、`cm_audit_logs` 和 RuoYi `sys_oper_log` 写入。
 
@@ -668,7 +675,10 @@ select role_id, role_key from sys_role where role_key like 'cupid_%';
 
 - `src/views/cupid/profile/index.vue`
 - `src/views/cupid/photo/index.vue`
-- `src/views/cupid/verification/index.vue`
+- `src/views/cupid/verification/identity/index.vue`
+- `src/views/cupid/verification/education/index.vue`
+- `src/views/cupid/verification/income/index.vue`
+- `src/views/cupid/verification/marital/index.vue`
 
 API：
 
@@ -676,7 +686,7 @@ API：
 | --- | --- |
 | Profile | `GET /cupid/profile/list`、`GET /cupid/profile/{id}`、`POST /cupid/profile/{id}/review` |
 | Photo | `GET /cupid/photo/list`、`GET /cupid/photo/{id}`、`POST /cupid/photo/{id}/review` |
-| Verification | `GET /cupid/verification/list`、`GET /cupid/verification/{profileId}`、`POST /cupid/verification/{profileId}/review`，当前仅为基础状态入口，后续由 Phase 8.2.2 重构 |
+| Verification | `GET /cupid/verification/list`、`GET /cupid/verification/{materialId}`、`POST /cupid/verification/{materialId}/review`，按认证材料审核 |
 
 要求：
 
@@ -808,6 +818,35 @@ API：
 - 拒绝后 C 端能看到结构化拒绝原因，并可重新提交对应类型材料。
 - C 端账号中心继续展示五个状态，但“平台审核”直接读取 Profile 发布审核状态。
 
+当前实现状态（2026-06-23）：
+
+- 已新增 `cm_profile_verification_materials`，用于保存每次认证材料提交和审核结果。
+- 已新增增量迁移脚本 `sql/cm_phase_8_2_2_verification_materials.sql`，用于现有数据库创建材料表并回填旧汇总认证状态。
+- 已保留 `cm_profile_verifications` 作为四类认证的汇总状态表。
+- C 端资料详情页已从“保存资料顺带提交身份认证”改为独立提交认证材料：
+  - 保存资料只保存草稿或资料内容，不自动进入平台发布审核。
+  - 已保存资料可调用 `POST /account/profiles/{profileId}/submit-review`，将 `draft` 或被拒后的 `hidden` 资料提交为 `review`。
+  - 身份认证提交 `legalName`、`dateOfBirth`、`materialUrl`、补充说明。
+  - 学历、收入、婚姻提交 `materialName`、`materialUrl`、补充说明。
+  - `materialUrl` 当前作为私有对象 Key 或受控文件地址保存，提交端和服务端都限制为 PDF/JPG/JPEG/PNG/WEBP。
+  - 提交成功后刷新资料详情，状态进入 `pending`。
+- Admin 已将认证材料队列拆为四个页面，共用同一个材料审核组件：
+  - `cupid/verification/identity/index`：身份认证材料。
+  - `cupid/verification/education/index`：学历认证材料。
+  - `cupid/verification/income/index`：收入认证材料。
+  - `cupid/verification/marital/index`：婚姻认证材料。
+  - 每个页面固定提交对应 `materialType` 查询，不再依赖人工筛选认证类型。
+  - 详情按 `materialId` 查看。
+  - 审核只影响该材料对应的一个认证类型。
+- 后端接口已按材料语义实现：
+  - `GET /account/profiles/{profileId}/verification`
+  - `POST /account/profiles/{profileId}/verification/materials`
+  - `GET /cupid/verification/list`
+  - `GET /cupid/verification/{materialId}`
+  - `POST /cupid/verification/{materialId}/review`
+- 当前材料附件仍使用 `materialUrl` 文本字段保存私有凭证；Admin 不直接打开裸链，后续通过鉴权预览/下载接口换取短期可访问地址。
+- 当前拒绝原因先保存为 `rejection_reason` 文本；Admin 提供快捷拒绝原因，结构化拒绝原因码后续再补。
+
 推荐数据模型：
 
 保留 `cm_profile_verifications` 作为 Profile 的认证汇总表：
@@ -820,23 +859,23 @@ API：
 - `verified_at`
 - `verified_by_user_id`
 
-新增认证材料表，建议命名 `cm_profile_verification_materials`：
+已新增认证材料表 `cm_profile_verification_materials`：
 
 | 字段 | 用途 |
 | --- | --- |
 | `id` | 材料 ID |
 | `profile_id` | 关联 Profile |
 | `material_type` | `identity`、`education`、`income`、`marital` |
-| `batch_no` | 提交批次，用于拒绝后重新提交 |
-| `file_url` | 附件地址或材料图片地址 |
-| `file_name` | 原始文件名 |
-| `mime_type` | 文件类型 |
-| `status` | `pending`、`approved`、`rejected`、`superseded` |
-| `reject_reason_code` | 结构化拒绝原因 |
-| `reject_reason_text` | 补充说明 |
+| `status` | `pending`、`approved`、`rejected` |
+| `legal_name`、`date_of_birth` | 身份认证提交字段 |
+| `material_name` | 材料名称 |
+| `material_url` | 材料私有地址或对象 Key，不存长期公开裸链 |
+| `review_note` | 用户提交说明 |
 | `submitted_by_user_id` | 提交人 |
+| `submitted_at` | 提交时间 |
 | `reviewed_by_user_id` | 审核人 |
 | `reviewed_at` | 审核时间 |
+| `rejection_reason` | 拒绝原因文本 |
 | `created_at`、`updated_at` | 时间戳 |
 
 如需要保留多条审核动作流水，可新增 `cm_profile_verification_audit_logs`；否则先复用 `cm_audit_logs` 记录 before/after/reason。
@@ -874,7 +913,7 @@ C 端账号中心：
   - 保存后进入 `pending`，前端按钮文案改为待审核。
 - 待审核状态展示已提交材料摘要、提交时间和“审核中”提示；是否允许撤回或替换材料需单独定义，默认先不支持撤回。
 - 已拒绝状态展示结构化拒绝原因、补充说明和重新提交入口。
-- 重新提交同类型材料时，旧的 rejected 材料保留，新材料进入 `pending`；如需要，只把旧 pending 标记为 `superseded`。
+- 重新提交同类型材料时，旧的 rejected 材料保留，新材料进入 `pending`；当前不允许同类型存在未处理 pending 重复提交。
 - 新增或扩展 API 传输认证材料，不复用资料编辑保存接口：
   - `GET /account/profiles/{profileId}/verification` 返回四类认证状态、材料摘要、拒绝原因和可操作状态。
   - `POST /account/profiles/{profileId}/verification/materials` 新增认证材料提交。
@@ -885,19 +924,19 @@ C 端账号中心：
 
 后台页面：
 
-- 当前 `cupid/verification/index` 可以保留路径，但必须重构为真实材料审核页面。
-- 后台不再保留一个“认证审核”总审核操作；页面只处理身份、学历、收入、婚姻四类材料。
+- 后台不再保留一个混合“认证审核”总页面；`认证审核` 作为目录，下面拆为身份、学历、收入、婚姻四个材料审核页面。
+- 四个页面共用一套审核组件和 `/cupid/verification/...` 接口，只通过固定 `materialType` 区分业务队列。
+- 页面只处理身份、学历、收入、婚姻四类材料。
 - 平台审核继续由 `cupid/profile/index` 资料审核页承担。
+- 发布审核页默认只显示 `profile_status = review` 的待审核资料；草稿资料不进入审核队列，手动筛出时也不可执行审核。
 - 列表筛选：
   - 资料 ID、资料名称、用户 ID、用户名称
-  - 认证类型
   - 材料状态
   - 提交时间、审核时间
   - 排序：待审优先、提交时间最新、审核时间最新
 - 列表列：
   - 资料摘要
   - 用户
-  - 认证类型
   - 当前材料状态
   - 拒绝原因摘要
   - 提交时间
@@ -908,16 +947,17 @@ C 端账号中心：
   - 历史提交批次
   - 已有拒绝原因
   - 审核操作区：通过、拒绝、拒绝原因快捷选项、补充说明
-- 四类认证是否拆页：
-  - 初期建议同一页面用认证类型筛选和标签区分，减少菜单复杂度。
-  - 如果材料字段差异变大，再拆成身份、学历、收入、婚姻四个子页面。
-- 当前粗粒度 `POST /cupid/verification/{profileId}/review` 完成 8.2.2 后应移除、废弃或仅保留兼容转发，不能继续一次性修改四类认证状态。
+- 当前粗粒度 `POST /cupid/verification/{profileId}/review` 已改为 `POST /cupid/verification/{materialId}/review` 语义，不能再一次性修改四类认证状态。
 
 权限规划：
 
 | 能力 | 权限 |
 | --- | --- |
-| 列表 | `cupid:verification:list` |
+| 身份认证页面 | `cupid:verification:identity:list` |
+| 学历认证页面 | `cupid:verification:education:list` |
+| 收入认证页面 | `cupid:verification:income:list` |
+| 婚姻认证页面 | `cupid:verification:marital:list` |
+| 接口列表 | `cupid:verification:list` |
 | 详情 | `cupid:verification:query` |
 | 审核 | `cupid:verification:review` |
 | 查看材料附件 | `cupid:verification:material` |
@@ -936,8 +976,8 @@ C 端账号中心：
 审计与通知：
 
 - 后台审核写操作必须写入 `cm_audit_logs`，action 建议使用：
-  - `cupid.verification.material.approve`
-  - `cupid.verification.material.reject`
+  - 当前实现：`cupid.verification.review`
+  - 后续可细化为 `cupid.verification.material.approve`、`cupid.verification.material.reject`
 - Controller 写操作接入 RuoYi `@Log`。
 - 拒绝后建议发送 Cupid Inbox 通知，内容引用结构化拒绝原因。
 - 通过后是否通知用户可配置，默认可以先不发，账号中心状态即时更新即可。
@@ -946,31 +986,34 @@ C 端账号中心：
 
 - 现有 `cm_profile_verifications` 数据保留为汇总状态。
 - 若没有历史材料，不伪造材料记录。
-- 当前基础 Verification 页面在 8.2.2 开始时可继续作为临时入口，但完成后必须改为真实材料队列。
-- `sql/cm_admin_menu.sql` 可保留现有 `cupid/verification` 菜单和权限名，减少动态路由迁移成本。
-- C 端账号中心需要迁移平台审核取值来源：从 Verification 的 `reviewStatus` 改为 Profile 的 `profileStatus` 或后端派生字段。
+- 当前基础 Verification 页面已拆为四个真实材料审核队列。
+- `sql/cm_admin_menu.sql` 使用一个 `认证审核` 目录承载四个分项页面；接口权限继续保留通用 `cupid:verification:list/query/review`，减少后端鉴权和接口复制成本。
+- C 端账号中心平台审核已从 Profile 的 `profileStatus` 派生；不能再从 Verification 的 `reviewStatus` 读取。
 - 后端需要检查所有 `reviewStatus` 命名，避免前端继续把认证汇总状态误解为平台审核。
 
 验收：
 
 - C 端可提交四类认证材料。
 - C 端五个状态来源清晰：四类认证来自 Verification，平台审核来自 Profile。
-- 后台可按认证类型和状态筛选待审材料。
-- 后台可查看材料附件并通过或拒绝。
+- 后台四个认证页面分别固定身份、学历、收入、婚姻材料队列。
+- 后台可按状态、资料、用户和时间筛选待审材料。
+- 后台可查看材料凭证并通过或拒绝；真实材料内容后续通过鉴权预览/下载接口访问。
 - 拒绝原因能回到 C 端账号中心。
 - 重新提交后新材料进入待审，旧材料不丢失。
 - 汇总状态与材料状态一致，不出现材料已拒绝但汇总仍 pending 的不一致状态。
 - 公开资料 `isVerified` 与后端认证规则一致。
 - 资料审核通过或拒绝只影响平台审核展示，不会批量修改四类认证状态。
 - 审核写入 `cm_audit_logs` 和 `sys_oper_log`。
-- Verification 认证审核闭环通过后，Phase 8.2.2 才算完成。
+- Verification 认证审核业务闭环已完成；真实上传、材料预览和材料下载不阻塞 8.2.2 收口，进入后续补强。
 
-8.2.2 完成前：
+8.2.2 后续补强：
 
-- 不把当前 Verification 页面视为最终认证审核能力。
-- 不要求认证审核具备完整业务闭环。
-- 不为认证材料伪造页面字段或把现有状态字段强行解释成材料审核结果。
-- 不再把 `cm_profile_verifications.review_status` 称为平台审核。
+- 接入真实附件上传、大小限制、病毒/内容扫描和材料预览，替代当前 `materialUrl` 文本输入。
+- 为材料访问增加鉴权预览/下载接口，返回短期签名地址或后端流式响应，避免裸露直连敏感材料。
+- 为拒绝原因增加结构化 reason code。
+- C 端平台审核状态需要继续从 `profileStatus` 派生，不再使用 `cm_profile_verifications.review_status`。
+- 如后续存在替换待审材料需求，再引入 `superseded` 或撤回状态。
+- 审核通知可接入 Cupid Inbox。
 
 ### 11.3 Phase 8.3：Private Introduction
 
@@ -1197,12 +1240,14 @@ API：
 ## 15. 当前执行入口
 
 Phase 8.2 已完成 Profile 与 Photo 审核的代码、菜单、列表、详情、页面挂载和写操作验收。
+Phase 8.2.1 已完成资料库与资料运营的拆分、内部字段展示和精选/备注运营。
+Phase 8.2.2 已完成 Verification 认证审核业务闭环；真实文件上传、鉴权预览/下载和结构化拒绝 reason code 作为后续补强。
 
 已确认：
 
 1. 资料审核和照片审核可执行通过或拒绝。
 2. 审核写操作会写入 `cm_audit_logs`，同时被 RuoYi `sys_oper_log` 记录。
 3. 重复审核会被阻止，并提示已处理。
-4. Verification 认证审核闭环暂不作为 Phase 8.2 完成条件，后续进入 Phase 8.2.2 单独设计。
+4. Verification 已按身份、学历、收入、婚姻拆分为四个材料审核队列。
 5. `cupid_auditor` 只读权限作为角色矩阵复验项保留，不阻塞 Phase 8.2 完成。
 6. Phase 8.2 完成后，可进入 Phase 8.3：Private Introduction。

@@ -11,6 +11,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
+import java.util.regex.Pattern;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -33,6 +34,7 @@ import com.ruoyi.cupid.domain.CupidProfilePhoto;
 import com.ruoyi.cupid.domain.CupidProfilePrivacyPreference;
 import com.ruoyi.cupid.domain.CupidProfileRelationshipValue;
 import com.ruoyi.cupid.domain.CupidProfileVerification;
+import com.ruoyi.cupid.domain.CupidProfileVerificationMaterial;
 import com.ruoyi.cupid.domain.CupidUserEntitlementBalance;
 import com.ruoyi.cupid.domain.CupidUserMembership;
 import com.ruoyi.cupid.mapper.CupidMembershipMapper;
@@ -52,6 +54,10 @@ public class CupidProfileServiceImpl implements ICupidProfileService
     private static final List<String> FAMILY_DIRECTORY_FIELD_NAMES =
             Arrays.asList("city", "education", "industry", "summary", "relationship_goal", "residence_plan");
     private static final List<String> TAG_FIELD_NAMES = Arrays.asList("tags");
+    private static final List<String> VERIFICATION_MATERIAL_TYPES =
+            Arrays.asList("identity", "education", "income", "marital");
+    private static final Pattern VERIFICATION_MATERIAL_FILE_PATTERN =
+            Pattern.compile("(?i).+\\.(pdf|jpg|jpeg|png|webp)(?:[?#].*)?$");
 
     /** 本地化单值字段：DB snake_case → 前端 camelCase */
     private static final Map<String, String> LOCALIZED_FIELD_MAP = new LinkedHashMap<>();
@@ -507,15 +513,6 @@ public class CupidProfileServiceImpl implements ICupidProfileService
             reconcilePhotos(profileId, photosPayload);
         }
 
-        // 认证草稿
-        Map<String, Object> verificationPayload = (Map) payload.get("verification");
-        if (verificationPayload != null)
-        {
-            profileMapper.upsertVerificationDraft(
-                    buildVerificationFromPayload(profileId, verificationPayload,
-                            profileMapper.selectVerificationByProfileId(profileId)));
-        }
-
         return getOwnerProfileDetail(profileId, userId, locale);
     }
 
@@ -550,6 +547,29 @@ public class CupidProfileServiceImpl implements ICupidProfileService
     }
 
     @Override
+    @Transactional
+    public Map<String, Object> submitProfileForReview(String profileId, String userId, String locale)
+    {
+        requireOwnedEditableProfile(profileId, userId);
+        CupidProfile profile = profileMapper.selectProfileById(profileId);
+        String status = profile.getProfileStatus();
+        if ("review".equals(status))
+        {
+            throw new CupidApiException(HttpStatus.CONFLICT, "profile_review_pending");
+        }
+        if ("open".equals(status))
+        {
+            throw new CupidApiException(HttpStatus.CONFLICT, "profile_already_open");
+        }
+        if (!"draft".equals(status) && !"hidden".equals(status))
+        {
+            throw new CupidApiException(HttpStatus.CONFLICT, "profile_status_not_submittable");
+        }
+        profileMapper.updateAdminProfileReviewStatus(profileId, "review");
+        return getOwnerProfileDetail(profileId, userId, locale);
+    }
+
+    @Override
     public Map<String, Object> updatePrivacyPreferences(String profileId, String userId, Map<String, Object> prefs)
     {
         CupidProfileOwnership ownership =
@@ -580,6 +600,111 @@ public class CupidProfileServiceImpl implements ICupidProfileService
         profileMapper.upsertPrivacyPreference(record);
         return buildPrivacyPreferencesDTO(
                 profileMapper.selectPrivacyPreferenceByProfileId(profileId));
+    }
+
+    @Override
+    public Map<String, Object> getVerificationMaterials(String profileId, String userId)
+    {
+        requireOwnedEditableProfile(profileId, userId);
+        Map<String, Object> dto = new LinkedHashMap<>();
+        dto.put("profileId", profileId);
+        dto.put("verification", buildVerificationDTO(profileMapper.selectVerificationByProfileId(profileId)));
+        dto.put("materials", buildVerificationMaterialList(
+                profileMapper.selectVerificationMaterialsByProfileId(profileId)));
+        return dto;
+    }
+
+    @Override
+    @Transactional
+    public Map<String, Object> submitVerificationMaterial(String profileId, String userId, Map<String, Object> payload)
+    {
+        requireOwnedEditableProfile(profileId, userId);
+        String materialType = string(payload, "materialType", "");
+        if (!VERIFICATION_MATERIAL_TYPES.contains(materialType))
+        {
+            throw new CupidApiException(HttpStatus.BAD_REQUEST, "invalid_verification_material_type");
+        }
+
+        CupidProfileVerification verification = profileMapper.selectVerificationByProfileId(profileId);
+        if (verification != null)
+        {
+            String currentStatus = verificationStatusOf(verification, materialType);
+            if ("verified".equals(currentStatus))
+            {
+                throw new CupidApiException(HttpStatus.CONFLICT, "verification_already_verified");
+            }
+            if ("pending".equals(currentStatus))
+            {
+                throw new CupidApiException(HttpStatus.CONFLICT, "verification_pending");
+            }
+        }
+
+        CupidProfileVerificationMaterial material = new CupidProfileVerificationMaterial();
+        material.setId(IdUtils.fastUUID());
+        material.setProfileId(profileId);
+        material.setMaterialType(materialType);
+        material.setStatus("pending");
+        material.setSubmittedByUserId(userId);
+        material.setLegalName(string(payload, "legalName", null));
+        material.setDateOfBirth(parseSqlDate(string(payload, "dateOfBirth", null)));
+        material.setMaterialName(string(payload, "materialName", null));
+        material.setMaterialUrl(string(payload, "materialUrl", null));
+        material.setReviewNote(string(payload, "reviewNote", null));
+        validateVerificationMaterialFile(material.getMaterialUrl());
+
+        if ("identity".equals(materialType))
+        {
+            if (!StringUtils.hasText(material.getLegalName())
+                    || material.getDateOfBirth() == null
+                    || !StringUtils.hasText(material.getMaterialUrl()))
+            {
+                throw new CupidApiException(HttpStatus.BAD_REQUEST, "identity_material_required");
+            }
+        }
+        else if (!StringUtils.hasText(material.getMaterialName())
+                || !StringUtils.hasText(material.getMaterialUrl()))
+        {
+            throw new CupidApiException(HttpStatus.BAD_REQUEST, "verification_material_required");
+        }
+
+        CupidProfileVerification initial = buildInitialVerification(profileId);
+        profileMapper.upsertVerification(initial);
+        profileMapper.insertVerificationMaterial(material);
+        profileMapper.markVerificationMaterialPending(profileId, materialType,
+                material.getLegalName(), material.getDateOfBirth(), userId);
+        return getVerificationMaterials(profileId, userId);
+    }
+
+    private void validateVerificationMaterialFile(String materialUrl)
+    {
+        if (!StringUtils.hasText(materialUrl))
+        {
+            return;
+        }
+        if (!VERIFICATION_MATERIAL_FILE_PATTERN.matcher(materialUrl.trim()).matches())
+        {
+            throw new CupidApiException(HttpStatus.BAD_REQUEST, "invalid_verification_material_file_type");
+        }
+    }
+
+    private void requireOwnedEditableProfile(String profileId, String userId)
+    {
+        CupidProfileOwnership ownership =
+                profileMapper.selectOwnershipByUserAndProfile(userId, profileId);
+        if (ownership == null)
+        {
+            throw new CupidApiException(HttpStatus.NOT_FOUND, "profile_not_found");
+        }
+        if (!"owner".equals(ownership.getPermission())
+                && !"manager".equals(ownership.getPermission()))
+        {
+            throw new CupidApiException(HttpStatus.FORBIDDEN, "not_profile_owner");
+        }
+        CupidProfile profile = profileMapper.selectProfileById(profileId);
+        if (profile == null || profile.getArchivedAt() != null)
+        {
+            throw new CupidApiException(HttpStatus.NOT_FOUND, "profile_not_found");
+        }
     }
 
     /**
@@ -1623,6 +1748,55 @@ public class CupidProfileServiceImpl implements ICupidProfileService
         dto.put("reviewStatus", verification.getReviewStatus());
         dto.put("verifiedByUserId", verification.getVerifiedByUserId());
         return dto;
+    }
+
+    private List<Map<String, Object>> buildVerificationMaterialList(
+            List<CupidProfileVerificationMaterial> materials)
+    {
+        List<Map<String, Object>> list = new ArrayList<>();
+        if (materials == null)
+        {
+            return list;
+        }
+        for (CupidProfileVerificationMaterial material : materials)
+        {
+            Map<String, Object> dto = new LinkedHashMap<>();
+            dto.put("materialId", material.getId());
+            dto.put("profileId", material.getProfileId());
+            dto.put("materialType", material.getMaterialType());
+            dto.put("status", material.getStatus());
+            dto.put("legalName", material.getLegalName());
+            dto.put("dateOfBirth", material.getDateOfBirth());
+            dto.put("materialName", material.getMaterialName());
+            dto.put("materialUrl", material.getMaterialUrl());
+            dto.put("reviewNote", material.getReviewNote());
+            dto.put("submittedAt", material.getSubmittedAt());
+            dto.put("reviewedAt", material.getReviewedAt());
+            dto.put("rejectionReason", material.getRejectionReason());
+            list.add(dto);
+        }
+        return list;
+    }
+
+    private String verificationStatusOf(CupidProfileVerification verification, String materialType)
+    {
+        if ("identity".equals(materialType))
+        {
+            return verification.getIdentityStatus();
+        }
+        if ("education".equals(materialType))
+        {
+            return verification.getEducationStatus();
+        }
+        if ("income".equals(materialType))
+        {
+            return verification.getIncomeStatus();
+        }
+        if ("marital".equals(materialType))
+        {
+            return verification.getMaritalVerificationStatus();
+        }
+        return "unverified";
     }
 
     /**

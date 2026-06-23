@@ -13,6 +13,7 @@ import com.ruoyi.cupid.domain.CupidProfilePrivacyPreference;
 import com.ruoyi.cupid.domain.CupidProfileRelationshipValue;
 import com.ruoyi.cupid.domain.CupidProfileContact;
 import com.ruoyi.cupid.domain.CupidProfileVerification;
+import com.ruoyi.cupid.domain.CupidProfileVerificationMaterial;
 import com.ruoyi.cupid.domain.CupidFavoriteProfile;
 import com.ruoyi.cupid.domain.CupidPrivateIntroductionRequest;
 import com.ruoyi.cupid.domain.CupidUserEntitlementBalance;
@@ -42,12 +43,19 @@ public interface CupidProfileMapper
 
     List<Map<String, Object>> selectAdminVerificationList(Map<String, Object> params);
 
-    Map<String, Object> selectAdminVerificationDetail(@Param("profileId") String profileId);
+    Map<String, Object> selectAdminVerificationDetail(@Param("materialId") String materialId);
 
-    int updateAdminVerificationReviewStatus(@Param("profileId") String profileId,
-            @Param("reviewStatus") String reviewStatus,
+    int updateAdminVerificationMaterialStatus(@Param("materialId") String materialId,
+            @Param("status") String status,
+            @Param("reviewerUserId") String reviewerUserId,
+            @Param("rejectionReason") String rejectionReason);
+
+    int updateVerificationStatusByMaterial(@Param("profileId") String profileId,
+            @Param("materialType") String materialType,
             @Param("materialStatus") String materialStatus,
             @Param("reviewerUserId") String reviewerUserId);
+
+    int refreshVerificationReviewStatus(@Param("profileId") String profileId);
 
     int insertAdminAuditLog(@Param("id") String id,
             @Param("actorType") String actorType,
@@ -193,6 +201,25 @@ public interface CupidProfileMapper
      * 查询指定资料的认证信息
      */
     CupidProfileVerification selectVerificationByProfileId(@Param("profileId") String profileId);
+
+    /**
+     * 查询指定资料的认证材料记录
+     */
+    List<CupidProfileVerificationMaterial> selectVerificationMaterialsByProfileId(@Param("profileId") String profileId);
+
+    /**
+     * 新增认证材料
+     */
+    int insertVerificationMaterial(CupidProfileVerificationMaterial material);
+
+    /**
+     * 将指定认证项标记为待审核
+     */
+    int markVerificationMaterialPending(@Param("profileId") String profileId,
+            @Param("materialType") String materialType,
+            @Param("legalName") String legalName,
+            @Param("dateOfBirth") java.util.Date dateOfBirth,
+            @Param("userId") String userId);
 
     /**
      * 查询指定资料的隐私偏好设置

@@ -53,7 +53,22 @@ public interface ICupidProfileService
     Map<String, Object> archiveProfile(String profileId, String userId);
 
     /**
+     * 提交资料进入发布审核
+     */
+    Map<String, Object> submitProfileForReview(String profileId, String userId, String locale);
+
+    /**
      * 更新资料隐私偏好
      */
     Map<String, Object> updatePrivacyPreferences(String profileId, String userId, Map<String, Object> prefs);
+
+    /**
+     * 查询资料认证材料状态
+     */
+    Map<String, Object> getVerificationMaterials(String profileId, String userId);
+
+    /**
+     * 提交资料认证材料
+     */
+    Map<String, Object> submitVerificationMaterial(String profileId, String userId, Map<String, Object> payload);
 }

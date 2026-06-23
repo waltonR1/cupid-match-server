@@ -9,7 +9,26 @@ where subject_id in (
   '33333333-3333-4333-8333-333333333333',
   'aaaa1111-1111-4111-8111-111111111111',
   'aaaa2222-2222-4222-8222-222222222222',
-  'aaaa3333-3333-4333-8333-333333333333'
+  'aaaa3333-3333-4333-8333-333333333333',
+  '96000000-0000-4000-8000-000000000001',
+  '96000000-0000-4000-8000-000000000002',
+  '96000000-0000-4000-8000-000000000003',
+  '96000000-0000-4000-8000-000000000004',
+  '96000000-0000-4000-8000-000000000005',
+  '96000000-0000-4000-8000-000000000006',
+  '96000000-0000-4000-8000-000000000007',
+  '96000000-0000-4000-8000-000000000008',
+  '96000000-0000-4000-8000-000000000009',
+  '96000000-0000-4000-8000-000000000010',
+  '96000000-0000-4000-8000-000000000011',
+  '96000000-0000-4000-8000-000000000012'
+);
+
+delete from cm_profile_verification_materials
+where profile_id in (
+  '11111111-1111-4111-8111-111111111111',
+  '22222222-2222-4222-8222-222222222222',
+  '33333333-3333-4333-8333-333333333333'
 );
 
 delete from cm_profile_verifications
@@ -198,6 +217,36 @@ insert into cm_profile_verifications (
 ) values
   ('95000000-0000-4000-8000-000000000001', '11111111-1111-4111-8111-111111111111', 'Test A', '1994-03-12', 'pending', 'pending', 'pending', 'pending', 'pending', null, null, now(), now()),
   ('95000000-0000-4000-8000-000000000002', '22222222-2222-4222-8222-222222222222', 'Test B', '1990-08-20', 'verified', 'verified', 'verified', 'verified', 'approved', now(), '1', now(), now()),
-  ('95000000-0000-4000-8000-000000000003', '33333333-3333-4333-8333-333333333333', 'Test C', '1988-11-05', 'pending', 'pending', 'pending', 'pending', 'pending', null, null, now(), now());
+  ('95000000-0000-4000-8000-000000000003', '33333333-3333-4333-8333-333333333333', 'Test C', '1988-11-05', 'pending', 'rejected', 'pending', 'unverified', 'pending', null, null, now(), now());
+
+insert into cm_profile_verification_materials (
+  id, profile_id, material_type, status, legal_name, date_of_birth,
+  material_name, material_url, review_note, submitted_by_user_id, submitted_at,
+  reviewed_by_user_id, reviewed_at, rejection_reason, created_at, updated_at
+) values
+  ('96000000-0000-4000-8000-000000000001', '11111111-1111-4111-8111-111111111111', 'identity', 'pending', 'Test A', '1994-03-12',
+   '护照首页照片', 'private://verification/11111111/identity/passport-front-20260615.jpg', '用户提交身份证明信息。', '90000000-0000-4000-8000-000000000001', now(), null, null, null, now(), now()),
+  ('96000000-0000-4000-8000-000000000002', '11111111-1111-4111-8111-111111111111', 'education', 'pending', null, null,
+   '硕士学位证书', 'private://verification/11111111/education/master-diploma-20260615.pdf', '法国商学院硕士材料。', '90000000-0000-4000-8000-000000000001', now(), null, null, null, now(), now()),
+  ('96000000-0000-4000-8000-000000000003', '11111111-1111-4111-8111-111111111111', 'income', 'pending', null, null,
+   '近一年税单', 'private://verification/11111111/income/tax-statement-2025.pdf', '近一年收入证明。', '90000000-0000-4000-8000-000000000001', now(), null, null, null, now(), now()),
+  ('96000000-0000-4000-8000-000000000004', '11111111-1111-4111-8111-111111111111', 'marital', 'pending', null, null,
+   '未婚声明', 'private://verification/11111111/marital/single-status-declaration.pdf', '婚姻状态声明。', '90000000-0000-4000-8000-000000000001', now(), null, null, null, now(), now()),
+  ('96000000-0000-4000-8000-000000000005', '22222222-2222-4222-8222-222222222222', 'identity', 'approved', 'Test B', '1990-08-20',
+   '身份证正反面', 'private://verification/22222222/identity/id-card-combined.png', '历史通过材料。', '90000000-0000-4000-8000-000000000002', now(), '1', now(), null, now(), now()),
+  ('96000000-0000-4000-8000-000000000006', '22222222-2222-4222-8222-222222222222', 'education', 'approved', null, null,
+   '本科学位证书', 'private://verification/22222222/education/bachelor-degree.pdf', '历史通过材料。', '90000000-0000-4000-8000-000000000002', now(), '1', now(), null, now(), now()),
+  ('96000000-0000-4000-8000-000000000007', '33333333-3333-4333-8333-333333333333', 'identity', 'pending', 'Test C', '1988-11-05',
+   '护照扫描件', 'private://verification/33333333/identity/passport-scan-20260615.pdf', '用户重新提交身份信息。', '90000000-0000-4000-8000-000000000003', now(), null, null, null, now(), now()),
+  ('96000000-0000-4000-8000-000000000008', '33333333-3333-4333-8333-333333333333', 'education', 'rejected', null, null,
+   '博士学位证书', 'private://verification/33333333/education/phd-degree-blurry.jpg', '扫描件不清晰。', '90000000-0000-4000-8000-000000000003', now(), '1', now(), '图片不清晰，请重新上传。', now(), now()),
+  ('96000000-0000-4000-8000-000000000009', '33333333-3333-4333-8333-333333333333', 'income', 'pending', null, null,
+   '自由职业收入说明', 'private://verification/33333333/income/freelance-income-statement.pdf', '自由职业收入说明。', '90000000-0000-4000-8000-000000000003', now(), null, null, null, now(), now()),
+  ('96000000-0000-4000-8000-000000000010', '33333333-3333-4333-8333-333333333333', 'marital', 'approved', null, null,
+   '离婚证明', 'private://verification/33333333/marital/divorce-certificate.pdf', '历史通过材料。', '90000000-0000-4000-8000-000000000003', now(), '1', now(), null, now(), now()),
+  ('96000000-0000-4000-8000-000000000011', '22222222-2222-4222-8222-222222222222', 'income', 'approved', null, null,
+   '雇主收入证明', 'private://verification/22222222/income/employer-income-letter.pdf', 'HR 出具收入证明。', '90000000-0000-4000-8000-000000000002', now(), '1', now(), null, now(), now()),
+  ('96000000-0000-4000-8000-000000000012', '22222222-2222-4222-8222-222222222222', 'marital', 'rejected', null, null,
+   '婚姻状态截图', 'private://verification/22222222/marital/marital-status-screenshot.webp', '材料缺少官方抬头。', '90000000-0000-4000-8000-000000000002', now(), '1', now(), '材料类型不符合认证要求。', now(), now());
 
 commit;

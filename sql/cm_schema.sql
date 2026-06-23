@@ -38,6 +38,7 @@ drop table if exists cm_membership_plans;
 drop table if exists cm_profile_privacy_preferences;
 drop table if exists cm_profile_contacts;
 drop table if exists cm_profile_verifications;
+drop table if exists cm_profile_verification_materials;
 drop table if exists cm_profile_internal_localized_fields;
 drop table if exists cm_profile_internal_records;
 drop table if exists cm_profile_ownerships;
@@ -346,6 +347,29 @@ create table cm_profile_verifications (
   primary key (id),
   unique key uk_cm_profile_verifications_profile (profile_id)
 ) engine=innodb comment='资料认证';
+
+create table cm_profile_verification_materials (
+  id                  varchar(36)  not null comment '认证材料ID',
+  profile_id          varchar(36)  not null comment '资料ID，关联 cm_profiles.id',
+  material_type       varchar(20)  not null comment '材料类型；可选值：identity, education, income, marital',
+  status              varchar(20)  not null default 'pending' comment '材料审核状态；可选值：pending, approved, rejected',
+  legal_name          varchar(100) default null comment '法定姓名，仅身份认证使用',
+  date_of_birth       date         default null comment '出生日期，仅身份认证使用',
+  material_name       varchar(191) default null comment '材料名称',
+  material_url        varchar(500) default null comment '材料私有地址或对象Key',
+  review_note         varchar(500) default null comment '提交说明',
+  submitted_by_user_id varchar(36) not null comment '提交人用户ID，关联 cm_users.id',
+  submitted_at        datetime     not null default current_timestamp comment '提交时间',
+  reviewed_by_user_id varchar(36)  default null comment '审核人用户ID（后台操作人保存 sys_user.user_id 字符串）',
+  reviewed_at         datetime     default null comment '审核时间',
+  rejection_reason    varchar(500) default null comment '拒绝原因',
+  created_at          datetime     not null default current_timestamp comment '创建时间',
+  updated_at          datetime     not null default current_timestamp on update current_timestamp comment '更新时间',
+  primary key (id),
+  key idx_cm_profile_verification_materials_profile (profile_id),
+  key idx_cm_profile_verification_materials_status (status, submitted_at),
+  key idx_cm_profile_verification_materials_type (material_type, status)
+) engine=innodb comment='资料认证材料';
 
 create table cm_profile_contacts (
   id                 varchar(36)  not null comment '资料联系方式ID',

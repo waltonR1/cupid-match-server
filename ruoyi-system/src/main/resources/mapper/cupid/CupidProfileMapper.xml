@@ -488,11 +488,13 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     </update>
 
     <select id="selectAdminVerificationList" parameterType="map" resultType="map">
-        select v.profile_id as profileId, v.legal_name as legalName, v.date_of_birth as dateOfBirth,
-               v.identity_status as identityStatus, v.education_status as educationStatus,
-               v.income_status as incomeStatus, v.marital_status as maritalVerificationStatus,
-               v.review_status as reviewStatus, v.verified_at as verifiedAt,
-               v.verified_by_user_id as verifiedByUserId, v.updated_at as updatedAt,
+        select m.id as materialId, m.profile_id as profileId, m.material_type as materialType,
+               m.status, m.legal_name as legalName, m.date_of_birth as dateOfBirth,
+               m.material_name as materialName, m.material_url as materialUrl,
+               m.review_note as reviewNote, m.submitted_by_user_id as submittedByUserId,
+               m.submitted_at as submittedAt, m.reviewed_by_user_id as reviewedByUserId,
+               m.reviewed_at as reviewedAt, m.rejection_reason as rejectionReason,
+               m.updated_at as updatedAt,
                p.profile_type as profileType, p.profile_status as profileStatus,
                p.gender, p.birth_year as birthYear, p.city_code as cityCode,
                (select lf.value from cm_profile_localized_fields lf
@@ -502,13 +504,13 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
                 where lf.profile_id = p.id and lf.field_name = 'city' and lf.locale = 'zh'
                 limit 1) as cityLabel,
                o.user_id as ownerUserId, u.account_name as ownerAccountName
-        from cm_profile_verifications v
-        inner join cm_profiles p on p.id = v.profile_id
+        from cm_profile_verification_materials m
+        inner join cm_profiles p on p.id = m.profile_id
         left join cm_profile_ownerships o on o.profile_id = p.id and o.status = 'active'
         left join cm_users u on u.id = o.user_id
         where p.archived_at is null
         <if test="profileId != null and profileId != ''">
-            and v.profile_id like concat('%', #{profileId}, '%')
+            and m.profile_id like concat('%', #{profileId}, '%')
         </if>
         <if test="profileKeyword != null and profileKeyword != ''">
             and exists (
@@ -524,41 +526,42 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <if test="userKeyword != null and userKeyword != ''">
             and u.account_name like concat('%', #{userKeyword}, '%')
         </if>
-        <if test="reviewStatus != null and reviewStatus != ''">
-            and v.review_status = #{reviewStatus}
+        <if test="materialType != null and materialType != ''">
+            and m.material_type = #{materialType}
         </if>
-        <if test="identityStatus != null and identityStatus != ''">
-            and v.identity_status = #{identityStatus}
+        <if test="status != null and status != ''">
+            and m.status = #{status}
         </if>
         <if test="beginTime != null and beginTime != ''">
-            and v.updated_at &gt;= concat(#{beginTime}, ' 00:00:00')
+            and m.updated_at &gt;= concat(#{beginTime}, ' 00:00:00')
         </if>
         <if test="endTime != null and endTime != ''">
-            and v.updated_at &lt;= concat(#{endTime}, ' 23:59:59')
+            and m.updated_at &lt;= concat(#{endTime}, ' 23:59:59')
         </if>
         <choose>
-            <when test="sortBy == 'updatedDesc'">order by v.updated_at desc</when>
-            <when test="sortBy == 'profileNameAsc'">order by profileName asc, v.updated_at desc</when>
-            <when test="sortBy == 'userNameAsc'">order by ownerAccountName asc, v.updated_at desc</when>
+            <when test="sortBy == 'updatedDesc'">order by m.updated_at desc</when>
+            <when test="sortBy == 'profileNameAsc'">order by profileName asc, m.updated_at desc</when>
+            <when test="sortBy == 'userNameAsc'">order by ownerAccountName asc, m.updated_at desc</when>
             <otherwise>
-                order by case v.review_status
+                order by case m.status
                              when 'pending' then 0
-                             when 'unreviewed' then 1
-                             when 'approved' then 2
-                             when 'rejected' then 3
+                             when 'approved' then 1
+                             when 'rejected' then 2
                              else 9
                          end,
-                         v.updated_at desc
+                         m.updated_at desc
             </otherwise>
         </choose>
     </select>
 
     <select id="selectAdminVerificationDetail" resultType="map">
-        select v.id, v.profile_id as profileId, v.legal_name as legalName, v.date_of_birth as dateOfBirth,
-               v.identity_status as identityStatus, v.education_status as educationStatus,
-               v.income_status as incomeStatus, v.marital_status as maritalVerificationStatus,
-               v.review_status as reviewStatus, v.verified_at as verifiedAt,
-               v.verified_by_user_id as verifiedByUserId, v.created_at as createdAt, v.updated_at as updatedAt,
+        select m.id as materialId, m.profile_id as profileId, m.material_type as materialType,
+               m.status, m.legal_name as legalName, m.date_of_birth as dateOfBirth,
+               m.material_name as materialName, m.material_url as materialUrl,
+               m.review_note as reviewNote, m.submitted_by_user_id as submittedByUserId,
+               m.submitted_at as submittedAt, m.reviewed_by_user_id as reviewedByUserId,
+               m.reviewed_at as reviewedAt, m.rejection_reason as rejectionReason,
+               m.created_at as createdAt, m.updated_at as updatedAt,
                p.profile_type as profileType, p.profile_status as profileStatus,
                p.gender, p.birth_year as birthYear, p.city_code as cityCode,
                (select lf.value from cm_profile_localized_fields lf
@@ -568,23 +571,63 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
                 where lf.profile_id = p.id and lf.field_name = 'city' and lf.locale = 'zh'
                 limit 1) as cityLabel,
                o.user_id as ownerUserId, u.account_name as ownerAccountName
-        from cm_profile_verifications v
-        inner join cm_profiles p on p.id = v.profile_id
+        from cm_profile_verification_materials m
+        inner join cm_profiles p on p.id = m.profile_id
         left join cm_profile_ownerships o on o.profile_id = p.id and o.status = 'active'
         left join cm_users u on u.id = o.user_id
-        where v.profile_id = #{profileId}
+        where m.id = #{materialId}
         limit 1
     </select>
 
-    <update id="updateAdminVerificationReviewStatus">
+    <update id="updateAdminVerificationMaterialStatus">
+        update cm_profile_verification_materials
+        set status = #{status},
+            reviewed_by_user_id = #{reviewerUserId},
+            reviewed_at = now(),
+            rejection_reason = #{rejectionReason},
+            updated_at = now()
+        where id = #{materialId}
+    </update>
+
+    <update id="updateVerificationStatusByMaterial">
         update cm_profile_verifications
-        set review_status = #{reviewStatus},
-            identity_status = #{materialStatus},
-            education_status = #{materialStatus},
-            income_status = #{materialStatus},
-            marital_status = #{materialStatus},
-            verified_at = if(#{reviewStatus} = 'approved', now(), null),
+        <set>
+            <choose>
+                <when test="materialType == 'identity'">identity_status = #{materialStatus},</when>
+                <when test="materialType == 'education'">education_status = #{materialStatus},</when>
+                <when test="materialType == 'income'">income_status = #{materialStatus},</when>
+                <when test="materialType == 'marital'">marital_status = #{materialStatus},</when>
+            </choose>
             verified_by_user_id = #{reviewerUserId},
+            updated_at = now()
+        </set>
+        where profile_id = #{profileId}
+    </update>
+
+    <update id="refreshVerificationReviewStatus">
+        update cm_profile_verifications
+        set review_status = case
+                when identity_status = 'pending'
+                  or education_status = 'pending'
+                  or income_status = 'pending'
+                  or marital_status = 'pending' then 'pending'
+                when identity_status = 'rejected'
+                  or education_status = 'rejected'
+                  or income_status = 'rejected'
+                  or marital_status = 'rejected' then 'rejected'
+                when identity_status = 'verified'
+                  and education_status = 'verified'
+                  and income_status = 'verified'
+                  and marital_status = 'verified' then 'approved'
+                else 'unreviewed'
+            end,
+            verified_at = case
+                when identity_status = 'verified'
+                  and education_status = 'verified'
+                  and income_status = 'verified'
+                  and marital_status = 'verified' then coalesce(verified_at, now())
+                else null
+            end,
             updated_at = now()
         where profile_id = #{profileId}
     </update>
@@ -907,6 +950,19 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         from cm_profile_verifications
         where profile_id = #{profileId}
         limit 1
+    </select>
+
+    <select id="selectVerificationMaterialsByProfileId" resultType="CupidProfileVerificationMaterial">
+        select id, profile_id as profileId, material_type as materialType, status,
+               legal_name as legalName, date_of_birth as dateOfBirth,
+               material_name as materialName, material_url as materialUrl,
+               review_note as reviewNote, submitted_by_user_id as submittedByUserId,
+               submitted_at as submittedAt, reviewed_by_user_id as reviewedByUserId,
+               reviewed_at as reviewedAt, rejection_reason as rejectionReason,
+               created_at as createdAt, updated_at as updatedAt
+        from cm_profile_verification_materials
+        where profile_id = #{profileId}
+        order by submitted_at desc
     </select>
 
     <select id="selectPrivacyPreferenceByProfileId" resultType="CupidProfilePrivacyPreference">
@@ -1520,5 +1576,38 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             verified_by_user_id = values(verified_by_user_id),
             updated_at = now()
     </insert>
+
+    <insert id="insertVerificationMaterial">
+        insert into cm_profile_verification_materials (
+            id, profile_id, material_type, status,
+            legal_name, date_of_birth, material_name, material_url, review_note,
+            submitted_by_user_id, submitted_at, created_at, updated_at
+        ) values (
+            #{id}, #{profileId}, #{materialType}, #{status},
+            #{legalName}, #{dateOfBirth}, #{materialName}, #{materialUrl}, #{reviewNote},
+            #{submittedByUserId}, now(), now(), now()
+        )
+    </insert>
+
+    <update id="markVerificationMaterialPending">
+        update cm_profile_verifications
+        <set>
+            <choose>
+                <when test="materialType == 'identity'">
+                    identity_status = 'pending',
+                    legal_name = #{legalName},
+                    date_of_birth = #{dateOfBirth},
+                </when>
+                <when test="materialType == 'education'">education_status = 'pending',</when>
+                <when test="materialType == 'income'">income_status = 'pending',</when>
+                <when test="materialType == 'marital'">marital_status = 'pending',</when>
+            </choose>
+            review_status = 'pending',
+            verified_at = null,
+            verified_by_user_id = #{userId},
+            updated_at = now()
+        </set>
+        where profile_id = #{profileId}
+    </update>
 
 </mapper>
