@@ -491,6 +491,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         select m.id as materialId, m.profile_id as profileId, m.material_type as materialType,
                m.status, m.legal_name as legalName, m.date_of_birth as dateOfBirth,
                m.material_name as materialName, m.material_url as materialUrl,
+               m.scan_status as scanStatus, m.scan_message as scanMessage, m.scanned_at as scannedAt,
                m.review_note as reviewNote, m.submitted_by_user_id as submittedByUserId,
                m.submitted_at as submittedAt, m.reviewed_by_user_id as reviewedByUserId,
                m.reviewed_at as reviewedAt, m.rejection_reason as rejectionReason,
@@ -558,6 +559,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         select m.id as materialId, m.profile_id as profileId, m.material_type as materialType,
                m.status, m.legal_name as legalName, m.date_of_birth as dateOfBirth,
                m.material_name as materialName, m.material_url as materialUrl,
+               m.scan_status as scanStatus, m.scan_message as scanMessage, m.scanned_at as scannedAt,
                m.review_note as reviewNote, m.submitted_by_user_id as submittedByUserId,
                m.submitted_at as submittedAt, m.reviewed_by_user_id as reviewedByUserId,
                m.reviewed_at as reviewedAt, m.rejection_reason as rejectionReason,
@@ -597,6 +599,25 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
                 <when test="materialType == 'education'">education_status = #{materialStatus},</when>
                 <when test="materialType == 'income'">income_status = #{materialStatus},</when>
                 <when test="materialType == 'marital'">marital_status = #{materialStatus},</when>
+            </choose>
+            verified_by_user_id = #{reviewerUserId},
+            updated_at = now()
+        </set>
+        where profile_id = #{profileId}
+    </update>
+
+    <update id="resetVerificationStatusByMaterial">
+        update cm_profile_verifications
+        <set>
+            <choose>
+                <when test="materialType == 'identity'">
+                    identity_status = 'unverified',
+                    legal_name = null,
+                    date_of_birth = null,
+                </when>
+                <when test="materialType == 'education'">education_status = 'unverified',</when>
+                <when test="materialType == 'income'">income_status = 'unverified',</when>
+                <when test="materialType == 'marital'">marital_status = 'unverified',</when>
             </choose>
             verified_by_user_id = #{reviewerUserId},
             updated_at = now()
@@ -956,6 +977,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         select id, profile_id as profileId, material_type as materialType, status,
                legal_name as legalName, date_of_birth as dateOfBirth,
                material_name as materialName, material_url as materialUrl,
+               scan_status as scanStatus, scan_message as scanMessage, scanned_at as scannedAt,
                review_note as reviewNote, submitted_by_user_id as submittedByUserId,
                submitted_at as submittedAt, reviewed_by_user_id as reviewedByUserId,
                reviewed_at as reviewedAt, rejection_reason as rejectionReason,
@@ -1580,11 +1602,13 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     <insert id="insertVerificationMaterial">
         insert into cm_profile_verification_materials (
             id, profile_id, material_type, status,
-            legal_name, date_of_birth, material_name, material_url, review_note,
+            legal_name, date_of_birth, material_name, material_url,
+            scan_status, scan_message, scanned_at, review_note,
             submitted_by_user_id, submitted_at, created_at, updated_at
         ) values (
             #{id}, #{profileId}, #{materialType}, #{status},
-            #{legalName}, #{dateOfBirth}, #{materialName}, #{materialUrl}, #{reviewNote},
+            #{legalName}, #{dateOfBirth}, #{materialName}, #{materialUrl},
+            #{scanStatus}, #{scanMessage}, now(), #{reviewNote},
             #{submittedByUserId}, now(), now(), now()
         )
     </insert>

@@ -6,6 +6,8 @@ import java.util.Set;
 import com.alibaba.fastjson2.JSON;
 import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.utils.uuid.IdUtils;
+import com.ruoyi.cupid.domain.CupidProfileVerification;
+import com.ruoyi.cupid.domain.CupidProfileVerificationMaterial;
 import com.ruoyi.cupid.mapper.CupidProfileMapper;
 import com.ruoyi.cupid.service.ICupidAdminReviewService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -19,6 +21,8 @@ import org.springframework.transaction.annotation.Transactional;
 public class CupidAdminReviewServiceImpl implements ICupidAdminReviewService
 {
     private static final Set<String> REVIEW_STATUSES = Set.of("approved", "rejected");
+
+    private static final Set<String> MATERIAL_TYPES = Set.of("identity", "education", "income", "marital");
 
     @Autowired
     private CupidProfileMapper profileMapper;
@@ -103,6 +107,10 @@ public class CupidAdminReviewServiceImpl implements ICupidAdminReviewService
         assertReviewStatus(status);
         Map<String, Object> before = require(profileMapper.selectAdminVerificationDetail(materialId), "认证材料不存在");
         assertCurrentStatus(before, "status", "pending", "该认证材料已处理，不能重复审核");
+        if ("approved".equals(status) && !"passed".equals(before.get("scanStatus")))
+        {
+            throw new ServiceException("认证材料未通过安全检查，不能审核通过");
+        }
         String profileId = String.valueOf(before.get("profileId"));
         String materialType = String.valueOf(before.get("materialType"));
         String materialStatus = "approved".equals(status) ? "verified" : "rejected";
@@ -114,11 +122,143 @@ public class CupidAdminReviewServiceImpl implements ICupidAdminReviewService
                 "cupid.verification.review", reviewerUserId, before, after, reason);
     }
 
+    @Override
+    @Transactional
+    public void createVerificationMaterial(Map<String, Object> payload, String materialUrl,
+            String scanStatus, String scanMessage, String reviewerUserId)
+    {
+        String profileId = string(payload, "profileId");
+        String materialType = string(payload, "materialType");
+        String materialName = string(payload, "materialName");
+        String reviewNote = string(payload, "reviewNote");
+        String legalName = string(payload, "legalName");
+        java.util.Date dateOfBirth = parseSqlDate(string(payload, "dateOfBirth"));
+        if (!MATERIAL_TYPES.contains(materialType))
+        {
+            throw new ServiceException("认证材料类型不正确");
+        }
+        if (!hasText(profileId))
+        {
+            throw new ServiceException("资料ID不能为空");
+        }
+        if (!"passed".equals(scanStatus))
+        {
+            throw new ServiceException("认证材料未通过安全检查，不能保存");
+        }
+        if (!hasText(materialName))
+        {
+            throw new ServiceException("材料名称不能为空");
+        }
+        if (!hasText(reviewNote))
+        {
+            throw new ServiceException("补录说明不能为空");
+        }
+        if ("identity".equals(materialType) && (!hasText(legalName) || dateOfBirth == null))
+        {
+            throw new ServiceException("身份认证补录需要填写法定姓名和出生日期");
+        }
+        Map<String, Object> profile = require(profileMapper.selectAdminProfileDetail(profileId), "资料不存在");
+        String submittedByUserId = String.valueOf(profile.get("ownerUserId"));
+        if (!hasText(submittedByUserId) || "null".equals(submittedByUserId))
+        {
+            throw new ServiceException("资料未关联C端用户，不能补录认证材料");
+        }
+        CupidProfileVerificationMaterial material = new CupidProfileVerificationMaterial();
+        material.setId(IdUtils.fastUUID());
+        material.setProfileId(profileId);
+        material.setMaterialType(materialType);
+        material.setStatus("pending");
+        material.setLegalName(legalName);
+        material.setDateOfBirth(dateOfBirth);
+        material.setMaterialName(materialName);
+        material.setMaterialUrl(materialUrl);
+        material.setScanStatus(scanStatus);
+        material.setScanMessage(scanMessage);
+        material.setReviewNote(reviewNote);
+        material.setSubmittedByUserId(submittedByUserId);
+        profileMapper.upsertVerification(buildInitialVerification(profileId));
+        profileMapper.insertVerificationMaterial(material);
+        profileMapper.markVerificationMaterialPending(profileId, materialType, legalName, dateOfBirth, submittedByUserId);
+        Map<String, Object> after = profileMapper.selectAdminVerificationDetail(material.getId());
+        insertAudit("profile_verification_material", material.getId(),
+                "cupid.verification.material.create", reviewerUserId, profile, after, reviewNote);
+    }
+
+    @Override
+    @Transactional
+    public void resetVerification(String profileId, String materialType, String reason, String reviewerUserId)
+    {
+        if (!hasText(profileId))
+        {
+            throw new ServiceException("资料ID不能为空");
+        }
+        if (!MATERIAL_TYPES.contains(materialType))
+        {
+            throw new ServiceException("认证材料类型不正确");
+        }
+        if (!hasText(reason))
+        {
+            throw new ServiceException("重置原因不能为空");
+        }
+        Map<String, Object> profile = require(profileMapper.selectAdminProfileDetail(profileId), "资料不存在");
+        CupidProfileVerification before = profileMapper.selectVerificationByProfileId(profileId);
+        if (before == null)
+        {
+            throw new ServiceException("资料没有认证状态记录");
+        }
+        profileMapper.resetVerificationStatusByMaterial(profileId, materialType, reviewerUserId);
+        profileMapper.refreshVerificationReviewStatus(profileId);
+        CupidProfileVerification after = profileMapper.selectVerificationByProfileId(profileId);
+        insertAudit("profile_verification", profileId,
+                "cupid.verification.reset", reviewerUserId, Map.of("profile", profile, "verification", before),
+                Map.of("profile", profile, "verification", after), reason);
+    }
+
     private void assertReviewStatus(String status)
     {
         if (!REVIEW_STATUSES.contains(status))
         {
             throw new ServiceException("审核状态不正确");
+        }
+    }
+
+    private CupidProfileVerification buildInitialVerification(String profileId)
+    {
+        CupidProfileVerification verification = new CupidProfileVerification();
+        verification.setId(IdUtils.fastUUID());
+        verification.setProfileId(profileId);
+        verification.setIdentityStatus("unverified");
+        verification.setEducationStatus("unverified");
+        verification.setIncomeStatus("unverified");
+        verification.setMaritalVerificationStatus("unverified");
+        verification.setReviewStatus("unreviewed");
+        return verification;
+    }
+
+    private String string(Map<String, Object> payload, String key)
+    {
+        Object value = payload == null ? null : payload.get(key);
+        return value == null ? null : String.valueOf(value).trim();
+    }
+
+    private boolean hasText(String value)
+    {
+        return value != null && !value.trim().isEmpty();
+    }
+
+    private java.sql.Date parseSqlDate(String value)
+    {
+        if (!hasText(value))
+        {
+            return null;
+        }
+        try
+        {
+            return java.sql.Date.valueOf(value);
+        }
+        catch (IllegalArgumentException e)
+        {
+            throw new ServiceException("日期格式不正确");
         }
     }
 

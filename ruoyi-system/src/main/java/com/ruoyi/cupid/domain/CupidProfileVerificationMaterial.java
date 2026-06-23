@@ -15,6 +15,9 @@ public class CupidProfileVerificationMaterial
     private Date dateOfBirth;
     private String materialName;
     private String materialUrl;
+    private String scanStatus;
+    private String scanMessage;
+    private Date scannedAt;
     private String reviewNote;
     private String submittedByUserId;
     private Date submittedAt;
@@ -55,6 +58,18 @@ public class CupidProfileVerificationMaterial
     public String getMaterialUrl() { return materialUrl; }
 
     public void setMaterialUrl(String materialUrl) { this.materialUrl = materialUrl; }
+
+    public String getScanStatus() { return scanStatus; }
+
+    public void setScanStatus(String scanStatus) { this.scanStatus = scanStatus; }
+
+    public String getScanMessage() { return scanMessage; }
+
+    public void setScanMessage(String scanMessage) { this.scanMessage = scanMessage; }
+
+    public Date getScannedAt() { return scannedAt; }
+
+    public void setScannedAt(Date scannedAt) { this.scannedAt = scannedAt; }
 
     public String getReviewNote() { return reviewNote; }
 

@@ -57,7 +57,7 @@ public class CupidProfileServiceImpl implements ICupidProfileService
     private static final List<String> VERIFICATION_MATERIAL_TYPES =
             Arrays.asList("identity", "education", "income", "marital");
     private static final Pattern VERIFICATION_MATERIAL_FILE_PATTERN =
-            Pattern.compile("(?i).+\\.(pdf|jpg|jpeg|png|webp)(?:[?#].*)?$");
+            Pattern.compile("(?i)^private://verification/.+\\.(pdf|jpg|jpeg|png|webp)$");
 
     /** 本地化单值字段：DB snake_case → 前端 camelCase */
     private static final Map<String, String> LOCALIZED_FIELD_MAP = new LinkedHashMap<>();
@@ -649,6 +649,8 @@ public class CupidProfileServiceImpl implements ICupidProfileService
         material.setDateOfBirth(parseSqlDate(string(payload, "dateOfBirth", null)));
         material.setMaterialName(string(payload, "materialName", null));
         material.setMaterialUrl(string(payload, "materialUrl", null));
+        material.setScanStatus("passed");
+        material.setScanMessage("upload_signature_checked");
         material.setReviewNote(string(payload, "reviewNote", null));
         validateVerificationMaterialFile(material.getMaterialUrl());
 
@@ -1769,6 +1771,9 @@ public class CupidProfileServiceImpl implements ICupidProfileService
             dto.put("dateOfBirth", material.getDateOfBirth());
             dto.put("materialName", material.getMaterialName());
             dto.put("materialUrl", material.getMaterialUrl());
+            dto.put("scanStatus", material.getScanStatus());
+            dto.put("scanMessage", material.getScanMessage());
+            dto.put("scannedAt", material.getScannedAt());
             dto.put("reviewNote", material.getReviewNote());
             dto.put("submittedAt", material.getSubmittedAt());
             dto.put("reviewedAt", material.getReviewedAt());

@@ -1,6 +1,8 @@
 package com.ruoyi.web.controller.cupid.support;
 
 import java.io.IOException;
+import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -38,6 +40,7 @@ public class CupidVerificationMaterialStorage
         {
             throw new IllegalArgumentException("invalid_file_type");
         }
+        String scanMessage = scanContent(extension, file);
 
         LocalDate today = LocalDate.now();
         String relativePath = profileId + "/" + today.getYear() + "/"
@@ -52,7 +55,8 @@ public class CupidVerificationMaterialStorage
         Files.createDirectories(target.getParent());
         file.transferTo(target);
         return new StoredMaterial(PRIVATE_PREFIX + relativePath.replace('\\', '/'),
-                file.getOriginalFilename(), file.getContentType(), file.getSize());
+                file.getOriginalFilename(), file.getContentType(), file.getSize(),
+                "passed", scanMessage);
     }
 
     public MaterialFile resolve(String materialUrl)
@@ -108,6 +112,61 @@ public class CupidVerificationMaterialStorage
         return false;
     }
 
+    private String scanContent(String extension, MultipartFile file) throws IOException
+    {
+        byte[] header = new byte[16];
+        int read;
+        try (InputStream input = file.getInputStream())
+        {
+            read = input.read(header);
+        }
+        if (read < 0)
+        {
+            throw new IllegalArgumentException("empty_file");
+        }
+        if ("pdf".equals(extension) && startsWith(header, read, "%PDF-".getBytes(StandardCharsets.US_ASCII)))
+        {
+            return "pdf_signature_checked";
+        }
+        if (("jpg".equals(extension) || "jpeg".equals(extension))
+                && read >= 3
+                && (header[0] & 0xff) == 0xff
+                && (header[1] & 0xff) == 0xd8
+                && (header[2] & 0xff) == 0xff)
+        {
+            return "jpeg_signature_checked";
+        }
+        if ("png".equals(extension)
+                && startsWith(header, read, new byte[] {(byte) 0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a}))
+        {
+            return "png_signature_checked";
+        }
+        if ("webp".equals(extension)
+                && read >= 12
+                && header[0] == 'R' && header[1] == 'I' && header[2] == 'F' && header[3] == 'F'
+                && header[8] == 'W' && header[9] == 'E' && header[10] == 'B' && header[11] == 'P')
+        {
+            return "webp_signature_checked";
+        }
+        throw new IllegalArgumentException("invalid_file_content");
+    }
+
+    private boolean startsWith(byte[] header, int read, byte[] expected)
+    {
+        if (read < expected.length)
+        {
+            return false;
+        }
+        for (int i = 0; i < expected.length; i++)
+        {
+            if (header[i] != expected[i])
+            {
+                return false;
+            }
+        }
+        return true;
+    }
+
     private String contentType(Path file)
     {
         try
@@ -137,7 +196,8 @@ public class CupidVerificationMaterialStorage
         return "image/jpeg";
     }
 
-    public record StoredMaterial(String materialUrl, String originalFilename, String contentType, long size)
+    public record StoredMaterial(String materialUrl, String originalFilename, String contentType, long size,
+            String scanStatus, String scanMessage)
     {
     }
 

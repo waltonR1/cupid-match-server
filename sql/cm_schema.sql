@@ -357,6 +357,9 @@ create table cm_profile_verification_materials (
   date_of_birth       date         default null comment '出生日期，仅身份认证使用',
   material_name       varchar(191) default null comment '材料名称',
   material_url        varchar(500) default null comment '材料私有地址或对象Key',
+  scan_status         varchar(20)  not null default 'passed' comment '安全检查状态',
+  scan_message        varchar(255) default null comment '安全检查说明',
+  scanned_at          datetime     default null comment '安全检查时间',
   review_note         varchar(500) default null comment '提交说明',
   submitted_by_user_id varchar(36) not null comment '提交人用户ID，关联 cm_users.id',
   submitted_at        datetime     not null default current_timestamp comment '提交时间',
@@ -368,7 +371,8 @@ create table cm_profile_verification_materials (
   primary key (id),
   key idx_cm_profile_verification_materials_profile (profile_id),
   key idx_cm_profile_verification_materials_status (status, submitted_at),
-  key idx_cm_profile_verification_materials_type (material_type, status)
+  key idx_cm_profile_verification_materials_type (material_type, status),
+  key idx_cm_profile_verification_materials_scan (scan_status, scanned_at)
 ) engine=innodb comment='资料认证材料';
 
 create table cm_profile_contacts (

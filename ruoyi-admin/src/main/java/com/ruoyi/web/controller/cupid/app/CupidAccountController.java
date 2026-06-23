@@ -394,6 +394,8 @@ public class CupidAccountController
             result.put("originalFilename", material.originalFilename());
             result.put("contentType", material.contentType());
             result.put("size", material.size());
+            result.put("scanStatus", material.scanStatus());
+            result.put("scanMessage", material.scanMessage());
             return AjaxResult.success(result);
         }
         catch (IllegalArgumentException e)

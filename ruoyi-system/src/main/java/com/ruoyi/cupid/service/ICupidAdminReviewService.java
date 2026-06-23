@@ -25,4 +25,9 @@ public interface ICupidAdminReviewService
     Map<String, Object> selectVerificationDetail(String materialId);
 
     void reviewVerification(String materialId, String status, String reason, String reviewerUserId);
+
+    void createVerificationMaterial(Map<String, Object> payload, String materialUrl,
+            String scanStatus, String scanMessage, String reviewerUserId);
+
+    void resetVerification(String profileId, String materialType, String reason, String reviewerUserId);
 }

@@ -876,6 +876,9 @@ API：
 | `legal_name`、`date_of_birth` | 身份认证提交字段 |
 | `material_name` | 材料名称 |
 | `material_url` | 材料私有地址或对象 Key，不存长期公开裸链 |
+| `scan_status` | 安全检查状态；当前上传入口写入 `passed` |
+| `scan_message` | 安全检查说明 |
+| `scanned_at` | 安全检查时间 |
 | `review_note` | 用户提交说明 |
 | `submitted_by_user_id` | 提交人 |
 | `submitted_at` | 提交时间 |
@@ -969,6 +972,8 @@ C 端账号中心：
 | 审核 | `cupid:verification:review` |
 | 预览材料附件 | `cupid:verification:material:preview` |
 | 下载材料附件 | `cupid:verification:material:download` |
+| 后台补录材料 | `cupid:verification:material:create` |
+| 重置认证状态 | `cupid:verification:reset` |
 
 接口规划：
 
@@ -982,6 +987,8 @@ C 端账号中心：
 | Admin | `GET /cupid/verification/{materialId}` | 查看材料详情 |
 | Admin | `GET /cupid/verification/{materialId}/material/preview` | 点击材料凭证后弹窗预览，由后端流式返回，受 `cupid:verification:material:preview` 控制 |
 | Admin | `GET /cupid/verification/{materialId}/material/download` | 鉴权下载材料文件，由后端流式返回，受 `cupid:verification:material:download` 控制 |
+| Admin | `POST /cupid/verification/material/create` | 后台手工补录新的待审材料，受 `cupid:verification:material:create` 控制 |
+| Admin | `POST /cupid/verification/reset` | 后台重置某个资料的某类认证状态，受 `cupid:verification:reset` 控制 |
 | Admin | `POST /cupid/verification/{materialId}/review` | 审核材料 |
 
 审计与通知：
@@ -1020,13 +1027,14 @@ C 端账号中心：
 
 ### 11.2.3 Phase 8.2.3：Verification 安全与 Profile 编辑边界补强
 
-Phase 8.2.3 位于 Phase 8.2.2 和 Phase 8.3 之间。它不阻塞认证审核闭环完成，只承接认证材料安全治理、后台补传和 Profile 后台编辑边界，不再扩展成完整认证重构。
+Phase 8.2.3 位于 Phase 8.2.2 和 Phase 8.3 之间。它不阻塞认证审核闭环完成，只承接认证材料安全治理、后台材料补录、认证重置和 Profile 后台编辑边界，不再扩展成完整认证重构。
 
 - 为认证材料补充病毒/内容扫描。
 - 如后续迁移对象存储，可将当前后端流式响应替换为短期签名地址，但仍不能裸露直连敏感材料。
 - C 端平台审核状态需要继续从 `profileStatus` 派生，不再使用 `cm_profile_verifications.review_status`。
 - C 端不提供替换待审材料能力；同类型存在 `pending` 材料时继续禁止重复提交，被拒绝后再提交新材料。
-- 如确有运营协助需求，仅在后台提供受独立权限控制的材料补传或替换能力，旧材料必须保留审计链路。
+- 如确有运营协助需求，仅在后台提供受独立权限控制的材料补录能力；补录新增一条 pending 材料，不覆盖历史材料。
+- 如已通过认证需要撤销或重新认证，后台使用“重置认证状态”，将该类型汇总状态改回 `unverified`，历史材料和审核记录保留。
 - 后台可继续完善 Profile 内部字段、精选和备注；面向 C 端展示的资料字段如需后台编辑，必须进入独立资料编辑能力，不混入审核中心。
 - 拒绝原因继续使用快捷文本和备注，不引入结构化 reason code。
 - 审核通知等待 Phase 8.5 Cupid Inbox 完成后统一接入，不在 8.2.3 提前实现。
@@ -1035,9 +1043,20 @@ Phase 8.2.3 位于 Phase 8.2.2 和 Phase 8.3 之间。它不阻塞认证审核�
 
 - 认证材料上传、预览和下载仍必须走后端鉴权接口，不得回退为公开 URL。
 - 扫描失败、扫描中和扫描通过的状态处理必须明确，不得让未扫描材料直接进入通过流程。
-- 后台补传或替换材料必须具备独立权限、操作原因和审计日志；不得允许 C 端替换 pending 材料。
+- 后台补录材料必须具备独立权限、补录说明和审计日志；不得允许 C 端替换 pending 材料。
+- 重置认证状态必须具备独立权限、重置原因和审计日志；不得删除历史材料。
 - 后台编辑面向 C 端展示字段时，必须记录 before/after/operator/reason，并明确是否触发发布审核。
 - 通知能力只在 Phase 8.5 之后作为业务消息进入 Cupid Inbox，不复用 RuoYi 后台通知公告。
+
+当前实现状态：
+
+- 已新增认证材料安全检查字段：`scan_status`、`scan_message`、`scanned_at`。
+- C 端认证材料上传和后台材料补录都会在保存前做基础文件签名检查，当前支持 PDF/JPG/JPEG/PNG/WEBP。
+- 审核通过前要求材料 `scan_status = passed`；未通过安全检查的材料不能被审核通过。
+- 后台页面可补录新的待审材料，使用 `cupid:verification:material:create`，并写入 `cm_audit_logs` 与 RuoYi 操作日志。
+- 后台页面可重置某个资料的某类认证状态，使用 `cupid:verification:reset`，重置后 C 端可重新提交。
+- C 端仍不支持替换 pending 材料；被拒绝后重新提交新材料。
+- 当前安全检查是基础签名检查，不等同于完整外部杀毒引擎；如上线需要更强扫描，可在此阶段继续接入外部扫描服务。
 
 ### 11.3 Phase 8.3：Private Introduction
 

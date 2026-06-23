@@ -14,6 +14,7 @@ import com.ruoyi.common.enums.BusinessType;
 import com.ruoyi.cupid.service.ICupidAdminReviewService;
 import com.ruoyi.web.controller.cupid.support.CupidVerificationMaterialStorage;
 import com.ruoyi.web.controller.cupid.support.CupidVerificationMaterialStorage.MaterialFile;
+import com.ruoyi.web.controller.cupid.support.CupidVerificationMaterialStorage.StoredMaterial;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -23,6 +24,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
 
 /**
  * Cupid Match 后台审核接口
@@ -114,6 +116,43 @@ public class CupidAdminReviewController extends BaseController
             throws IOException
     {
         writeVerificationMaterial(materialId, response, true);
+    }
+
+    @Log(title = "Cupid认证材料补录", businessType = BusinessType.INSERT)
+    @PreAuthorize("@ss.hasPermi('cupid:verification:material:create')")
+    @PostMapping("/verification/material/create")
+    public AjaxResult createVerificationMaterial(@RequestParam Map<String, Object> payload,
+            @RequestParam("file") MultipartFile file)
+    {
+        try
+        {
+            StoredMaterial material = materialStorage.upload(String.valueOf(payload.get("profileId")), file);
+            if (payload.get("materialName") == null || String.valueOf(payload.get("materialName")).trim().isEmpty())
+            {
+                payload.put("materialName", material.originalFilename());
+            }
+            reviewService.createVerificationMaterial(payload, material.materialUrl(),
+                    material.scanStatus(), material.scanMessage(), String.valueOf(getUserId()));
+            return success();
+        }
+        catch (IllegalArgumentException e)
+        {
+            return AjaxResult.error(400, e.getMessage());
+        }
+        catch (Exception e)
+        {
+            return AjaxResult.error(400, "upload_failed");
+        }
+    }
+
+    @Log(title = "Cupid认证重置", businessType = BusinessType.UPDATE)
+    @PreAuthorize("@ss.hasPermi('cupid:verification:reset')")
+    @PostMapping("/verification/reset")
+    public AjaxResult resetVerification(@RequestBody Map<String, String> body)
+    {
+        reviewService.resetVerification(body.get("profileId"), body.get("materialType"),
+                body.get("reason"), String.valueOf(getUserId()));
+        return success();
     }
 
     @Log(title = "Cupid认证审核", businessType = BusinessType.UPDATE)

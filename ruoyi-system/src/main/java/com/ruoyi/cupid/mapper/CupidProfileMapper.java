@@ -55,6 +55,10 @@ public interface CupidProfileMapper
             @Param("materialStatus") String materialStatus,
             @Param("reviewerUserId") String reviewerUserId);
 
+    int resetVerificationStatusByMaterial(@Param("profileId") String profileId,
+            @Param("materialType") String materialType,
+            @Param("reviewerUserId") String reviewerUserId);
+
     int refreshVerificationReviewStatus(@Param("profileId") String profileId);
 
     int insertAdminAuditLog(@Param("id") String id,
