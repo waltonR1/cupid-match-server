@@ -27,12 +27,6 @@ public class CupidCommonOptionsController
     @GetMapping("/options")
     public AjaxResult options(@RequestParam Map<String, String> params)
     {
-        String scope = params.getOrDefault("scope", "profile");
-        if (!"profile".equals(scope))
-        {
-            return AjaxResult.error(400, "unsupported_options_scope");
-        }
-
         return AjaxResult.success(profileOptionService.getProfileOptions(
                 resolveLocale(params), params.get("version")));
     }

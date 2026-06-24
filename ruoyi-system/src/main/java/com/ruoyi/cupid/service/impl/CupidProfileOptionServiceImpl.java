@@ -16,7 +16,8 @@ import com.ruoyi.cupid.service.ICupidProfileOptionService;
 @Service
 public class CupidProfileOptionServiceImpl implements ICupidProfileOptionService
 {
-    private static final String VERSION = "2026-06-24-profile-options-v1";
+    private static final String VERSION = "2026-06-24-common-options-v1";
+    private static final String PROFILE_GROUP_PREFIX = "profile.";
 
     private static final Map<String, List<Option>> GROUPS = new LinkedHashMap<>();
 
@@ -178,7 +179,7 @@ public class CupidProfileOptionServiceImpl implements ICupidProfileOptionService
             {
                 options.add(option.toMap(loc));
             }
-            groups.put(entry.getKey(), options);
+            groups.put(PROFILE_GROUP_PREFIX + entry.getKey(), options);
         }
         result.put("unchanged", false);
         result.put("groups", groups);
