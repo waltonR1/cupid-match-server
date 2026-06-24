@@ -330,7 +330,7 @@ cm_profile_option_extra_texts (
 
 #### 数据迁移与 localized_fields 调整
 
-8.2.4.1 需要写迁移 SQL，并一步到位调整枚举字段的数据来源。
+8.2.4.1 需要把初始化 SQL 和现有数据来源一步到位调整到 code 结构。
 
 迁移原则：
 
@@ -339,7 +339,8 @@ cm_profile_option_extra_texts (
 - `cm_profile_localized_fields` 中对应枚举字段的旧展示文本在迁移后删除，不保留为后端读取来源。
 - 若旧值无法映射到新 code，迁移为 `other`，并写入 `cm_profile_option_extra_texts`。
 - 保存接口不再为这些枚举字段写 localized value。
-- 详情接口展示 label 时从 options/resolver 取值。
+- Account 编辑详情接口只返回 code；页面展示 label 时从 options store 取值。
+- C 端公开展示类接口可以继续返回后端 resolver 得到的展示文本，后续按 API 分区逐步收敛。
 
 options 来源：
 
@@ -368,8 +369,8 @@ options 来源：
 接口字段命名：
 
 - 保存 payload 中的枚举字段改为明确的 code 字段，例如 `cityCode`、`countryCode`、`nationalityCode`、`educationCode`、`industryCode`。
-- 对应的展示字段使用 label 字段，例如 `cityLabel`、`countryLabel`、`nationalityLabel`、`educationLabel`、`industryLabel`。
-- 页面展示使用 label；编辑器回显和保存使用 code。
+- Account 编辑详情响应只返回 code，不返回冗余 label。
+- Account 页面展示时通过 options store 将 code 转为 label；若 code 为 `other`，非编辑态优先展示 `cm_profile_option_extra_texts` 中的补充说明。
 
 本轮涉及从 localized fields 退出的字段：
 
@@ -405,26 +406,25 @@ options 来源：
 - 新增后端代码常量版 profile options，并返回整体 `version` 与 `unchanged`。
 - `cm_profiles` 增加 `relationship_goal_code`、`residence_plan_code`、`preferred_education_code`、`family_life_code`、`exercise_code`。
 - 新增 `cm_profile_option_extra_texts`，用于保存枚举 `other` 的当前语言补充说明。
-- 新增迁移脚本 `sql/cm_phase_8_2_4_profile_options.sql`。
-- `cm_schema.sql` 已同步新列、新表和 localized fields 职责收窄。
-- Account profile owner detail 已返回 `xxxCode`、`xxxLabel`，旧 `xxx` 字段暂时作为 label 兼容展示。
+- `cm_schema.sql` 已同步新列、新表和 localized fields 职责收窄，当前以全量重建脚本为准。
+- Account profile owner detail 仅返回 `xxxCode`，不再返回旧 `xxx` 字段或 `xxxLabel`。
 - Account profile 保存链路已改为保存 code 字段，`other` 补充说明写入专用表。
 - C 端公开目录/detail 的 city、country、nationality、education、industry、relationshipGoal、residencePlan、preferredEducation、familyLife、exercise 展示改为后端 options label。
 - 目录 education 筛选与 facet 已从 `degree_level` 调整为 `education_code`。
 
-尚未完成的 C 端部分：
+已完成的 C 端部分：
 
-- 新增持久化 Pinia options store。
+- 新增持久化 Pinia options store：`src/stores/modules/profile-options.ts`。
 - C 端调用 `/api/profiles/options` 并按 locale/version 缓存。
-- Account Profile Detail 将对应输入框改为 select。
-- `city/country/nationality/education/industry/relationshipGoal/residencePlan/preferredEducation/familyLife/exercise` 保存 payload 改为提交 `xxxCode`。
-- `other` 选项显示补充说明输入框，并保存到 `optionExtraTexts`。
-- Account Settings 的 `preferredCity` 改为复用城市 options。
+- Account Profile Detail 将 `city/country/nationality/education/industry/relationshipGoal/residencePlan/preferredEducation/familyLife/exercise` 改为枚举选择。
+- Account Profile Detail 保存 payload 改为提交 `xxxCode`，并提交 `optionExtraTexts`。
+- `other` 选项编辑态显示补充说明输入框，非编辑态显示具体补充说明而不是“其他”。
+- Account Settings 的 `preferredCity` 改为复用城市 options 并保存 city code。
+- C 端已通过 `npm.cmd run type-check`。
 
 当前阻塞：
 
-- 本次 Codex 会话无法写入兄弟目录 `cupid-match-app`，工具层提升权限额度已耗尽。C 端接入需要切到 app 仓库或重新授权后继续。
-- 当前 shell 未配置 `mvn` / `mvn.cmd`，后端 Maven 编译未能执行；已执行 `git diff --check`，未发现 whitespace 问题。
+- 当前 server shell 未配置 `mvn` / `mvn.cmd`，后端 Maven 编译未能执行；已执行 `git diff --check`，未发现 whitespace 问题。
 
 ## 8.2.4.2 API 展示语义前移到后端
 

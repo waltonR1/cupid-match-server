@@ -22,6 +22,11 @@ public class CupidProfile
     private String degreeLevel;
     private String educationCode;
     private String industryCode;
+    private String relationshipGoalCode;
+    private String residencePlanCode;
+    private String preferredEducationCode;
+    private String familyLifeCode;
+    private String exerciseCode;
     private String maritalStatus;
     private boolean hasChildren;
     private String childrenPlan;
@@ -224,6 +229,56 @@ public class CupidProfile
     public void setIndustryCode(String industryCode)
     {
         this.industryCode = industryCode;
+    }
+
+    public String getRelationshipGoalCode()
+    {
+        return relationshipGoalCode;
+    }
+
+    public void setRelationshipGoalCode(String relationshipGoalCode)
+    {
+        this.relationshipGoalCode = relationshipGoalCode;
+    }
+
+    public String getResidencePlanCode()
+    {
+        return residencePlanCode;
+    }
+
+    public void setResidencePlanCode(String residencePlanCode)
+    {
+        this.residencePlanCode = residencePlanCode;
+    }
+
+    public String getPreferredEducationCode()
+    {
+        return preferredEducationCode;
+    }
+
+    public void setPreferredEducationCode(String preferredEducationCode)
+    {
+        this.preferredEducationCode = preferredEducationCode;
+    }
+
+    public String getFamilyLifeCode()
+    {
+        return familyLifeCode;
+    }
+
+    public void setFamilyLifeCode(String familyLifeCode)
+    {
+        this.familyLifeCode = familyLifeCode;
+    }
+
+    public String getExerciseCode()
+    {
+        return exerciseCode;
+    }
+
+    public void setExerciseCode(String exerciseCode)
+    {
+        this.exerciseCode = exerciseCode;
     }
 
     public String getMaritalStatus()

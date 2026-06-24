@@ -7,6 +7,7 @@ import com.ruoyi.cupid.domain.CupidProfile;
 import com.ruoyi.cupid.domain.CupidProfileLanguage;
 import com.ruoyi.cupid.domain.CupidProfileLocalizedField;
 import com.ruoyi.cupid.domain.CupidProfileLocalizedItem;
+import com.ruoyi.cupid.domain.CupidProfileOptionExtraText;
 import com.ruoyi.cupid.domain.CupidProfileOwnership;
 import com.ruoyi.cupid.domain.CupidProfilePhoto;
 import com.ruoyi.cupid.domain.CupidProfilePrivacyPreference;
@@ -188,6 +189,24 @@ public interface CupidProfileMapper
     /**
      * 按资料 ID 集合批量查询资料
      */
+    /**
+     * 查询指定资料的枚举“其他”补充说明。
+     */
+    List<CupidProfileOptionExtraText> selectOptionExtraTextsByProfileId(
+            @Param("profileId") String profileId, @Param("locale") String locale);
+
+    /**
+     * 新增或更新枚举“其他”补充说明。
+     */
+    int upsertOptionExtraText(CupidProfileOptionExtraText extraText);
+
+    /**
+     * 删除指定字段的枚举“其他”补充说明。
+     */
+    int deleteOptionExtraText(@Param("profileId") String profileId,
+            @Param("fieldName") String fieldName,
+            @Param("locale") String locale);
+
     List<CupidProfile> selectProfilesByIds(@Param("profileIds") List<String> profileIds);
 
     /**

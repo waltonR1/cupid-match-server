@@ -29,6 +29,7 @@ import com.ruoyi.cupid.domain.CupidProfile;
 import com.ruoyi.cupid.domain.CupidProfileLanguage;
 import com.ruoyi.cupid.domain.CupidProfileLocalizedField;
 import com.ruoyi.cupid.domain.CupidProfileLocalizedItem;
+import com.ruoyi.cupid.domain.CupidProfileOptionExtraText;
 import com.ruoyi.cupid.domain.CupidProfileOwnership;
 import com.ruoyi.cupid.domain.CupidProfilePhoto;
 import com.ruoyi.cupid.domain.CupidProfilePrivacyPreference;
@@ -39,6 +40,7 @@ import com.ruoyi.cupid.domain.CupidUserEntitlementBalance;
 import com.ruoyi.cupid.domain.CupidUserMembership;
 import com.ruoyi.cupid.mapper.CupidMembershipMapper;
 import com.ruoyi.cupid.mapper.CupidProfileMapper;
+import com.ruoyi.cupid.service.ICupidProfileOptionService;
 import com.ruoyi.cupid.service.ICupidProfileService;
 import com.ruoyi.cupid.service.ICupidTranslationService;
 import com.ruoyi.cupid.service.ICupidUserService;
@@ -50,9 +52,9 @@ import com.ruoyi.cupid.service.ICupidUserService;
 public class CupidProfileServiceImpl implements ICupidProfileService
 {
     private static final List<String> DIRECTORY_FIELD_NAMES =
-            Arrays.asList("city", "education", "industry", "summary");
+            Arrays.asList("summary");
     private static final List<String> FAMILY_DIRECTORY_FIELD_NAMES =
-            Arrays.asList("city", "education", "industry", "summary", "relationship_goal", "residence_plan");
+            Arrays.asList("summary");
     private static final List<String> TAG_FIELD_NAMES = Arrays.asList("tags");
     private static final List<String> VERIFICATION_MATERIAL_TYPES =
             Arrays.asList("identity", "education", "income", "marital");
@@ -62,19 +64,21 @@ public class CupidProfileServiceImpl implements ICupidProfileService
     /** 本地化单值字段：DB snake_case → 前端 camelCase */
     private static final Map<String, String> LOCALIZED_FIELD_MAP = new LinkedHashMap<>();
     static {
-        LOCALIZED_FIELD_MAP.put("city", "city");
-        LOCALIZED_FIELD_MAP.put("country", "country");
-        LOCALIZED_FIELD_MAP.put("nationality", "nationality");
-        LOCALIZED_FIELD_MAP.put("education", "education");
-        LOCALIZED_FIELD_MAP.put("industry", "industry");
         LOCALIZED_FIELD_MAP.put("career_direction", "careerDirection");
-        LOCALIZED_FIELD_MAP.put("relationship_goal", "relationshipGoal");
-        LOCALIZED_FIELD_MAP.put("residence_plan", "residencePlan");
-        LOCALIZED_FIELD_MAP.put("preferred_education", "preferredEducation");
-        LOCALIZED_FIELD_MAP.put("family_life", "familyLife");
-        LOCALIZED_FIELD_MAP.put("exercise", "exercise");
         LOCALIZED_FIELD_MAP.put("summary", "summary");
         LOCALIZED_FIELD_MAP.put("profile_name", "profileName");
+    }
+
+    /** 枚举字段“其他”补充说明：前端 camelCase -> DB snake_case。 */
+    private static final Map<String, String> OPTION_EXTRA_FIELD_MAP = new LinkedHashMap<>();
+    static {
+        OPTION_EXTRA_FIELD_MAP.put("education", "education");
+        OPTION_EXTRA_FIELD_MAP.put("industry", "industry");
+        OPTION_EXTRA_FIELD_MAP.put("relationshipGoal", "relationship_goal");
+        OPTION_EXTRA_FIELD_MAP.put("residencePlan", "residence_plan");
+        OPTION_EXTRA_FIELD_MAP.put("preferredEducation", "preferred_education");
+        OPTION_EXTRA_FIELD_MAP.put("familyLife", "family_life");
+        OPTION_EXTRA_FIELD_MAP.put("exercise", "exercise");
     }
 
     /** 本地化列表字段 */
@@ -99,6 +103,9 @@ public class CupidProfileServiceImpl implements ICupidProfileService
 
     @Autowired
     private ICupidTranslationService translationService;
+
+    @Autowired
+    private ICupidProfileOptionService profileOptionService;
 
     @Autowired
     private CupidMembershipMapper membershipMapper;
@@ -192,7 +199,7 @@ public class CupidProfileServiceImpl implements ICupidProfileService
         // 过滤已归档
         profiles.removeIf(p -> p.getArchivedAt() != null);
         String loc = normalizeLocale(locale);
-        List<String> fieldNames = Arrays.asList("profile_name", "city");
+        List<String> fieldNames = Arrays.asList("profile_name");
         Map<String, List<CupidProfilePhoto>> photosByProfile = loadPhotosByProfile(profileIds);
         Map<String, Map<String, String>> localizedByProfile =
                 loadLocalizedFieldsByProfile(profileIds, fieldNames, loc);
@@ -214,7 +221,7 @@ public class CupidProfileServiceImpl implements ICupidProfileService
                     photosByProfile.getOrDefault(profile.getId(), new ArrayList<>());
             item.put("avatarUrl", findPrimaryPhotoUrl(photos));
             item.put("age", calculateAge(profile.getBirthYear()));
-            item.put("city", fields.getOrDefault("city", profile.getCityCode()));
+            item.put("city", profileOptionService.label("city", profile.getCityCode(), loc));
             item.put("relationshipToProfile", ownership.getRelationshipToProfile());
             item.put("permission", ownership.getPermission());
             item.put("ownershipStatus", ownership.getStatus());
@@ -251,6 +258,8 @@ public class CupidProfileServiceImpl implements ICupidProfileService
                 profileMapper.selectAllLocalizedFieldsByProfileId(profileId, loc);
         List<CupidProfileLocalizedItem> localizedItems =
                 profileMapper.selectAllLocalizedItemsByProfileId(profileId, loc);
+        List<CupidProfileOptionExtraText> optionExtraTexts =
+                profileMapper.selectOptionExtraTextsByProfileId(profileId, loc);
         CupidProfileVerification verification =
                 profileMapper.selectVerificationByProfileId(profileId);
         CupidProfilePrivacyPreference privacy =
@@ -259,6 +268,7 @@ public class CupidProfileServiceImpl implements ICupidProfileService
 
         Map<String, String> fields = resolveEditableLocalizedFields(localizedFields, loc);
         Map<String, List<String>> items = resolveEditableLocalizedItems(localizedItems, loc);
+        Map<String, String> extraTexts = resolveEditableOptionExtraTexts(optionExtraTexts, loc);
         List<CupidProfileLanguage> languages = profileMapper.selectLanguagesByProfileId(profileId);
         List<CupidProfileRelationshipValue> relationshipValues =
                 profileMapper.selectRelationshipValuesByProfileId(profileId);
@@ -272,22 +282,23 @@ public class CupidProfileServiceImpl implements ICupidProfileService
         detail.put("verification", buildVerificationDTO(verification));
         detail.put("privacyPreferences", buildPrivacyPreferencesDTO(privacy));
         detail.put("localizedMeta", buildLocalizedMeta(localizedFields, localizedItems, loc));
+        detail.put("optionExtraTexts", buildOptionExtraTextDTO(extraTexts));
         detail.put("contact", buildContactDTO(contact));
         detail.put("photos", buildPhotoListWithStatus(photos));
 
         // 使用可编辑本地化值（raw value，不回落）
-        detail.put("city", value(fields, "city", profile.getCityCode()));
-        detail.put("country", value(fields, "country", profile.getCountryCode()));
-        detail.put("nationality", value(fields, "nationality", profile.getNationalityCode()));
-        detail.put("education", value(fields, "education", profile.getEducationCode()));
-        detail.put("industry", value(fields, "industry", profile.getIndustryCode()));
+        putOptionCodeField(detail, "city", profile.getCityCode());
+        putOptionCodeField(detail, "country", profile.getCountryCode());
+        putOptionCodeField(detail, "nationality", profile.getNationalityCode());
+        putOptionCodeField(detail, "education", profile.getEducationCode());
+        putOptionCodeField(detail, "industry", profile.getIndustryCode());
         detail.put("careerDirection", fields.containsKey("career_direction")
                 ? value(fields, "career_direction", "") : null);
-        detail.put("relationshipGoal", value(fields, "relationship_goal", ""));
-        detail.put("residencePlan", value(fields, "residence_plan", ""));
-        detail.put("preferredEducation", value(fields, "preferred_education", ""));
-        detail.put("familyLife", value(fields, "family_life", ""));
-        detail.put("exercise", value(fields, "exercise", ""));
+        putOptionCodeField(detail, "relationshipGoal", profile.getRelationshipGoalCode());
+        putOptionCodeField(detail, "residencePlan", profile.getResidencePlanCode());
+        putOptionCodeField(detail, "preferredEducation", profile.getPreferredEducationCode());
+        putOptionCodeField(detail, "familyLife", profile.getFamilyLifeCode());
+        putOptionCodeField(detail, "exercise", profile.getExerciseCode());
         detail.put("summary", value(fields, "summary", ""));
         detail.put("dealBreakers", items.getOrDefault("deal_breakers", new ArrayList<>()));
         detail.put("personalityTraits", items.getOrDefault("personality_traits", new ArrayList<>()));
@@ -325,12 +336,18 @@ public class CupidProfileServiceImpl implements ICupidProfileService
                 && profile.getBirthYear() == 0
                 && profile.getHeight() == 0
                 && languages.isEmpty()
-                && !hasLocalizedValue(profileId, "city")
-                && !hasLocalizedValue(profileId, "education")
+                && !StringUtils.hasText(profile.getCityCode())
+                && !StringUtils.hasText(profile.getEducationCode())
                 && !hasLocalizedValue(profileId, "summary");
         detail.put("isBlankDraft", blankDraft);
 
         return detail;
+    }
+
+    @Override
+    public Map<String, Object> getProfileOptions(String locale, String clientVersion)
+    {
+        return profileOptionService.getProfileOptions(locale, clientVersion);
     }
 
     @Override
@@ -440,6 +457,8 @@ public class CupidProfileServiceImpl implements ICupidProfileService
         }
 
         // 本地化列表字段写入（仅删当前 locale）
+        saveOptionExtraTexts(profileId, profileData, locale);
+
         for (String dbField : LOCALIZED_ITEM_MAP.keySet())
         {
             String camelKey = LOCALIZED_ITEM_MAP.get(dbField);
@@ -815,14 +834,16 @@ public class CupidProfileServiceImpl implements ICupidProfileService
             Map<String, String> fields =
                     localizedByProfile.getOrDefault(profile.getId(), new LinkedHashMap<>());
             profile.setDisplayName(deriveDisplayName(profile.getId()));
-            profile.setCity(fields.getOrDefault("city", profile.getCityCode()));
-            profile.setEducation(fields.getOrDefault("education", profile.getEducationCode()));
-            profile.setIndustry(fields.getOrDefault("industry", profile.getIndustryCode()));
+            profile.setCity(profileOptionService.label("city", profile.getCityCode(), locale));
+            profile.setEducation(profileOptionService.label("education", profile.getEducationCode(), locale));
+            profile.setIndustry(profileOptionService.label("industry", profile.getIndustryCode(), locale));
             profile.setDatingIntentionLabel(deriveDatingIntentionLabel(
                     profile.getDatingIntentionCode(), locale));
             profile.setSummary(fields.getOrDefault("summary", ""));
-            profile.setRelationshipGoal(fields.getOrDefault("relationship_goal", ""));
-            profile.setResidencePlan(fields.getOrDefault("residence_plan", ""));
+            profile.setRelationshipGoal(profileOptionService.label(
+                    "relationshipGoal", profile.getRelationshipGoalCode(), locale));
+            profile.setResidencePlan(profileOptionService.label(
+                    "residencePlan", profile.getResidencePlanCode(), locale));
             profile.setTags(itemsByProfile
                     .getOrDefault(profile.getId(), new LinkedHashMap<>())
                     .getOrDefault("tags", new ArrayList<>()));
@@ -862,10 +883,10 @@ public class CupidProfileServiceImpl implements ICupidProfileService
                 ? mask(calculateAge(profile.getBirthYear()), "age", viewerRole, privacy, true)
                 : calculateAge(profile.getBirthYear()));
         detail.put("height", profile.getHeight());
-        detail.put("city", value(fields, "city", profile.getCityCode()));
-        detail.put("country", mask(value(fields, "country", profile.getCountryCode()),
+        detail.put("city", profileOptionService.label("city", profile.getCityCode(), locale));
+        detail.put("country", mask(profileOptionService.label("country", profile.getCountryCode(), locale),
                 "country", viewerRole, privacy, selfProfile));
-        detail.put("nationality", mask(value(fields, "nationality", profile.getNationalityCode()),
+        detail.put("nationality", mask(profileOptionService.label("nationality", profile.getNationalityCode(), locale),
                 "nationality", viewerRole, privacy, selfProfile));
         detail.put("languages", mask(toLanguageCodes(languages),
                 "languages", viewerRole, privacy, selfProfile));
@@ -875,8 +896,8 @@ public class CupidProfileServiceImpl implements ICupidProfileService
                 && "approved".equals(verification.getReviewStatus()));
         detail.put("degreeLevel", profile.getDegreeLevel());
         detail.put("familyVisible", profile.isFamilyVisible());
-        detail.put("education", value(fields, "education", profile.getEducationCode()));
-        detail.put("industry", mask(value(fields, "industry", profile.getIndustryCode()),
+        detail.put("education", profileOptionService.label("education", profile.getEducationCode(), locale));
+        detail.put("industry", mask(profileOptionService.label("industry", profile.getIndustryCode(), locale),
                 "industry", viewerRole, privacy, selfProfile));
         if (fields.containsKey("career_direction"))
         {
@@ -894,9 +915,11 @@ public class CupidProfileServiceImpl implements ICupidProfileService
         detail.put("datingIntentionCode", profile.getDatingIntentionCode());
         detail.put("datingIntentionLabel",
                 deriveDatingIntentionLabel(profile.getDatingIntentionCode(), locale));
-        detail.put("relationshipGoal", mask(value(fields, "relationship_goal", ""),
+        detail.put("relationshipGoal", mask(profileOptionService.label(
+                        "relationshipGoal", profile.getRelationshipGoalCode(), locale),
                 "relationshipGoal", viewerRole, privacy, selfProfile));
-        detail.put("residencePlan", mask(value(fields, "residence_plan", ""),
+        detail.put("residencePlan", mask(profileOptionService.label(
+                        "residencePlan", profile.getResidencePlanCode(), locale),
                 "residencePlan", viewerRole, privacy, selfProfile));
         detail.put("relocation", mask(profile.getRelocation(),
                 "relocation", viewerRole, privacy, selfProfile));
@@ -908,9 +931,11 @@ public class CupidProfileServiceImpl implements ICupidProfileService
                 "preferredAgeMax", viewerRole, privacy, selfProfile));
         detail.put("preferredLocation", mask(profile.getPreferredLocation(),
                 "preferredLocation", viewerRole, privacy, selfProfile));
-        detail.put("preferredEducation", mask(value(fields, "preferred_education", ""),
+        detail.put("preferredEducation", mask(profileOptionService.label(
+                        "preferredEducation", profile.getPreferredEducationCode(), locale),
                 "preferredEducation", viewerRole, privacy, selfProfile));
-        detail.put("familyLife", mask(value(fields, "family_life", ""),
+        detail.put("familyLife", mask(profileOptionService.label(
+                        "familyLife", profile.getFamilyLifeCode(), locale),
                 "familyLife", viewerRole, privacy, selfProfile));
         detail.put("dealBreakers", mask(items.getOrDefault("deal_breakers", new ArrayList<>()),
                 "dealBreakers", viewerRole, privacy, selfProfile));
@@ -918,7 +943,7 @@ public class CupidProfileServiceImpl implements ICupidProfileService
                 "smoking", viewerRole, privacy, selfProfile));
         detail.put("drinking", mask(profile.getDrinking(),
                 "drinking", viewerRole, privacy, selfProfile));
-        detail.put("exercise", mask(value(fields, "exercise", ""),
+        detail.put("exercise", mask(profileOptionService.label("exercise", profile.getExerciseCode(), locale),
                 "exercise", viewerRole, privacy, selfProfile));
         detail.put("activityLevel", mask(profile.getActivityLevel(),
                 "activityLevel", viewerRole, privacy, selfProfile));
@@ -1272,12 +1297,12 @@ public class CupidProfileServiceImpl implements ICupidProfileService
             if ("city".equals(field))
             {
                 option.put("value", row.getCityCode());
-                option.put("label", row.getCity());
+                option.put("label", profileOptionService.label("city", row.getCityCode(), locale));
             }
             else if ("education".equals(field))
             {
-                option.put("value", row.getDegreeLevel());
-                option.put("label", row.getEducation());
+                option.put("value", row.getEducationCode());
+                option.put("label", profileOptionService.label("education", row.getEducationCode(), locale));
             }
             else if ("gender".equals(field))
             {
@@ -1287,7 +1312,7 @@ public class CupidProfileServiceImpl implements ICupidProfileService
             else
             {
                 option.put("value", row.getIndustryCode());
-                option.put("label", row.getIndustry());
+                option.put("label", profileOptionService.label("industry", row.getIndustryCode(), locale));
             }
             option.put("count", row.getCount());
             options.add(option);
@@ -1588,6 +1613,77 @@ public class CupidProfileServiceImpl implements ICupidProfileService
     private String value(Map<String, String> fields, String fieldName, String fallback)
     {
         return fields.getOrDefault(fieldName, fallback == null ? "" : fallback);
+    }
+
+    private void putOptionCodeField(Map<String, Object> detail, String fieldName, String code)
+    {
+        String safeCode = code == null ? "" : code;
+        detail.put(fieldName + "Code", safeCode);
+    }
+
+    private Map<String, String> resolveEditableOptionExtraTexts(
+            List<CupidProfileOptionExtraText> extraTexts, String locale)
+    {
+        Map<String, String> selected = new LinkedHashMap<>();
+        for (CupidProfileOptionExtraText extraText : extraTexts)
+        {
+            if (locale.equals(extraText.getLocale()))
+            {
+                selected.putIfAbsent(extraText.getFieldName(),
+                        extraText.getValue() == null ? "" : extraText.getValue());
+            }
+        }
+        return selected;
+    }
+
+    private Map<String, Object> buildOptionExtraTextDTO(Map<String, String> extraTexts)
+    {
+        Map<String, Object> dto = new LinkedHashMap<>();
+        for (Map.Entry<String, String> entry : OPTION_EXTRA_FIELD_MAP.entrySet())
+        {
+            dto.put(entry.getKey(), extraTexts.getOrDefault(entry.getValue(), ""));
+        }
+        return dto;
+    }
+
+    private void saveOptionExtraTexts(String profileId, Map<String, Object> profileData, String locale)
+    {
+        Object raw = profileData.get("optionExtraTexts");
+        Map<String, Object> extraTexts = raw instanceof Map ? (Map<String, Object>) raw : new LinkedHashMap<>();
+        for (Map.Entry<String, String> entry : OPTION_EXTRA_FIELD_MAP.entrySet())
+        {
+            String camelKey = entry.getKey();
+            String dbField = entry.getValue();
+            if (!profileData.containsKey(camelKey + "Code") && !extraTexts.containsKey(camelKey))
+            {
+                continue;
+            }
+
+            String code = string(profileData, camelKey + "Code", "");
+            if (!"other".equals(code))
+            {
+                profileMapper.deleteOptionExtraText(profileId, dbField, locale);
+                continue;
+            }
+
+            String value = String.valueOf(extraTexts.getOrDefault(camelKey, "")).trim();
+            if (!StringUtils.hasText(value))
+            {
+                profileMapper.deleteOptionExtraText(profileId, dbField, locale);
+                continue;
+            }
+
+            CupidProfileOptionExtraText extraText = new CupidProfileOptionExtraText();
+            extraText.setId(IdUtils.fastUUID());
+            extraText.setProfileId(profileId);
+            extraText.setFieldName(dbField);
+            extraText.setLocale(locale);
+            extraText.setValue(value);
+            extraText.setSource("manual");
+            extraText.setProvider("human");
+            extraText.setStatus("ready");
+            profileMapper.upsertOptionExtraText(extraText);
+        }
     }
 
     /**
@@ -1898,9 +1994,7 @@ public class CupidProfileServiceImpl implements ICupidProfileService
         }
 
         // 为所有支持的 field 补充 missing 状态
-        String[] allFields = {"profileName", "city", "country", "nationality", "education",
-                "industry", "careerDirection", "relationshipGoal", "residencePlan",
-                "preferredEducation", "familyLife", "exercise", "summary",
+        String[] allFields = {"profileName", "careerDirection", "summary",
                 "dealBreakers", "personalityTraits", "interests", "tags"};
         for (String fn : allFields)
         {
@@ -2007,6 +2101,11 @@ public class CupidProfileServiceImpl implements ICupidProfileService
         p.setDegreeLevel(string(data, "degreeLevel", "bachelor"));
         p.setEducationCode(string(data, "educationCode", ""));
         p.setIndustryCode(string(data, "industryCode", ""));
+        p.setRelationshipGoalCode(string(data, "relationshipGoalCode", ""));
+        p.setResidencePlanCode(string(data, "residencePlanCode", ""));
+        p.setPreferredEducationCode(string(data, "preferredEducationCode", ""));
+        p.setFamilyLifeCode(string(data, "familyLifeCode", ""));
+        p.setExerciseCode(string(data, "exerciseCode", ""));
         p.setMaritalStatus(string(data, "maritalStatus", "never_married"));
         p.setHasChildren(Boolean.TRUE.equals(data.get("hasChildren")));
         p.setChildrenPlan(string(data, "childrenPlan", "open_to_discuss"));
@@ -2108,6 +2207,11 @@ public class CupidProfileServiceImpl implements ICupidProfileService
         if (data.containsKey("degreeLevel")) target.setDegreeLevel(string(data, "degreeLevel", target.getDegreeLevel()));
         if (data.containsKey("educationCode")) target.setEducationCode(string(data, "educationCode", target.getEducationCode()));
         if (data.containsKey("industryCode")) target.setIndustryCode(string(data, "industryCode", target.getIndustryCode()));
+        if (data.containsKey("relationshipGoalCode")) target.setRelationshipGoalCode(string(data, "relationshipGoalCode", target.getRelationshipGoalCode()));
+        if (data.containsKey("residencePlanCode")) target.setResidencePlanCode(string(data, "residencePlanCode", target.getResidencePlanCode()));
+        if (data.containsKey("preferredEducationCode")) target.setPreferredEducationCode(string(data, "preferredEducationCode", target.getPreferredEducationCode()));
+        if (data.containsKey("familyLifeCode")) target.setFamilyLifeCode(string(data, "familyLifeCode", target.getFamilyLifeCode()));
+        if (data.containsKey("exerciseCode")) target.setExerciseCode(string(data, "exerciseCode", target.getExerciseCode()));
         if (data.containsKey("maritalStatus")) target.setMaritalStatus(string(data, "maritalStatus", target.getMaritalStatus()));
         if (data.containsKey("hasChildren")) target.setHasChildren(Boolean.TRUE.equals(data.get("hasChildren")));
         if (data.containsKey("childrenPlan")) target.setChildrenPlan(string(data, "childrenPlan", target.getChildrenPlan()));
