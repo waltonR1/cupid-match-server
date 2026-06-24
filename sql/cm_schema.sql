@@ -44,6 +44,7 @@ drop table if exists cm_profile_internal_records;
 drop table if exists cm_profile_ownerships;
 drop table if exists cm_profile_photos;
 drop table if exists cm_profile_localized_items;
+drop table if exists cm_profile_option_extra_texts;
 drop table if exists cm_profile_localized_fields;
 drop table if exists cm_profile_relationship_values;
 drop table if exists cm_profile_languages;
@@ -196,6 +197,11 @@ create table cm_profiles (
   degree_level             varchar(20)  not null comment '学历层级；可选值：bachelor, master, phd',
   education_code           varchar(80)  not null comment '教育代码',
   industry_code            varchar(80)  not null comment '行业代码',
+  relationship_goal_code   varchar(80)  not null default '' comment '关系目标代码；可选值由资料选项接口维护',
+  residence_plan_code      varchar(80)  not null default '' comment '居住计划代码；可选值由资料选项接口维护',
+  preferred_education_code varchar(80)  not null default '' comment '期望学历代码；可选值由资料选项接口维护',
+  family_life_code         varchar(80)  not null default '' comment '家庭生活代码；可选值由资料选项接口维护',
+  exercise_code            varchar(80)  not null default '' comment '运动习惯代码；可选值由资料选项接口维护',
   marital_status           varchar(30)  not null comment '婚姻状态；可选值：never_married, divorced, widowed',
   has_children             tinyint(1)   not null default 0 comment '是否有子女',
   children_plan            varchar(40)  not null comment '子女计划；可选值：wants, open_to_discuss, does_not_want',
@@ -241,7 +247,7 @@ create table cm_profile_relationship_values (
 create table cm_profile_localized_fields (
   id                 varchar(36)   not null comment '资料多语言字段ID',
   profile_id         varchar(36)   not null comment '资料ID，关联 cm_profiles.id',
-  field_name         varchar(60)   not null comment '字段名称；可选值：profile_name, city, country, nationality, education, industry, career_direction, relationship_goal, residence_plan, preferred_education, family_life, exercise, summary',
+  field_name         varchar(60)   not null comment '字段名称；可选值：profile_name, career_direction, summary',
   locale             varchar(8)    not null comment '语言；可选值：zh, fr, en',
   value              text          not null comment '值',
   source             varchar(20)   not null default 'manual' comment '来源；可选值：manual, machine',
@@ -253,6 +259,22 @@ create table cm_profile_localized_fields (
   unique key uk_cm_profile_localized_field (profile_id, field_name, locale),
   key idx_cm_profile_localized_lookup (field_name, locale, status)
 ) engine=innodb comment='资料多语言字段';
+
+create table cm_profile_option_extra_texts (
+  id                 varchar(36)   not null comment '资料枚举其他补充说明ID',
+  profile_id         varchar(36)   not null comment '资料ID，关联 cm_profiles.id',
+  field_name         varchar(60)   not null comment '字段名称；可选值：education, industry, relationship_goal, residence_plan, preferred_education, family_life, exercise',
+  locale             varchar(8)    not null comment '语言；可选值：zh, fr, en',
+  value              text          not null comment '补充说明',
+  source             varchar(20)   not null default 'manual' comment '来源；可选值：manual, machine',
+  provider           varchar(30)   default null comment '翻译提供方；可选值：human, translation_api',
+  status             varchar(20)   not null default 'ready' comment '状态；可选值：ready, pending, failed, stale',
+  created_at         datetime      not null default current_timestamp comment '创建时间',
+  updated_at         datetime      not null default current_timestamp on update current_timestamp comment '更新时间',
+  primary key (id),
+  unique key uk_cm_profile_option_extra_text (profile_id, field_name, locale),
+  key idx_cm_profile_option_extra_lookup (field_name, locale, status)
+) engine=innodb comment='资料枚举其他补充说明';
 
 create table cm_profile_localized_items (
   id                 varchar(36)   not null comment '资料多语言列表项ID',
