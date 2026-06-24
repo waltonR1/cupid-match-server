@@ -4,24 +4,24 @@
 
 ## 目标
 
-Phase 8.2.4 不新增主要业务流程，目标是把 C 端和 Admin 后台分散维护的枚举、状态、可选项展示语义逐步收回后端，避免同一个 code 在不同前端页面被翻译成不同含义。
+Phase 8.2.4 不新增主要业务流程，目标是把 C 端和 Admin 后台分散维护的枚举、状态、可选项展示语义逐步收回到后端 options/dictionary 来源，避免同一个 code 在不同前端页面被翻译成不同含义。
 
 这不是一次全局大重构。执行时必须按字段、接口和页面分区推进，每个分区完成后再进入下一个分区。
 
 ## 基本原则
 
 - 数据库优先存稳定 code，不在业务表里存中文、英文、法文展示名。
-- 保存接口只接收 code；展示接口可以返回 code 与可展示文本。
-- 后端负责稳定业务 code 的语义映射，例如状态、学历、行业、婚恋偏好、活动状态、会员权益等。
+- 保存接口只接收 code；编辑、筛选、提交链路的业务 API 默认继续返回 code。
+- 后端负责稳定业务 code 的语义来源，例如状态、学历、行业、婚恋偏好、活动状态、会员权益等；前端通过 options/dictionary 查表显示 label。
 - 前端继续负责格式化，例如日期、年龄、身高单位、空值展示、数组拼接、页面文案和布局。
-- 前端不再为后端返回的稳定 code 维护运行时翻译兜底。
+- 前端不再为后端返回的稳定 code 维护本地枚举文案表，只保留通用 `value -> label` 查表逻辑。
 - 不在字段边界未确认前建设动态字典中心。
 - 不把所有模块一次性改完，每次只处理一个 API 或页面分区。
 
 ## 执行顺序
 
 1. 先做 `8.2.4.1`：框定可写字段和筛选字段中哪些必须变成枚举，评估是否需要调整数据库。
-2. 再做 `8.2.4.2`：从 API 出发，把前端已有的 code 翻译步骤逐段前移到后端。
+2. 再做 `8.2.4.2`：从 API 出发，把前端已有的 code 文案来源逐段切到后端 options/dictionary。
 3. 最后做 `8.2.4.3`：在语义边界稳定后，再评估枚举值动态管理。
 
 ## 8.2.4.1 可写字段枚举边界与页面优化
@@ -241,15 +241,27 @@ Account Settings：偏好设置
 
 该 API 只负责读取可选项，不提供后台维护能力；枚举值动态管理仍属于 8.2.4.3。
 
-建议 API：
+8.2.4.1 当前实现先使用资料范围 API：
 
 ```text
-GET /api/profiles/options?locale=zh&version={clientVersion}
+GET /api/profiles/options?version={clientVersion}
 ```
+
+语言不应由页面或业务 store 手动传入。C 端 `http.ts` 已经统一维护当前 locale，后续请求应复用统一语言注入；后端从统一请求上下文读取语言。若后端暂时仍保留 `locale` 参数，只作为兼容入口，不作为页面层必须显式传入的业务参数。
+
+8.2.4.2 需要评估并逐步收敛为更通用的 options/dictionary 入口，例如：
+
+```text
+GET /api/common/options?scope=profile&version={clientVersion}
+GET /api/common/options?scope=account&version={clientVersion}
+GET /api/common/options?scope=event&version={clientVersion}
+```
+
+`/api/profiles/options` 可以作为 profile scope 的当前实现或兼容别名；新模块不应继续新增各自分散的本地枚举文案表。
 
 返回规则：
 
-- 前端首次进入需要枚举选项的页面时，请求当前语言的 options。
+- 前端首次进入需要枚举选项的页面时，请求当前语言的 options；语言由 `http.ts` 统一注入。
 - 请求附带本地缓存的 `version` 或 `updatedAt`。
 - 如果前端版本与后端一致，后端返回“不需要更新”的轻量响应。
 - 如果版本不一致，后端返回新的 options、版本号和更新时间。
@@ -402,20 +414,20 @@ options 来源：
 
 已完成的服务端部分：
 
-- 新增 `GET /api/profiles/options?locale={locale}&version={version}`。
+- 新增 profile scope options 接口；当前实现路径为 `GET /api/profiles/options?version={version}`，语言后续统一由 `http.ts` 注入。
 - 新增后端代码常量版 profile options，并返回整体 `version` 与 `unchanged`。
 - `cm_profiles` 增加 `relationship_goal_code`、`residence_plan_code`、`preferred_education_code`、`family_life_code`、`exercise_code`。
 - 新增 `cm_profile_option_extra_texts`，用于保存枚举 `other` 的当前语言补充说明。
 - `cm_schema.sql` 已同步新列、新表和 localized fields 职责收窄，当前以全量重建脚本为准。
 - Account profile owner detail 仅返回 `xxxCode`，不再返回旧 `xxx` 字段或 `xxxLabel`。
 - Account profile 保存链路已改为保存 code 字段，`other` 补充说明写入专用表。
-- C 端公开目录/detail 的 city、country、nationality、education、industry、relationshipGoal、residencePlan、preferredEducation、familyLife、exercise 展示改为后端 options label。
+- C 端公开目录/detail 中已完成新增枚举化字段的展示整理：city、country、nationality、education、industry、relationshipGoal、residencePlan、preferredEducation、familyLife、exercise 可按后端 options 语义展示；编辑接口仍只返回 code。
 - 目录 education 筛选与 facet 已从 `degree_level` 调整为 `education_code`。
 
 已完成的 C 端部分：
 
 - 新增持久化 Pinia options store：`src/stores/modules/profile-options.ts`。
-- C 端调用 `/api/profiles/options` 并按 locale/version 缓存。
+- C 端调用 `/api/profiles/options` 并按 locale/version 缓存；8.2.4.2 需要移除业务 store 手动传 locale 的写法，改为复用 `http.ts` 的统一语言注入。
 - Account Profile Detail 将 `city/country/nationality/education/industry/relationshipGoal/residencePlan/preferredEducation/familyLife/exercise` 改为枚举选择。
 - Account Profile Detail 保存 payload 改为提交 `xxxCode`，并提交 `optionExtraTexts`。
 - `other` 选项编辑态显示补充说明输入框，非编辑态显示具体补充说明而不是“其他”。
@@ -426,11 +438,13 @@ options 来源：
 
 - 当前 server shell 未配置 `mvn` / `mvn.cmd`，后端 Maven 编译未能执行；已执行 `git diff --check`，未发现 whitespace 问题。
 
-## 8.2.4.2 API 展示语义前移到后端
+## 8.2.4.2 枚举文案来源统一到后端 options
 
 ### 范围
 
-本步骤从 API 出发处理展示语义。只处理“后端返回稳定 code，前端再翻译”的字段。
+本步骤从 API 出发处理枚举文案来源。只处理“数据库与业务 API 已经使用稳定 code，但前端仍通过本地 i18n key、映射函数或硬编码 options 翻译”的字段。
+
+本步骤不把编辑、筛选、提交链路的业务 API 大量改成 label 返回。业务 API 继续传递稳定 code，前端通过后端下发的 options/dictionary 做通用 `value -> label` 查表。
 
 不处理：
 
@@ -440,6 +454,8 @@ options 来源：
 - 空值展示。
 - 数组显示样式。
 - 页面静态文案。
+- 编辑、筛选、提交 payload 的 code 结构。
+- 状态机和权限分支判断使用的 code。
 
 ### 执行方法
 
@@ -447,10 +463,12 @@ options 来源：
 
 1. 列出该分区 API 返回的稳定 code 字段。
 2. 找到当前 C 端或 Admin 前端的映射函数、i18n key 或本地 options。
-3. 后端在原 API 中补充可展示文本，或将原展示字段改为已映射文本。
-4. 前端删除对应本地映射，只消费后端返回的展示文本。
-5. 保留前端格式化逻辑。
+3. 确认该 code 字段已经存在于后端 options/dictionary 分组；缺失时先补 options 分组。
+4. 前端删除对应本地枚举文案表，改为统一调用 options store 的 `optionLabel(group, value)` 或 `optionsFor(group)`。
+5. 保留前端格式化逻辑，例如日期、年龄、身高、空值、数组拼接和页面静态文案。
 6. 运行对应构建或类型检查。
+
+如果某个接口本来就是纯展示接口，可以在后续分区中评估是否直接返回展示文本；但这不是 8.2.4.2 的默认策略。默认策略是“业务 API 保持 code，后端 options 作为唯一文案来源”。
 
 ### 分区顺序
 
@@ -464,16 +482,17 @@ options 来源：
 
 - API endpoint。
 - code 字段。
-- 后端输出字段。
-- 前端删除或替换的映射文件。
+- options/dictionary 分组名。
+- 前端删除或替换的映射文件、i18n key 或硬编码 options。
 - 是否存在数据库字段迁移。
 - 手工校验点。
 
 ### 验收标准
 
-- 该分区不再通过前端本地枚举翻译后端返回的稳定 code。
+- 该分区不再通过前端本地枚举文案表翻译后端返回的稳定 code。
+- 编辑、筛选、提交链路仍使用稳定 code。
+- label 统一来自后端 options/dictionary。
 - 前端仅保留格式化和页面展示逻辑。
-- 后端返回的展示文本在 C 端和 Admin 含义一致。
 - 构建或类型检查通过。
 
 ## 8.2.4.3 枚举值动态管理
