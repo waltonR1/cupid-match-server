@@ -345,12 +345,6 @@ public class CupidProfileServiceImpl implements ICupidProfileService
     }
 
     @Override
-    public Map<String, Object> getProfileOptions(String locale, String clientVersion)
-    {
-        return profileOptionService.getProfileOptions(locale, clientVersion);
-    }
-
-    @Override
     @Transactional
     public Map<String, Object> saveProfile(String userId, Map<String, Object> payload, String locale)
     {

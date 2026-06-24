@@ -45,11 +45,6 @@ public interface ICupidProfileService
     /**
      * 保存资料（新建或更新）
      */
-    /**
-     * 查询资料选项字典。
-     */
-    Map<String, Object> getProfileOptions(String locale, String clientVersion);
-
     Map<String, Object> saveProfile(String userId, Map<String, Object> payload, String locale);
 
     /**

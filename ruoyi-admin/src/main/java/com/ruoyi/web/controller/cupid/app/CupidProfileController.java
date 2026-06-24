@@ -54,17 +54,6 @@ public class CupidProfileController
     /**
      * 自助征婚资料详情
      */
-    /**
-     * 资料表单可选项。
-     */
-    @GetMapping("/options")
-    public AjaxResult options(
-            @RequestParam(value = "locale", defaultValue = "zh") String locale,
-            @RequestParam(value = "version", required = false) String version)
-    {
-        return AjaxResult.success(profileService.getProfileOptions(locale, version));
-    }
-
     @GetMapping("/self/{id}")
     public AjaxResult selfDetail(@PathVariable String id,
             @RequestParam(value = "lang", defaultValue = "zh") String locale,

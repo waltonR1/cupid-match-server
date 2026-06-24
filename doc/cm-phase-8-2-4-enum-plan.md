@@ -241,23 +241,15 @@ Account Settings：偏好设置
 
 该 API 只负责读取可选项，不提供后台维护能力；枚举值动态管理仍属于 8.2.4.3。
 
-8.2.4.1 当前实现先使用资料范围 API：
-
-```text
-GET /api/profiles/options?version={clientVersion}
-```
-
-语言不应由页面或业务 store 手动传入。C 端 `http.ts` 已经统一维护当前 locale，后续请求应复用统一语言注入；后端从统一请求上下文读取语言。若后端暂时仍保留 `locale` 参数，只作为兼容入口，不作为页面层必须显式传入的业务参数。
-
-8.2.4.2 需要评估并逐步收敛为更通用的 options/dictionary 入口，例如：
+当前实现已提供通用 options API：
 
 ```text
 GET /api/common/options?scope=profile&version={clientVersion}
-GET /api/common/options?scope=account&version={clientVersion}
-GET /api/common/options?scope=event&version={clientVersion}
 ```
 
-`/api/profiles/options` 可以作为 profile scope 的当前实现或兼容别名；新模块不应继续新增各自分散的本地枚举文案表。
+语言不由页面或业务 store 手动传入。C 端 `http.ts` 已经统一维护当前 locale，后端从统一请求参数 `lang` 读取语言。`locale` query 只作为旧兼容兜底。
+
+options API 已从 profile 业务接口中移出；新模块不应继续新增各自分散的本地枚举文案表。
 
 返回规则：
 
@@ -414,7 +406,7 @@ options 来源：
 
 已完成的服务端部分：
 
-- 新增 profile scope options 接口；当前实现路径为 `GET /api/profiles/options?version={version}`，语言后续统一由 `http.ts` 注入。
+- 新增通用 options 接口；当前实现路径为 `GET /api/common/options?scope=profile&version={version}`，语言由 `http.ts` 统一注入。
 - 新增后端代码常量版 profile options，并返回整体 `version` 与 `unchanged`。
 - `cm_profiles` 增加 `relationship_goal_code`、`residence_plan_code`、`preferred_education_code`、`family_life_code`、`exercise_code`。
 - 新增 `cm_profile_option_extra_texts`，用于保存枚举 `other` 的当前语言补充说明。
@@ -426,8 +418,8 @@ options 来源：
 
 已完成的 C 端部分：
 
-- 新增持久化 Pinia options store：`src/stores/modules/profile-options.ts`。
-- C 端调用 `/api/profiles/options` 并按 locale/version 缓存；8.2.4.2 需要移除业务 store 手动传 locale 的写法，改为复用 `http.ts` 的统一语言注入。
+- 新增持久化 Pinia options store：`src/stores/modules/options.ts`。
+- C 端调用 `/api/common/options?scope=profile` 并按 locale/version 缓存；业务 store 不再手动传 locale，统一复用 `http.ts` 的语言注入。
 - Account Profile Detail 将 `city/country/nationality/education/industry/relationshipGoal/residencePlan/preferredEducation/familyLife/exercise` 改为枚举选择。
 - Account Profile Detail 保存 payload 改为提交 `xxxCode`，并提交 `optionExtraTexts`。
 - `other` 选项编辑态显示补充说明输入框，非编辑态显示具体补充说明而不是“其他”。
