@@ -8,7 +8,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import com.ruoyi.common.annotation.Anonymous;
 import com.ruoyi.common.core.domain.AjaxResult;
-import com.ruoyi.cupid.service.ICupidProfileOptionService;
+import com.ruoyi.cupid.service.ICupidCommonOptionService;
 
 /**
  * Cupid Match 前台通用可选项接口
@@ -18,7 +18,7 @@ import com.ruoyi.cupid.service.ICupidProfileOptionService;
 public class CupidCommonOptionsController
 {
     @Autowired
-    private ICupidProfileOptionService profileOptionService;
+    private ICupidCommonOptionService commonOptionService;
 
     /**
      * 查询通用可选项。
@@ -27,7 +27,7 @@ public class CupidCommonOptionsController
     @GetMapping("/options")
     public AjaxResult options(@RequestParam Map<String, String> params)
     {
-        return AjaxResult.success(profileOptionService.getProfileOptions(
+        return AjaxResult.success(commonOptionService.getOptions(
                 resolveLocale(params), params.get("version")));
     }
 

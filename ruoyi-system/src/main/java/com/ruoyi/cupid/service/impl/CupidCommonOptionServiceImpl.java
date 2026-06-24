@@ -6,15 +6,15 @@ import java.util.List;
 import java.util.Map;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
-import com.ruoyi.cupid.service.ICupidProfileOptionService;
+import com.ruoyi.cupid.service.ICupidCommonOptionService;
 
 /**
- * Cupid Match 资料选项服务实现。
+ * Cupid Match 通用可选项服务实现。
  *
  * <p>8.2.4.1 阶段先使用后端代码常量维护 options；动态管理放到后续阶段。</p>
  */
 @Service
-public class CupidProfileOptionServiceImpl implements ICupidProfileOptionService
+public class CupidCommonOptionServiceImpl implements ICupidCommonOptionService
 {
     private static final String VERSION = "2026-06-24-common-options-v1";
     private static final String PROFILE_GROUP_PREFIX = "profile.";
@@ -160,7 +160,7 @@ public class CupidProfileOptionServiceImpl implements ICupidProfileOptionService
     }
 
     @Override
-    public Map<String, Object> getProfileOptions(String locale, String clientVersion)
+    public Map<String, Object> getOptions(String locale, String clientVersion)
     {
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("version", VERSION);

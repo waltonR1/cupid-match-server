@@ -40,7 +40,7 @@ import com.ruoyi.cupid.domain.CupidUserEntitlementBalance;
 import com.ruoyi.cupid.domain.CupidUserMembership;
 import com.ruoyi.cupid.mapper.CupidMembershipMapper;
 import com.ruoyi.cupid.mapper.CupidProfileMapper;
-import com.ruoyi.cupid.service.ICupidProfileOptionService;
+import com.ruoyi.cupid.service.ICupidCommonOptionService;
 import com.ruoyi.cupid.service.ICupidProfileService;
 import com.ruoyi.cupid.service.ICupidTranslationService;
 import com.ruoyi.cupid.service.ICupidUserService;
@@ -105,7 +105,7 @@ public class CupidProfileServiceImpl implements ICupidProfileService
     private ICupidTranslationService translationService;
 
     @Autowired
-    private ICupidProfileOptionService profileOptionService;
+    private ICupidCommonOptionService commonOptionService;
 
     @Autowired
     private CupidMembershipMapper membershipMapper;
@@ -221,7 +221,7 @@ public class CupidProfileServiceImpl implements ICupidProfileService
                     photosByProfile.getOrDefault(profile.getId(), new ArrayList<>());
             item.put("avatarUrl", findPrimaryPhotoUrl(photos));
             item.put("age", calculateAge(profile.getBirthYear()));
-            item.put("city", profileOptionService.label("city", profile.getCityCode(), loc));
+            item.put("city", commonOptionService.label("city", profile.getCityCode(), loc));
             item.put("relationshipToProfile", ownership.getRelationshipToProfile());
             item.put("permission", ownership.getPermission());
             item.put("ownershipStatus", ownership.getStatus());
@@ -828,15 +828,15 @@ public class CupidProfileServiceImpl implements ICupidProfileService
             Map<String, String> fields =
                     localizedByProfile.getOrDefault(profile.getId(), new LinkedHashMap<>());
             profile.setDisplayName(deriveDisplayName(profile.getId()));
-            profile.setCity(profileOptionService.label("city", profile.getCityCode(), locale));
-            profile.setEducation(profileOptionService.label("education", profile.getEducationCode(), locale));
-            profile.setIndustry(profileOptionService.label("industry", profile.getIndustryCode(), locale));
+            profile.setCity(commonOptionService.label("city", profile.getCityCode(), locale));
+            profile.setEducation(commonOptionService.label("education", profile.getEducationCode(), locale));
+            profile.setIndustry(commonOptionService.label("industry", profile.getIndustryCode(), locale));
             profile.setDatingIntentionLabel(deriveDatingIntentionLabel(
                     profile.getDatingIntentionCode(), locale));
             profile.setSummary(fields.getOrDefault("summary", ""));
-            profile.setRelationshipGoal(profileOptionService.label(
+            profile.setRelationshipGoal(commonOptionService.label(
                     "relationshipGoal", profile.getRelationshipGoalCode(), locale));
-            profile.setResidencePlan(profileOptionService.label(
+            profile.setResidencePlan(commonOptionService.label(
                     "residencePlan", profile.getResidencePlanCode(), locale));
             profile.setTags(itemsByProfile
                     .getOrDefault(profile.getId(), new LinkedHashMap<>())
@@ -877,10 +877,10 @@ public class CupidProfileServiceImpl implements ICupidProfileService
                 ? mask(calculateAge(profile.getBirthYear()), "age", viewerRole, privacy, true)
                 : calculateAge(profile.getBirthYear()));
         detail.put("height", profile.getHeight());
-        detail.put("city", profileOptionService.label("city", profile.getCityCode(), locale));
-        detail.put("country", mask(profileOptionService.label("country", profile.getCountryCode(), locale),
+        detail.put("city", commonOptionService.label("city", profile.getCityCode(), locale));
+        detail.put("country", mask(commonOptionService.label("country", profile.getCountryCode(), locale),
                 "country", viewerRole, privacy, selfProfile));
-        detail.put("nationality", mask(profileOptionService.label("nationality", profile.getNationalityCode(), locale),
+        detail.put("nationality", mask(commonOptionService.label("nationality", profile.getNationalityCode(), locale),
                 "nationality", viewerRole, privacy, selfProfile));
         detail.put("languages", mask(toLanguageCodes(languages),
                 "languages", viewerRole, privacy, selfProfile));
@@ -890,8 +890,8 @@ public class CupidProfileServiceImpl implements ICupidProfileService
                 && "approved".equals(verification.getReviewStatus()));
         detail.put("degreeLevel", profile.getDegreeLevel());
         detail.put("familyVisible", profile.isFamilyVisible());
-        detail.put("education", profileOptionService.label("education", profile.getEducationCode(), locale));
-        detail.put("industry", mask(profileOptionService.label("industry", profile.getIndustryCode(), locale),
+        detail.put("education", commonOptionService.label("education", profile.getEducationCode(), locale));
+        detail.put("industry", mask(commonOptionService.label("industry", profile.getIndustryCode(), locale),
                 "industry", viewerRole, privacy, selfProfile));
         if (fields.containsKey("career_direction"))
         {
@@ -909,10 +909,10 @@ public class CupidProfileServiceImpl implements ICupidProfileService
         detail.put("datingIntentionCode", profile.getDatingIntentionCode());
         detail.put("datingIntentionLabel",
                 deriveDatingIntentionLabel(profile.getDatingIntentionCode(), locale));
-        detail.put("relationshipGoal", mask(profileOptionService.label(
+        detail.put("relationshipGoal", mask(commonOptionService.label(
                         "relationshipGoal", profile.getRelationshipGoalCode(), locale),
                 "relationshipGoal", viewerRole, privacy, selfProfile));
-        detail.put("residencePlan", mask(profileOptionService.label(
+        detail.put("residencePlan", mask(commonOptionService.label(
                         "residencePlan", profile.getResidencePlanCode(), locale),
                 "residencePlan", viewerRole, privacy, selfProfile));
         detail.put("relocation", mask(profile.getRelocation(),
@@ -925,10 +925,10 @@ public class CupidProfileServiceImpl implements ICupidProfileService
                 "preferredAgeMax", viewerRole, privacy, selfProfile));
         detail.put("preferredLocation", mask(profile.getPreferredLocation(),
                 "preferredLocation", viewerRole, privacy, selfProfile));
-        detail.put("preferredEducation", mask(profileOptionService.label(
+        detail.put("preferredEducation", mask(commonOptionService.label(
                         "preferredEducation", profile.getPreferredEducationCode(), locale),
                 "preferredEducation", viewerRole, privacy, selfProfile));
-        detail.put("familyLife", mask(profileOptionService.label(
+        detail.put("familyLife", mask(commonOptionService.label(
                         "familyLife", profile.getFamilyLifeCode(), locale),
                 "familyLife", viewerRole, privacy, selfProfile));
         detail.put("dealBreakers", mask(items.getOrDefault("deal_breakers", new ArrayList<>()),
@@ -937,7 +937,7 @@ public class CupidProfileServiceImpl implements ICupidProfileService
                 "smoking", viewerRole, privacy, selfProfile));
         detail.put("drinking", mask(profile.getDrinking(),
                 "drinking", viewerRole, privacy, selfProfile));
-        detail.put("exercise", mask(profileOptionService.label("exercise", profile.getExerciseCode(), locale),
+        detail.put("exercise", mask(commonOptionService.label("exercise", profile.getExerciseCode(), locale),
                 "exercise", viewerRole, privacy, selfProfile));
         detail.put("activityLevel", mask(profile.getActivityLevel(),
                 "activityLevel", viewerRole, privacy, selfProfile));
@@ -1291,12 +1291,12 @@ public class CupidProfileServiceImpl implements ICupidProfileService
             if ("city".equals(field))
             {
                 option.put("value", row.getCityCode());
-                option.put("label", profileOptionService.label("city", row.getCityCode(), locale));
+                option.put("label", commonOptionService.label("city", row.getCityCode(), locale));
             }
             else if ("education".equals(field))
             {
                 option.put("value", row.getEducationCode());
-                option.put("label", profileOptionService.label("education", row.getEducationCode(), locale));
+                option.put("label", commonOptionService.label("education", row.getEducationCode(), locale));
             }
             else if ("gender".equals(field))
             {
@@ -1306,7 +1306,7 @@ public class CupidProfileServiceImpl implements ICupidProfileService
             else
             {
                 option.put("value", row.getIndustryCode());
-                option.put("label", profileOptionService.label("industry", row.getIndustryCode(), locale));
+                option.put("label", commonOptionService.label("industry", row.getIndustryCode(), locale));
             }
             option.put("count", row.getCount());
             options.add(option);
