@@ -488,6 +488,73 @@ GET /api/common/options?version={clientVersion}
 5. Admin 资料审核、资料库、资料运营、照片审核、认证审核。
 6. Admin 系统已有模块中被 Cupid 复用的字典、参数或状态展示。
 
+### 当前完成分区
+
+#### C 端 Account Profile Detail 与 Account Settings
+
+| 项目 | 说明 |
+| --- | --- |
+| 页面/模块 | Account Profile Detail、Account Settings |
+| API endpoint | `/api/account/profiles/{id}`、`/api/account/preferences`、`/api/common/options` |
+| code 字段 | `gender`、`degreeLevel`、`city`、`country`、`nationality`、`languages`、`education`、`industry`、`maritalStatus`、`childrenPlan`、`datingIntentionCode`、`relationshipGoal`、`residencePlan`、`relocation`、`relationshipValues`、`preferredLocation`、`preferredEducation`、`familyLife`、`smoking`、`drinking`、`exercise`、`activityLevel`、`weekendStyle`、`pets`、`communicationStyle`、`relationshipToProfile`、`preferredChannel`、`contactVisibility`、`profileStatus`、`photoStatus`、`verificationStatus`、`reviewStatus`、`preferred_city`、`preferred_contact_channel` |
+| group | `profile.*` |
+| 原前端映射 | `profiles.detail.values.*`、`profiles.relationship.*`、`settings.contactChannel.*`、页面内硬编码 options |
+| 新读取方式 | `src/stores/modules/options.ts` 读取 `/api/common/options` 后，用 `profile.<field>` group 查询 label/options |
+| 不改原因 | `preferredLocale`、布尔值、空值、日期仍按页面原有格式化与静态文案处理 |
+| 校验点 | Account Profile Detail 创建/编辑/回显；多语言切换；`other` 补充说明展示；Account Settings 偏好城市和首选联系渠道显示/保存 |
+
+#### C 端 Profile 目录与详情
+
+| 项目 | 说明 |
+| --- | --- |
+| 页面/模块 | Self Profile Directory、Family Profile Directory、Self Profile Detail、Family Profile Detail |
+| API endpoint | `/api/profiles/self`、`/api/profiles/family`、`/api/profiles/self/{id}`、`/api/profiles/family/{id}`、`/api/common/options` |
+| code 字段 | `languages`、`gender`、`degreeLevel`、`maritalStatus`、`childrenPlan`、`datingIntentionCode`、`relationshipValues`、`communicationStyle`、`preferredLocation`、`relocation`、`activityLevel`、`weekendStyle`、`smoking`、`drinking`、`pets` |
+| group | `profile.*` |
+| 原前端映射 | `formatProfileLanguages`、`profiles.detail.values.*`、目录卡片里的 intent/marital switch、目录筛选里的 gender/education/marital 静态 i18n |
+| 新读取方式 | Profile 目录与详情 hook 通过 `src/stores/modules/options.ts` 读取 `/api/common/options`，向 mapper 传入 `optionLabel(fieldKey, value)`；mapper 只做纯展示转换 |
+| 不改原因 | 年龄、身高、空值、数组拼接、是否有子女、是否接受异地、认证状态、资料状态、排序文案仍属于前端格式化或页面静态文案；目录 facet 中的城市、行业、交友意向已由后端返回 label |
+| 校验点 | Self/Family 目录卡片徽章和语言展示；目录筛选项性别/学历/婚姻/语言展示；Self/Family 详情婚恋、生活方式、语言、关系价值观展示；语言切换后 label 更新 |
+
+#### C 端 Event 目录、详情、报名与首页预览
+
+| 项目 | 说明 |
+| --- | --- |
+| 页面/模块 | Events Directory、Event Detail、Home Events Preview |
+| API endpoint | `/api/events`、`/api/events/{id}`、`/api/events/{id}/register`、`/api/events/{id}/registration`、`/api/common/options` |
+| code 字段 | `status`、`languageCodes` |
+| group | `event.status`、`profile.languages` |
+| 原前端映射 | 活动卡片 `status.${code}`，详情页语言 `toUpperCase().join(' / ')` |
+| 新读取方式 | Event hooks 通过 `src/stores/modules/options.ts` 读取 `/api/common/options`，向 mapper 传入 `optionLabel(group, value)`；活动语言复用 `profile.languages`，活动卡片状态使用 `event.status` |
+| 不改原因 | 报名状态的 title/description/action 是页面状态说明和操作文案，不是简单枚举 label；活动 format、audience、relationshipFocus 当前由后端直接返回展示文本；日期、席位、地址锁定提示仍由前端格式化和页面文案处理 |
+| 校验点 | 首页活动卡片、活动目录卡片、活动详情 hero 和 facts 中的状态/语言展示；语言切换后 label 更新；报名/取消按钮文案不回退为裸 code |
+
+#### C 端 Membership、Introduction、Relationship 与账户摘要
+
+| 项目 | 说明 |
+| --- | --- |
+| 页面/模块 | Account Shell、Account Home、Account Events、Account Membership、Account Relationship、Account Profiles、Account Profile Detail |
+| API endpoint | `/api/account/dashboard`、`/api/account/events`、`/api/account/membership`、`/api/account/private-introductions`、`/api/account/profiles`、`/api/account/profiles/{id}`、`/api/common/options` |
+| code 字段 | `membershipTier`、`membership.status`、`entitlement.code`、`eventRegistration.status`、`introduction.status`、`relationshipToProfile`、`profileStatus` |
+| group | `membership.tier`、`membership.status`、`membership.entitlement`、`event.registrationStatus`、`introduction.status`、`profile.relationshipToProfile`、`profile.profileStatus` |
+| 原前端映射 | `home.membership.tier.*`、`membership.status.*`、`membership.entitlement.*`、`events.registrationStatus.*`、`introduction.status.*`、`profiles.relationship.*`、`profiles.status.*` |
+| 新读取方式 | 对应页面或组件通过 `src/stores/modules/options.ts` 读取 `/api/common/options`，使用 `optionLabel(group, value)` 显示短 label |
+| 不改原因 | `membership.tierPositioning.*`、`membership.entitlementDescription.*`、`relationship.contactReason.*`、`home.actions.*`、账号状态、语言、MFA、登录方式 provider、设置项名称是页面说明、操作文案或账号安全流程文案，不是本轮业务枚举 label |
+| 校验点 | 账户侧栏会员等级、账户首页活动/资料状态、我的资料列表、资料详情标题和状态、我的活动报名状态、我的会员状态和权益名称、私人介绍状态；语言切换后 label 更新 |
+
+#### Admin 资料审核、资料库、资料运营、照片审核、认证审核
+
+| 项目 | 说明 |
+| --- | --- |
+| 页面/模块 | Cupid Admin review utils、资料审核、资料库、资料运营、照片审核、认证材料审核 |
+| API endpoint | `/api/common/options`、`/cupid/profile/*`、`/cupid/photo/*`、`/cupid/verification/*` |
+| code 字段 | `profileType`、`profileStatus`、`photoStatus`、`reviewStatus`、`verificationStatus`、`verificationMaterialType`、`verificationMaterialStatus`、`gender`、`degreeLevel`、`maritalStatus`、`childrenPlan`、`datingIntentionCode`、`relocation`、`smoking`、`drinking`、`activityLevel`、`weekendStyle`、`pets`、`communicationStyle`、`relationshipValues`、`preferredLocation`、`languages`、`preferredChannel`、`contactVisibility`、`relationshipToProfile` |
+| group | `profile.*`、`verification.materialType`、`verification.materialStatus` |
+| 原前端映射 | `src/views/cupid/review-utils.ts` 中的静态 options、`optionLocaleLabels` 和 `labelOf/labelsOf` |
+| 新读取方式 | Admin 新增 `src/api/cupid/options.ts` 与 `src/store/modules/cupidOptions.ts`；`review-utils.labelOf/labelsOf/profileCodeLabel` 从 Pinia options store 读取 `/api/common/options` 的后端 label；options store 复用 RuoYi `cache.local` 持久化 locale/version/groups |
+| 不改原因 | 排序选项、拒绝快捷原因、审核操作文案、来源/翻译来源、yes/no、时间、空值仍属于页面控制或格式化；动态管理放到 8.2.4.3 |
+| 校验点 | 资料审核/资料库/资料运营/照片审核/认证审核中短枚举 label 不再裸露 code；切换资料详情语言时仍能显示 label；options 缓存由 Admin Pinia store 统一维护 |
+
 ### 每个分区需要记录
 
 | 项目 | 说明 |
