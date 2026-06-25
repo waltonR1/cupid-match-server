@@ -29,6 +29,7 @@ import com.ruoyi.cupid.domain.CupidUserEntitlementBalance;
 import com.ruoyi.cupid.domain.CupidUserMembership;
 import com.ruoyi.cupid.mapper.CupidAuthMapper;
 import com.ruoyi.cupid.mapper.CupidProfileMapper;
+import com.ruoyi.cupid.service.ICupidCommonOptionService;
 import com.ruoyi.cupid.service.ICupidRelationshipService;
 
 /**
@@ -41,7 +42,10 @@ public class CupidRelationshipServiceImpl implements ICupidRelationshipService
     private static final int INTRODUCTION_EXPIRY_DAYS = 7;
     private static final int INTRODUCTION_COOLDOWN_DAYS = 90;
     private static final List<String> SUMMARY_FIELDS =
-            List.of("profile_name", "city", "education", "industry", "summary");
+            List.of("profile_name", "summary");
+
+    @Autowired
+    private ICupidCommonOptionService commonOptionService;
 
     @Autowired
     private CupidProfileMapper profileMapper;
@@ -114,9 +118,10 @@ public class CupidRelationshipServiceImpl implements ICupidRelationshipService
             item.put("displayName", deriveDisplayName(profile.getId()));
             item.put("avatarUrl", photos.getOrDefault(profile.getId(), ""));
             item.put("age", Math.max(0, Year.now().getValue() - profile.getBirthYear()));
-            item.put("city", localized.getOrDefault("city", profile.getCityCode()));
-            item.put("education", localized.getOrDefault("education", profile.getEducationCode()));
-            item.put("industry", localized.getOrDefault("industry", profile.getIndustryCode()));
+            String loc = normalizeLocale(locale);
+            item.put("city", commonOptionService.label("city", profile.getCityCode(), loc));
+            item.put("education", commonOptionService.label("education", profile.getEducationCode(), loc));
+            item.put("industry", commonOptionService.label("industry", profile.getIndustryCode(), loc));
             item.put("summary", localized.getOrDefault("summary", ""));
             item.put("tags", tags.getOrDefault(profile.getId(), List.of()).stream().limit(3).toList());
             item.put("createdAt", favorite.getCreatedAt());

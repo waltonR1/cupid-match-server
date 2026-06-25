@@ -16,7 +16,7 @@ import com.ruoyi.cupid.service.ICupidCommonOptionService;
 @Service
 public class CupidCommonOptionServiceImpl implements ICupidCommonOptionService
 {
-    private static final String VERSION = "2026-06-25-common-options-v5";
+    private static final String VERSION = "2026-06-25-common-options-v7";
     private static final String PROFILE_GROUP_PREFIX = "profile.";
 
     private static final Map<String, List<Option>> GROUPS = new LinkedHashMap<>();
@@ -251,6 +251,7 @@ public class CupidCommonOptionServiceImpl implements ICupidCommonOptionService
                 option("balanced", "看情况", "Equilibre", "Balanced", false));
         put("relationshipToProfile",
                 option("self", "本人", "Moi", "Self", false),
+                option("parent", "家长", "Parent", "Parent", false),
                 option("father", "父亲", "Pere", "Father", false),
                 option("mother", "母亲", "Mere", "Mother", false),
                 option("relative", "亲属", "Proche", "Relative", false));
@@ -336,6 +337,32 @@ public class CupidCommonOptionServiceImpl implements ICupidCommonOptionService
                 option("login_required", "登录后可查看具体地址", "Connectez-vous pour voir l'adresse exacte", "Log in to view the exact address", false),
                 option("registration_required", "报名后可查看具体地址", "Inscrivez-vous pour voir l'adresse exacte", "Register for the event to view the exact address", false),
                 option("confirmation_required", "报名确认后可查看具体地址", "Adresse visible apres confirmation", "Address is visible after confirmation", false));
+        put("profile.ownershipPermission",
+                option("owner", "所有者", "Proprietaire", "Owner", false),
+                option("manager", "管理者", "Gestionnaire", "Manager", false));
+        put("profile.ownershipStatus",
+                option("pending", "待确认", "En attente", "Pending", false),
+                option("active", "有效", "Actif", "Active", false),
+                option("revoked", "已撤销", "Revoque", "Revoked", false));
+        put("profile.internalRecordSource",
+                option("self_submitted", "本人提交", "Soumis par soi-meme", "Self submitted", false),
+                option("family_submitted", "家庭提交", "Soumis par la famille", "Family submitted", false),
+                option("staff_collected", "员工采集", "Collecte par l'equipe", "Staff collected", false));
+        put("localized.status",
+                option("pending", "待处理", "En attente", "Pending", false),
+                option("ready", "已完成", "Pret", "Ready", false),
+                option("failed", "失败", "Echec", "Failed", false),
+                option("stale", "待刷新", "A rafraichir", "Stale", false));
+        put("localized.source",
+                option("manual", "人工录入", "Saisie manuelle", "Manual", false),
+                option("machine", "机器生成", "Genere par machine", "Machine generated", false),
+                option("generated", "自动生成", "Genere automatiquement", "Generated", false),
+                option("imported", "导入", "Importe", "Imported", false));
+        put("localized.provider",
+                option("human", "人工", "Humain", "Human", false),
+                option("translation_api", "翻译接口", "API de traduction", "Translation API", false),
+                option("libretranslate", "LibreTranslate", "LibreTranslate", "LibreTranslate", false),
+                option("system", "系统", "Systeme", "System", false));
         put("verification.materialType",
                 option("identity", "身份认证", "Identite", "Identity", false),
                 option("education", "学历认证", "Education", "Education", false),
@@ -345,6 +372,11 @@ public class CupidCommonOptionServiceImpl implements ICupidCommonOptionService
                 option("pending", "待审核", "En attente", "Pending", false),
                 option("approved", "已通过", "Approuve", "Approved", false),
                 option("rejected", "已拒绝", "Refuse", "Rejected", false));
+
+        put("verification.scanStatus",
+                option("pending", "待检查", "En attente", "Pending", false),
+                option("passed", "已通过", "Reussi", "Passed", false),
+                option("failed", "未通过", "Echoue", "Failed", false));
     }
 
     @Override
