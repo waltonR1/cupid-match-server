@@ -581,6 +581,8 @@ GET /api/common/options?version={clientVersion}
 
 本步骤必须等 `8.2.4.1` 和 `8.2.4.2` 稳定后再做。
 
+本步骤不是继续扩大枚举覆盖范围，而是把已经接入 `/api/common/options`、且确实适合运营维护的 options 从代码常量迁移到后台可维护来源。
+
 需要评估：
 
 - 复用 RuoYi `sys_dict` 还是新建 Cupid 专用字典表。
@@ -590,11 +592,94 @@ GET /api/common/options?version={clientVersion}
 - 缓存刷新。
 - C 端和 Admin 的 options 拉取方式。
 
+### 8.2.4.3 动态管理边界
+
+可进入动态管理的 group 必须满足：
+
+- 只影响展示 label、选择器 options、筛选项，不直接改变状态机流转。
+- 新增或停用某个 value 后，业务代码不需要新增分支判断。
+- 保存接口仍只保存稳定 code。
+- 禁用已有 value 时，不删除历史数据；历史数据展示仍能按 code 回显，必要时标记为已停用。
+
+优先进入动态管理：
+
+| group | 用途 | 说明 |
+| --- | --- | --- |
+| `profile.city` | 资料城市、偏好城市 | 运营需要维护城市列表与排序 |
+| `profile.country` | 国家 | 国家 code 稳定，label 可维护 |
+| `profile.nationality` | 国籍 | 与国家可共用基础数据，但 options group 保持独立 |
+| `profile.languages` | 语言 | 语言 code 稳定，label 和排序可维护 |
+| `profile.education` | 教育背景 | 8.2.4.1 新增枚举化字段，需要后续补全值 |
+| `profile.industry` | 行业 | 8.2.4.1 新增枚举化字段，需要后续补全值 |
+| `profile.relationshipGoal` | 关系目标 | 可作为运营维护的选择项 |
+| `profile.residencePlan` | 居住计划 | 可作为运营维护的选择项 |
+| `profile.preferredEducation` | 期望学历 | 可作为运营维护的选择项 |
+| `profile.familyLife` | 家庭生活 | 可作为运营维护的选择项 |
+| `profile.exercise` | 运动习惯 | 可作为运营维护的选择项 |
+| `profile.degreeLevel` | 最高学历 | 展示与筛选枚举，允许维护 label 和排序 |
+| `profile.maritalStatus` | 婚姻状态 | 展示与筛选枚举，新增值需谨慎但不应影响状态机 |
+| `profile.childrenPlan` | 子女计划 | 展示与筛选枚举 |
+| `profile.datingIntentionCode` | 交友意向 | 展示与筛选枚举 |
+| `profile.relocation` | 迁居意愿 | 展示与筛选枚举 |
+| `profile.relationshipValues` | 关系价值观 | 多选展示枚举 |
+| `profile.preferredLocation` | 地域偏好 | 展示与筛选枚举 |
+| `profile.smoking` | 吸烟 | 展示与筛选枚举 |
+| `profile.drinking` | 饮酒 | 展示与筛选枚举 |
+| `profile.activityLevel` | 活跃程度 | 展示与筛选枚举 |
+| `profile.weekendStyle` | 周末节奏 | 展示与筛选枚举 |
+| `profile.pets` | 宠物 | 展示与筛选枚举 |
+| `profile.communicationStyle` | 沟通方式 | 展示与筛选枚举 |
+
+暂不进入动态管理，继续代码常量维护：
+
+| group | 原因 |
+| --- | --- |
+| `profile.profileType` | 资料类型影响页面和权限分支 |
+| `profile.profileStatus` | 资料状态机 |
+| `profile.photoStatus` | 照片审核状态机 |
+| `profile.reviewStatus` | 审核状态机 |
+| `profile.verificationStatus` | 认证状态机 |
+| `profile.relationshipToProfile` | 资料归属权限语义，新增值需要代码处理 |
+| `profile.preferredChannel` | 联系方式字段固定，新增值需要表单和展示支持 |
+| `profile.contactVisibility` | 联系方式开放规则，影响权限判断 |
+| `profile.ownershipPermission` | 归属权限规则 |
+| `profile.ownershipStatus` | 归属状态机 |
+| `profile.internalRecordSource` | 内部来源语义，暂不开放给运营维护 |
+| `account.status` | 账号状态机 |
+| `account.locale` | 系统支持语言范围 |
+| `account.identityProvider` | 登录方式，需要认证链路支持 |
+| `account.preference` | 设置项名称，不是用户可选枚举值 |
+| `event.status` | 活动状态机 |
+| `event.registrationStatus` | 活动报名状态机 |
+| `introduction.status` | 私人介绍状态机 |
+| `membership.status` | 会员状态机 |
+| `membership.tier` | 会员套餐，涉及权益与价格，不在字典页维护 |
+| `membership.entitlement` | 权益 code，涉及消费规则 |
+| `message.subjectType` | 消息主题类型，涉及消息生成逻辑 |
+| `relationship.contactReason` | 联系方式不可见原因，属于业务分支文案 |
+| `event.addressLockReason` | 活动地址锁定原因，属于业务分支文案 |
+| `localized.status` | 翻译任务状态 |
+| `localized.source` | 本地化来源语义 |
+| `localized.provider` | 翻译提供方语义 |
+| `verification.materialType` | 认证材料类型，涉及审核页面和业务字段 |
+| `verification.materialStatus` | 认证材料状态机 |
+| `verification.scanStatus` | 材料安全扫描状态机 |
+
 不应动态管理：
 
 - 状态机 code。
 - 权益消费 code。
 - 会影响业务分支判断的硬规则 code。
+
+### 8.2.4.3 建议执行顺序
+
+1. 先确定数据来源方案：优先评估 RuoYi `sys_dict` 是否足够承载 `group/value/label/sort/status`，若多语言与版本刷新成本过高，再新建 Cupid 专用 options 表。
+2. 建立只读迁移：后端 `/api/common/options` 先支持从动态来源读取；动态来源缺失时仍可回落到代码常量，但只作为迁移保护。
+3. 建立后台管理页：只开放“优先进入动态管理”的 group，支持中/法/英 label、排序、启停、requiresExtraText。
+4. 建立版本刷新：动态 options 改动后更新整体 `commonOptionsVersion`，C 端和 Admin 继续沿用现有缓存逻辑。
+5. 建立审计：新增、修改、启停 options 写入业务审计日志。
+6. 迁移初始数据：把当前代码常量中的动态 group 初始化到数据库，代码常量只保留 static/system group。
+7. 校验 C 端和 Admin：确认动态 group 的新增、停用、排序、多语言切换都能正常回显。
 
 ## 非目标
 
