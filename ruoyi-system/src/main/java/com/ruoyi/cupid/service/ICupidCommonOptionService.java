@@ -1,5 +1,6 @@
 package com.ruoyi.cupid.service;
 
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -25,4 +26,14 @@ public interface ICupidCommonOptionService
      * @return 展示文案
      */
     String label(String group, String value, String locale);
+
+    List<Map<String, Object>> selectAdminOptionGroups();
+
+    List<Map<String, Object>> selectAdminOptionValues(String groupKey);
+
+    Map<String, Object> selectAdminOptionValue(String id);
+
+    Map<String, Object> createAdminOptionValue(Map<String, Object> body, String staffUserId);
+
+    void updateAdminOptionValue(String id, Map<String, Object> body, String staffUserId);
 }

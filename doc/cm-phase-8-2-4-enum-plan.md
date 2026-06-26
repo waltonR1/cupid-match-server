@@ -592,6 +592,16 @@ GET /api/common/options?version={clientVersion}
 - 缓存刷新。
 - C 端和 Admin 的 options 拉取方式。
 
+当前决策：
+
+- 不复用 RuoYi `sys_dict` 作为 Cupid options 权威来源。
+- 新建 `cm_option_groups` 和 `cm_option_values` 承载可动态维护的 options。
+- 原因：RuoYi 字典只有单语言 `dict_label`，缺少三语 label、`requiresExtraText`、整体版本刷新和“停用但历史回显”的明确模型；强行复用会把业务语义塞进 `remark/cssClass/listClass` 等非业务字段。
+- `/api/common/options` 接口保持不变，前端缓存逻辑不改。
+- 动态表只接管已列入 dynamic 的 group；static/system group 继续由代码常量维护。
+- 迁移初期采用“动态值覆盖同 value，未迁移值继续保留”的合并策略，避免 `profile.languages` 这类长列表在数据库未补全时被截断。
+- 前台 options 只返回启用项；后端 `label(group, value, locale)` 包含停用项，用于历史数据回显。
+
 ### 8.2.4.3 动态管理边界
 
 可进入动态管理的 group 必须满足：
@@ -673,13 +683,14 @@ GET /api/common/options?version={clientVersion}
 
 ### 8.2.4.3 建议执行顺序
 
-1. 先确定数据来源方案：优先评估 RuoYi `sys_dict` 是否足够承载 `group/value/label/sort/status`，若多语言与版本刷新成本过高，再新建 Cupid 专用 options 表。
-2. 建立只读迁移：后端 `/api/common/options` 先支持从动态来源读取；动态来源缺失时仍可回落到代码常量，但只作为迁移保护。
-3. 建立后台管理页：只开放“优先进入动态管理”的 group，支持中/法/英 label、排序、启停、requiresExtraText。
-4. 建立版本刷新：动态 options 改动后更新整体 `commonOptionsVersion`，C 端和 Admin 继续沿用现有缓存逻辑。
-5. 建立审计：新增、修改、启停 options 写入业务审计日志。
-6. 迁移初始数据：把当前代码常量中的动态 group 初始化到数据库，代码常量只保留 static/system group。
-7. 校验 C 端和 Admin：确认动态 group 的新增、停用、排序、多语言切换都能正常回显。
+1. 已完成：确定数据来源方案，使用 Cupid 专用 options 表，不复用 RuoYi `sys_dict`。
+2. 已完成：建立只读迁移，后端 `/api/common/options` 支持从动态来源读取，并保留代码常量作为迁移保护。
+3. 已完成：建立版本刷新，动态 options 改动后影响整体 `commonOptionsVersion`，C 端和 Admin 继续沿用现有缓存逻辑。
+4. 已完成：建立后台管理页，只开放“优先进入动态管理”的 group，支持中/法/英 label、排序、启停、requiresExtraText。
+5. 已完成：建立修改审计，新增、修改、启停 options 写入业务审计日志；删除暂不开放。
+6. 已完成：`/api/common/options` 同时返回 `groups` 和 `labelGroups`；`groups` 只用于选择器，停用值会被移除，`labelGroups` 用于历史数据回显，停用值仍能显示 label。
+7. 待执行：补全动态 group 的初始化数据，尤其是语言、国家、城市等长列表。
+8. 待执行：校验 C 端和 Admin，确认动态 group 的新增、停用、排序、多语言切换都能正常回显。
 
 ## 非目标
 

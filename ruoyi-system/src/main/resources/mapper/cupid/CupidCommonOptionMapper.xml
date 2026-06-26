@@ -1,0 +1,199 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.cupid.mapper.CupidCommonOptionMapper">
+
+    <resultMap id="CupidCommonOptionValueResult" type="CupidCommonOptionValue">
+        <result property="groupKey" column="group_key"/>
+        <result property="optionValue" column="option_value"/>
+        <result property="labelZh" column="label_zh"/>
+        <result property="labelFr" column="label_fr"/>
+        <result property="labelEn" column="label_en"/>
+        <result property="requiresExtraText" column="requires_extra_text"/>
+        <result property="status" column="status"/>
+        <result property="groupStatus" column="group_status"/>
+    </resultMap>
+
+    <sql id="optionValueColumns">
+        g.group_key,
+        v.option_value,
+        v.label_zh,
+        v.label_fr,
+        v.label_en,
+        v.requires_extra_text,
+        v.status,
+        g.status as group_status
+    </sql>
+
+    <select id="selectEnabledOptions" resultMap="CupidCommonOptionValueResult">
+        select
+        <include refid="optionValueColumns"/>
+        from cm_option_values v
+        inner join cm_option_groups g on g.id = v.group_id
+        where g.manage_status = 'dynamic'
+          and g.status = 'enabled'
+          and v.status = 'enabled'
+        order by g.sort_order, g.group_key, v.sort_order, v.option_value
+    </select>
+
+    <select id="selectAllOptions" resultMap="CupidCommonOptionValueResult">
+        select
+        <include refid="optionValueColumns"/>
+        from cm_option_values v
+        inner join cm_option_groups g on g.id = v.group_id
+        where g.manage_status = 'dynamic'
+        order by g.sort_order, g.group_key, v.sort_order, v.option_value
+    </select>
+
+    <select id="selectOptionsVersion" resultType="String">
+        select coalesce(date_format(max(updated_at), '%Y%m%d%H%i%s'), 'empty')
+        from (
+            select updated_at from cm_option_groups where manage_status = 'dynamic'
+            union all
+            select v.updated_at
+            from cm_option_values v
+            inner join cm_option_groups g on g.id = v.group_id
+            where g.manage_status = 'dynamic'
+        ) t
+    </select>
+
+    <select id="selectAdminOptionGroups" resultType="map">
+        select
+            id,
+            group_key as groupKey,
+            group_name as groupName,
+            group_scope as groupScope,
+            manage_status as manageStatus,
+            sort_order as sortOrder,
+            status,
+            created_at as createdAt,
+            updated_at as updatedAt
+        from cm_option_groups
+        where manage_status = 'dynamic'
+        order by sort_order, group_key
+    </select>
+
+    <select id="selectAdminOptionValues" resultType="map">
+        select
+            v.id,
+            g.group_key as groupKey,
+            g.group_name as groupName,
+            v.option_value as optionValue,
+            v.label_zh as labelZh,
+            v.label_fr as labelFr,
+            v.label_en as labelEn,
+            v.sort_order as sortOrder,
+            v.requires_extra_text as requiresExtraText,
+            v.status,
+            v.created_at as createdAt,
+            v.updated_at as updatedAt
+        from cm_option_values v
+        inner join cm_option_groups g on g.id = v.group_id
+        where g.manage_status = 'dynamic'
+        <if test="groupKey != null and groupKey != ''">
+            and g.group_key = #{groupKey}
+        </if>
+        order by g.sort_order, g.group_key, v.sort_order, v.option_value
+    </select>
+
+    <select id="selectAdminOptionValueById" resultType="map">
+        select
+            v.id,
+            g.group_key as groupKey,
+            g.group_name as groupName,
+            v.option_value as optionValue,
+            v.label_zh as labelZh,
+            v.label_fr as labelFr,
+            v.label_en as labelEn,
+            v.sort_order as sortOrder,
+            v.requires_extra_text as requiresExtraText,
+            v.status,
+            v.created_at as createdAt,
+            v.updated_at as updatedAt
+        from cm_option_values v
+        inner join cm_option_groups g on g.id = v.group_id
+        where g.manage_status = 'dynamic'
+          and v.id = #{id}
+        limit 1
+    </select>
+
+    <select id="selectAdminOptionGroupByKey" resultType="map">
+        select
+            id,
+            group_key as groupKey,
+            group_name as groupName,
+            group_scope as groupScope,
+            manage_status as manageStatus,
+            sort_order as sortOrder,
+            status,
+            created_at as createdAt,
+            updated_at as updatedAt
+        from cm_option_groups
+        where manage_status = 'dynamic'
+          and group_key = #{groupKey}
+        limit 1
+    </select>
+
+    <select id="selectAdminOptionValueByGroupAndValue" resultType="map">
+        select
+            v.id,
+            g.group_key as groupKey,
+            g.group_name as groupName,
+            v.option_value as optionValue,
+            v.label_zh as labelZh,
+            v.label_fr as labelFr,
+            v.label_en as labelEn,
+            v.sort_order as sortOrder,
+            v.requires_extra_text as requiresExtraText,
+            v.status,
+            v.created_at as createdAt,
+            v.updated_at as updatedAt
+        from cm_option_values v
+        inner join cm_option_groups g on g.id = v.group_id
+        where g.manage_status = 'dynamic'
+          and g.group_key = #{groupKey}
+          and v.option_value = #{optionValue}
+        limit 1
+    </select>
+
+    <insert id="insertAdminOptionValue" parameterType="map">
+        insert into cm_option_values (
+            id, group_id, option_value, label_zh, label_fr, label_en,
+            sort_order, requires_extra_text, status, created_at, updated_at
+        ) values (
+            #{id}, #{groupId}, #{optionValue}, #{labelZh}, #{labelFr}, #{labelEn},
+            #{sortOrder}, #{requiresExtraText}, #{status}, current_timestamp, current_timestamp
+        )
+    </insert>
+
+    <update id="updateAdminOptionValue" parameterType="map">
+        update cm_option_values
+        <set>
+            <if test="labelZh != null">label_zh = #{labelZh},</if>
+            <if test="labelFr != null">label_fr = #{labelFr},</if>
+            <if test="labelEn != null">label_en = #{labelEn},</if>
+            <if test="sortOrder != null">sort_order = #{sortOrder},</if>
+            <if test="requiresExtraText != null">requires_extra_text = #{requiresExtraText},</if>
+            <if test="status != null">status = #{status},</if>
+            updated_at = current_timestamp
+        </set>
+        where id = #{id}
+          and exists (
+              select 1
+              from cm_option_groups g
+              where g.id = cm_option_values.group_id
+                and g.manage_status = 'dynamic'
+          )
+    </update>
+
+    <insert id="insertAdminAuditLog">
+        insert into cm_audit_logs (
+            id, actor_type, actor_user_id, subject_type, subject_id, action,
+            before_data, after_data, reason, created_at
+        ) values (
+            #{id}, #{actorType}, #{actorUserId}, #{subjectType}, #{subjectId}, #{action},
+            #{beforeData}, #{afterData}, #{reason}, current_timestamp
+        )
+    </insert>
+</mapper>

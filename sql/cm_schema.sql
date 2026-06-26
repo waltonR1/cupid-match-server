@@ -53,6 +53,8 @@ drop table if exists cm_profile_localized_fields;
 drop table if exists cm_profile_relationship_values;
 drop table if exists cm_profile_languages;
 drop table if exists cm_profiles;
+drop table if exists cm_option_values;
+drop table if exists cm_option_groups;
 drop table if exists cm_user_agreement_acceptances;
 drop table if exists cm_legal_document_contents;
 drop table if exists cm_legal_documents;
@@ -763,6 +765,38 @@ create table cm_profile_option_extra_texts (
   unique key uk_cm_profile_option_extra_text (profile_id, field_name, locale),
   key idx_cm_profile_option_extra_lookup (field_name, locale, status)
 ) engine=innodb comment='资料枚举其他补充说明';
+
+create table cm_option_groups (
+  id                 varchar(36)   not null comment '通用选项分组ID',
+  group_key          varchar(100)  not null comment '分组键，例如 profile.city',
+  group_name         varchar(100)  not null comment '分组名称',
+  group_scope        varchar(40)   not null default 'profile' comment '分组范围；可选值：profile, account, event, membership, system',
+  manage_status      varchar(20)   not null default 'dynamic' comment '管理状态；可选值：dynamic, static, system',
+  sort_order         int           not null default 0 comment '排序',
+  status             varchar(20)   not null default 'enabled' comment '状态；可选值：enabled, disabled',
+  created_at         datetime      not null default current_timestamp comment '创建时间',
+  updated_at         datetime      not null default current_timestamp on update current_timestamp comment '更新时间',
+  primary key (id),
+  unique key uk_cm_option_group_key (group_key),
+  key idx_cm_option_group_status (manage_status, status, sort_order)
+) engine=innodb comment='通用选项分组';
+
+create table cm_option_values (
+  id                  varchar(36)   not null comment '通用选项值ID',
+  group_id            varchar(36)   not null comment '分组ID，关联 cm_option_groups.id',
+  option_value        varchar(100)  not null comment '稳定 code 值',
+  label_zh            varchar(200)  not null comment '中文标签',
+  label_fr            varchar(200)  not null comment '法文标签',
+  label_en            varchar(200)  not null comment '英文标签',
+  sort_order          int           not null default 0 comment '排序',
+  requires_extra_text tinyint(1)    not null default 0 comment '是否需要补充说明',
+  status              varchar(20)   not null default 'enabled' comment '状态；可选值：enabled, disabled',
+  created_at          datetime      not null default current_timestamp comment '创建时间',
+  updated_at          datetime      not null default current_timestamp on update current_timestamp comment '更新时间',
+  primary key (id),
+  unique key uk_cm_option_value (group_id, option_value),
+  key idx_cm_option_value_lookup (group_id, status, sort_order)
+) engine=innodb comment='通用选项值';
 
 create table cm_profile_localized_items (
   id                 varchar(36)   not null comment '资料多语言列表项ID',

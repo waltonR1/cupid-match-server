@@ -1,11 +1,19 @@
 package com.ruoyi.cupid.service.impl;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
+import com.alibaba.fastjson2.JSON;
+import com.ruoyi.common.exception.ServiceException;
+import com.ruoyi.common.utils.uuid.IdUtils;
+import com.ruoyi.cupid.domain.CupidCommonOptionValue;
+import com.ruoyi.cupid.mapper.CupidCommonOptionMapper;
 import com.ruoyi.cupid.service.ICupidCommonOptionService;
 
 /**
@@ -16,10 +24,14 @@ import com.ruoyi.cupid.service.ICupidCommonOptionService;
 @Service
 public class CupidCommonOptionServiceImpl implements ICupidCommonOptionService
 {
-    private static final String VERSION = "2026-06-25-common-options-v7";
+    private static final String VERSION = "2026-06-26-common-options-v8";
     private static final String PROFILE_GROUP_PREFIX = "profile.";
+    private static final Set<String> OPTION_STATUSES = Set.of("enabled", "disabled");
 
     private static final Map<String, List<Option>> GROUPS = new LinkedHashMap<>();
+
+    @Autowired
+    private CupidCommonOptionMapper commonOptionMapper;
 
     static
     {
@@ -383,27 +395,18 @@ public class CupidCommonOptionServiceImpl implements ICupidCommonOptionService
     public Map<String, Object> getOptions(String locale, String clientVersion)
     {
         Map<String, Object> result = new LinkedHashMap<>();
-        result.put("version", VERSION);
-        if (VERSION.equals(clientVersion))
+        String version = currentVersion();
+        result.put("version", version);
+        if (version.equals(clientVersion))
         {
             result.put("unchanged", true);
             return result;
         }
 
         String loc = normalizeLocale(locale);
-        Map<String, Object> groups = new LinkedHashMap<>();
-        for (Map.Entry<String, List<Option>> entry : GROUPS.entrySet())
-        {
-            List<Map<String, Object>> options = new ArrayList<>();
-            for (Option option : entry.getValue())
-            {
-                options.add(option.toMap(loc));
-            }
-            String group = entry.getKey().contains(".") ? entry.getKey() : PROFILE_GROUP_PREFIX + entry.getKey();
-            groups.put(group, options);
-        }
         result.put("unchanged", false);
-        result.put("groups", groups);
+        result.put("groups", responseGroups(visibleOptions(), loc));
+        result.put("labelGroups", responseGroups(allLabelOptions(), loc));
         return result;
     }
 
@@ -414,7 +417,12 @@ public class CupidCommonOptionServiceImpl implements ICupidCommonOptionService
         {
             return "";
         }
-        List<Option> options = GROUPS.get(group);
+        Map<String, List<Option>> groups = allLabelOptions();
+        List<Option> options = groups.get(externalGroupKey(group));
+        if (options == null)
+        {
+            options = GROUPS.get(group);
+        }
         if (options != null)
         {
             String loc = normalizeLocale(locale);
@@ -427,6 +435,280 @@ public class CupidCommonOptionServiceImpl implements ICupidCommonOptionService
             }
         }
         return value;
+    }
+
+    @Override
+    public List<Map<String, Object>> selectAdminOptionGroups()
+    {
+        return commonOptionMapper.selectAdminOptionGroups();
+    }
+
+    @Override
+    public List<Map<String, Object>> selectAdminOptionValues(String groupKey)
+    {
+        return commonOptionMapper.selectAdminOptionValues(groupKey);
+    }
+
+    @Override
+    public Map<String, Object> selectAdminOptionValue(String id)
+    {
+        return requireAdminOptionValue(id);
+    }
+
+    @Override
+    public Map<String, Object> createAdminOptionValue(Map<String, Object> body, String staffUserId)
+    {
+        String groupKey = requireText(body, "groupKey", "选项分组不能为空");
+        String optionValue = requireText(body, "optionValue", "选项 code 不能为空");
+        if (!optionValue.matches("[A-Za-z0-9:_-]+"))
+        {
+            throw new ServiceException("选项 code 只能包含字母、数字、冒号、下划线和短横线");
+        }
+
+        Map<String, Object> group = commonOptionMapper.selectAdminOptionGroupByKey(groupKey);
+        if (group == null)
+        {
+            throw new ServiceException("选项分组不存在或不可动态管理");
+        }
+        if (commonOptionMapper.selectAdminOptionValueByGroupAndValue(groupKey, optionValue) != null)
+        {
+            throw new ServiceException("选项 code 已存在");
+        }
+
+        Map<String, Object> params = new HashMap<>();
+        String id = IdUtils.fastUUID();
+        params.put("id", id);
+        params.put("groupId", group.get("id"));
+        params.put("optionValue", optionValue);
+        params.put("labelZh", requireText(body, "labelZh", "中文文案不能为空"));
+        params.put("labelFr", requireText(body, "labelFr", "法语文案不能为空"));
+        params.put("labelEn", requireText(body, "labelEn", "英语文案不能为空"));
+        params.put("sortOrder", integerValue(body.get("sortOrder"), 0, "排序不能为空"));
+        params.put("requiresExtraText", booleanValue(body.get("requiresExtraText")));
+        params.put("status", statusValue(body.get("status"), "enabled"));
+
+        commonOptionMapper.insertAdminOptionValue(params);
+        Map<String, Object> after = requireAdminOptionValue(id);
+        insertAudit("option", id, "cupid.option.create", staffUserId, null, after, null);
+        return after;
+    }
+
+    @Override
+    public void updateAdminOptionValue(String id, Map<String, Object> body, String staffUserId)
+    {
+        Map<String, Object> before = requireAdminOptionValue(id);
+        Map<String, Object> params = new HashMap<>();
+        params.put("id", id);
+        copyText(body, params, "labelZh");
+        copyText(body, params, "labelFr");
+        copyText(body, params, "labelEn");
+        copyInteger(body, params, "sortOrder");
+        copyBoolean(body, params, "requiresExtraText");
+        copyStatus(body, params);
+
+        if (params.size() == 1)
+        {
+            throw new ServiceException("没有需要修改的选项字段");
+        }
+
+        commonOptionMapper.updateAdminOptionValue(params);
+        Map<String, Object> after = requireAdminOptionValue(id);
+        insertAudit("option", id, "cupid.option.update", staffUserId, before, after, null);
+    }
+
+    private Map<String, Object> requireAdminOptionValue(String id)
+    {
+        if (!StringUtils.hasText(id))
+        {
+            throw new ServiceException("选项不存在");
+        }
+        Map<String, Object> option = commonOptionMapper.selectAdminOptionValueById(id);
+        if (option == null)
+        {
+            throw new ServiceException("选项不存在");
+        }
+        return option;
+    }
+
+    private String requireText(Map<String, Object> source, String key, String message)
+    {
+        Object value = source == null ? null : source.get(key);
+        if (value == null || !StringUtils.hasText(String.valueOf(value)))
+        {
+            throw new ServiceException(message);
+        }
+        return String.valueOf(value).trim();
+    }
+
+    private void copyText(Map<String, Object> source, Map<String, Object> target, String key)
+    {
+        if (!source.containsKey(key))
+        {
+            return;
+        }
+        Object value = source.get(key);
+        if (value == null || !StringUtils.hasText(String.valueOf(value)))
+        {
+            throw new ServiceException("选项标签不能为空");
+        }
+        target.put(key, String.valueOf(value).trim());
+    }
+
+    private void copyInteger(Map<String, Object> source, Map<String, Object> target, String key)
+    {
+        if (!source.containsKey(key))
+        {
+            return;
+        }
+        Object value = source.get(key);
+        if (value == null)
+        {
+            throw new ServiceException("排序不能为空");
+        }
+        target.put(key, integerValue(value, null, "排序不能为空"));
+    }
+
+    private void copyBoolean(Map<String, Object> source, Map<String, Object> target, String key)
+    {
+        if (!source.containsKey(key))
+        {
+            return;
+        }
+        Object value = source.get(key);
+        target.put(key, booleanValue(value));
+    }
+
+    private void copyStatus(Map<String, Object> source, Map<String, Object> target)
+    {
+        if (!source.containsKey("status"))
+        {
+            return;
+        }
+        target.put("status", statusValue(source.get("status"), null));
+    }
+
+    private Integer integerValue(Object value, Integer defaultValue, String message)
+    {
+        if (value == null || !StringUtils.hasText(String.valueOf(value)))
+        {
+            if (defaultValue != null)
+            {
+                return defaultValue;
+            }
+            throw new ServiceException(message);
+        }
+        return Integer.valueOf(String.valueOf(value));
+    }
+
+    private Integer booleanValue(Object value)
+    {
+        return Boolean.parseBoolean(String.valueOf(value)) ? 1 : 0;
+    }
+
+    private String statusValue(Object value, String defaultValue)
+    {
+        String status = value == null || !StringUtils.hasText(String.valueOf(value)) ? defaultValue : String.valueOf(value);
+        if (!OPTION_STATUSES.contains(status))
+        {
+            throw new ServiceException("选项状态不合法");
+        }
+        return status;
+    }
+
+    private void insertAudit(String subjectType, String subjectId, String action, String staffUserId,
+            Map<String, Object> before, Map<String, Object> after, String reason)
+    {
+        commonOptionMapper.insertAdminAuditLog(IdUtils.fastUUID(), "admin", staffUserId, subjectType, subjectId,
+                action, JSON.toJSONString(before), JSON.toJSONString(after), reason);
+    }
+
+    private String currentVersion()
+    {
+        String dynamicVersion = commonOptionMapper.selectOptionsVersion();
+        if (!StringUtils.hasText(dynamicVersion) || "empty".equals(dynamicVersion))
+        {
+            return VERSION;
+        }
+        return VERSION + "-" + dynamicVersion;
+    }
+
+    private Map<String, List<Option>> visibleOptions()
+    {
+        Map<String, List<Option>> options = staticOptionsByExternalGroup();
+        mergeDynamicOptions(options, commonOptionMapper.selectAllOptions(), false);
+        return options;
+    }
+
+    private Map<String, Object> responseGroups(Map<String, List<Option>> source, String locale)
+    {
+        Map<String, Object> groups = new LinkedHashMap<>();
+        for (Map.Entry<String, List<Option>> entry : source.entrySet())
+        {
+            List<Map<String, Object>> options = new ArrayList<>();
+            for (Option option : entry.getValue())
+            {
+                options.add(option.toMap(locale));
+            }
+            groups.put(entry.getKey(), options);
+        }
+        return groups;
+    }
+
+    private Map<String, List<Option>> allLabelOptions()
+    {
+        Map<String, List<Option>> options = staticOptionsByExternalGroup();
+        mergeDynamicOptions(options, commonOptionMapper.selectAllOptions(), true);
+        return options;
+    }
+
+    private Map<String, List<Option>> staticOptionsByExternalGroup()
+    {
+        Map<String, List<Option>> options = new LinkedHashMap<>();
+        for (Map.Entry<String, List<Option>> entry : GROUPS.entrySet())
+        {
+            options.put(externalGroupKey(entry.getKey()), new ArrayList<>(entry.getValue()));
+        }
+        return options;
+    }
+
+    private void mergeDynamicOptions(Map<String, List<Option>> options, List<CupidCommonOptionValue> rows,
+            boolean includeDisabled)
+    {
+        for (CupidCommonOptionValue row : rows)
+        {
+            String groupKey = row.getGroupKey();
+            if (!includeDisabled && "disabled".equals(row.getGroupStatus()))
+            {
+                options.remove(groupKey);
+                continue;
+            }
+
+            List<Option> groupOptions = options.computeIfAbsent(groupKey, key -> new ArrayList<>());
+            removeOption(groupOptions, row.getOptionValue());
+            if (includeDisabled || "enabled".equals(row.getStatus()))
+            {
+                groupOptions.add(option(
+                        row.getOptionValue(),
+                        row.getLabelZh(),
+                        row.getLabelFr(),
+                        row.getLabelEn(),
+                        row.getRequiresExtraText() != null && row.getRequiresExtraText() == 1));
+            }
+        }
+    }
+
+    private void removeOption(List<Option> options, String value)
+    {
+        options.removeIf(option -> option.value().equals(value));
+    }
+
+    private static String externalGroupKey(String group)
+    {
+        if (!StringUtils.hasText(group) || group.contains("."))
+        {
+            return group;
+        }
+        return PROFILE_GROUP_PREFIX + group;
     }
 
     private static void put(String group, Option... options)

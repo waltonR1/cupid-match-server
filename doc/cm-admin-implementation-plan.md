@@ -347,6 +347,7 @@ RuoYi 原生系统功能默认只管理后台账号和后台基础设施。不�
 | 活动运营 | `cupid-event` | `date` | Event、Event Registration |
 | 用户服务 | `cupid-user` | `user` | App User、Inbox |
 | 运营协作 | `cupid-operations` | `clipboard` | Staff Task、Audit Log |
+| 配置中心 | `cupid-config` | `dict` | Common Options |
 
 一级目录统一配置：
 
@@ -379,6 +380,7 @@ perms = ''
 | 系统通知 | 用户服务 | `inbox` | `cupid/inbox/index` | `cupid:inbox:list` |
 | Staff Task | 运营协作 | `task` | `cupid/staff-task/index` | `cupid:staffTask:list` |
 | 业务审计 | 运营协作 | `audit` | `cupid/audit/index` | `cupid:audit:list` |
+| 通用选项 | 配置中心 | `options` | `cupid/options/index` | `cupid:options:list` |
 
 页面菜单统一配置：
 
@@ -406,6 +408,7 @@ query = ''
 - `CupidInbox`
 - `CupidStaffTask`
 - `CupidAudit`
+- `CupidOptions`
 
 ### 6.3 按钮权限
 
@@ -421,6 +424,7 @@ query = ''
 | Inbox | `cupid:inbox:query`、`cupid:inbox:notify` |
 | Staff Task | `cupid:staffTask:query`、`cupid:staffTask:add`、`cupid:staffTask:edit` |
 | Audit | `cupid:audit:query` |
+| Options | `cupid:options:query`、`cupid:options:edit` |
 
 规则：
 
