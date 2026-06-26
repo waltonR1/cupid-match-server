@@ -1068,6 +1068,14 @@ Phase 8.2.3 位于 Phase 8.2.2 和 Phase 8.2.4 之间。它不阻塞认证审核
 
 ### 11.3 Phase 8.3：Private Introduction
 
+定位：
+
+- 后台不代表用户确认关系，只处理平台是否受理私人介绍服务。
+- `requested` 表示用户已申请、等待平台受理。
+- `accepted` 表示平台已受理，服务开始；不是双方确认。
+- `declined` 表示平台暂不受理，可按规则进入 cooldown。
+- 后续如改为用户确认、staff 确认或自动化受理，可在 `requested -> accepted/declined` 之间扩展，不推翻现有表结构。
+
 页面：
 
 - `src/views/cupid/introduction/index.vue`
@@ -1078,14 +1086,17 @@ API：
 - `GET /cupid/introduction/{id}`
 - `POST /cupid/introduction/{id}/accept`
 - `POST /cupid/introduction/{id}/decline`
+- `POST /cupid/introduction/{id}/note`
 
 要求：
 
-- 可按状态、申请时间、申请人和目标 Profile 筛选。
-- 只允许处理 `requested`。
+- 可按状态、申请时间、申请人、目标 Profile 和负责人员筛选。
+- accept/decline 只允许处理 `requested`，语义为平台受理/暂不受理。
 - 使用数据库锁防止重复处理。
-- 拒绝时按现有规则设置 cooldown。
+- 拒绝时按现有规则设置 cooldown，并记录原因。
 - 状态、时间、cooldown、Inbox 通知和审计保持事务一致。
+- 后台支持只读观察和内部跟进备注；备注不改变申请状态。
+- 后续可接自动化任务：规则检查通过自动受理，异常进入人工处理。
 
 ### 11.4 Phase 8.4：Event 与 Registration
 

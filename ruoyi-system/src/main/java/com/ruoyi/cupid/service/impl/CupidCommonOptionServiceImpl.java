@@ -112,8 +112,8 @@ public class CupidCommonOptionServiceImpl implements ICupidCommonOptionService
                 option("attended", "已参加", "Participe", "Attended", false));
         put("introduction.status",
                 option("requested", "已申请", "Demande", "Requested", false),
-                option("accepted", "已接受", "Accepte", "Accepted", false),
-                option("declined", "已婉拒", "Refuse", "Declined", false),
+                option("accepted", "平台已受理", "Accepte par la plateforme", "Accepted by platform", false),
+                option("declined", "平台暂不受理", "Refuse par la plateforme", "Declined by platform", false),
                 option("cancelled", "已取消", "Annule", "Cancelled", false),
                 option("expired", "已过期", "Expire", "Expired", false),
                 option("cooldown", "冷却中", "Attente", "Cooldown", false));
@@ -143,7 +143,7 @@ public class CupidCommonOptionServiceImpl implements ICupidCommonOptionService
         put("relationship.contactReason",
                 option("not_found", "未找到该申请", "Demande introuvable", "Request not found", false),
                 option("forbidden", "无权查看", "Acces refuse", "Access denied", false),
-                option("not_accepted", "对方尚未接受申请", "Pas encore accepte", "Not yet accepted", false),
+                option("not_accepted", "平台尚未受理申请", "Pas encore accepte par la plateforme", "Not yet accepted by the platform", false),
                 option("contact_unavailable", "对方未填写联系方式", "Aucun contact enregistre", "No contact info on file", false),
                 option("visibility_restricted", "对方设置了联系方式不可见", "Contact en prive", "Contact is set to private", false));
         put("event.addressLockReason",
