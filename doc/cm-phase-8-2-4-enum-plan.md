@@ -689,8 +689,8 @@ GET /api/common/options?version={clientVersion}
 4. 已完成：建立后台管理页，只开放“优先进入动态管理”的 group，支持中/法/英 label、排序、启停、requiresExtraText。
 5. 已完成：建立修改审计，新增、修改、启停 options 写入业务审计日志；删除暂不开放。
 6. 已完成：`/api/common/options` 同时返回 `groups` 和 `labelGroups`；`groups` 只用于选择器，停用值会被移除，`labelGroups` 用于历史数据回显，停用值仍能显示 label。
-7. 待执行：补全动态 group 的初始化数据，尤其是语言、国家、城市等长列表。
-8. 待执行：校验 C 端和 Admin，确认动态 group 的新增、停用、排序、多语言切换都能正常回显。
+7. 已完成：补全 dynamic group 初始化数据；`cm_seed.sql` 已覆盖当前动态管理的 24 个 group，并与后端 common options 常量保持一致。
+8. 已完成：已手工校验 C 端和 Admin，确认动态 group 的新增、停用、排序、多语言切换可正常回显。
 
 ## 非目标
 
