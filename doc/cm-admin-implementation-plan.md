@@ -1107,27 +1107,170 @@ API：
 
 ### 11.4 Phase 8.4：Event 与 Registration
 
-页面：
+#### Domain
+
+建立 `CupidEventRegistration`，不再用 `Map<String, Object>` 承担后台状态实体。
+
+`CupidEventRegistration` 字段（映射 `cm_event_registrations`）：
+
+| Java 字段 | 列 | 说明 |
+| --- | --- | --- |
+| `id` | `id` | UUID |
+| `userId` | `user_id` | 用户ID |
+| `eventId` | `event_id` | 活动ID |
+| `status` | `status` | requested / confirmed / declined / waitlist / cancelled / attended |
+| `requestedAt` | `requested_at` | 申请时间 |
+| `confirmedAt` | `confirmed_at` | 确认时间 |
+| `declinedAt` | `declined_at` | 拒绝时间 |
+| `waitlistedAt` | `waitlisted_at` | 候补时间 |
+| `cancelledAt` | `cancelled_at` | 取消时间 |
+| `attendedAt` | `attended_at` | 参加时间 |
+| `eventQuotaConsumedAt` | `event_quota_consumed_at` | 权益扣减时间 |
+| `eventQuotaReleasedAt` | `event_quota_released_at` | 权益释放时间 |
+| `createdAt` | `created_at` | 创建时间 |
+| `updatedAt` | `updated_at` | 更新时间 |
+
+#### 状态机
+
+Event：
+
+```
+draft → open → waitlist → closed → completed
+        ↘ closed
+        ↘ completed
+```
+
+- Event 状态只使用 `draft`、`open`、`waitlist`、`closed`、`completed`。
+- `member` 不是 Event 状态，会员专属来自 `visibility = member`。
+- 8.4 只允许 Admin 手动变更 Event 状态，不做活动内容编辑。
+- `draft` 可切 `open` 或 `closed`。
+- `open` 可切 `waitlist`（转入候补）、`closed`（停止报名）或 `completed`（活动结束）。
+- `waitlist` 可切 `closed` 或 `completed`。
+- `closed` 可切 `open`（重新开放）或 `completed`。
+- `completed` 为终态，8.4 不允许再切回其他状态。
+
+Registration（Admin 操作范围，不覆盖 C 端自助取消）：
+
+```
+requested → confirmed
+          → waitlist
+          → declined
+```
+
+- 8.4 Admin 只处理 `requested`，不能处理 `confirmed`、`waitlist`、`declined`、`cancelled` 或 `attended`。
+- `confirmed` 扣减会员活动额度并占用名额。
+- `waitlist` 不扣减额度，不占用 confirmed 名额。
+- `declined` 不扣减额度，但记录处理时间。
+- `waitlist → confirmed`、`confirmed → attended`、`confirmed → declined` 等后续状态变更不在 8.4 实现。
+
+#### 页面
 
 - `src/views/cupid/event/index.vue`
 - `src/views/cupid/event-registration/index.vue`
 
-API：
+#### Event 管理页
 
-| 模块 | 接口 |
+列表筛选：活动 slug、状态、城市、活动日期范围、排序（日期/创建时间）。
+
+列表列：
+
+| 列 | 说明 |
 | --- | --- |
-| Event | `GET /cupid/event/list`、`GET /cupid/event/{id}`、`POST /cupid/event/{id}/status` |
-| Registration | `GET /cupid/eventRegistration/list`、`GET /cupid/eventRegistration/{id}`、`POST /cupid/eventRegistration/{id}/review` |
+| 活动 | 标题 + slug（小字） |
+| 状态 | `labelOf(eventStatuses, ...)` |
+| 可见范围 | `labelOf(eventVisibilityOptions, ...)` |
+| 城市 | `optionLabel('profile.city', ...)` |
+| 日期 | eventDate |
+| 时段 | startTime – endTime |
+| 容量 | occupiedCount / capacity（confirmed + attended） |
+| 操作 | 详情按钮 + 状态变更按钮 |
 
-要求：
+详情抽屉：活动基本信息（标题、slug、状态、可见范围、日期、时间、城市、容量）、多语言描述、agenda items、报名统计（confirmed/attended/waitlist 数量）。
 
-- 建立 `CupidEventRegistration`，不再用 `Map<String, Object>` 承担后台状态实体。
-- Registration 可处理 `confirmed`、`waitlist` 和 `declined`。
-- 确认时锁定 Event 与 Registration。
-- 同一事务内检查容量并原子扣减活动权益。
-- 余额不足或容量不足时整体失败。
-- 禁止超卖和重复扣减。
-- 状态回滚按现有规则返还权益。
+状态变更弹窗：选择目标状态，填写原因。变更写入 `cm_audit_logs`。8.4 不提供活动标题、描述、议程、图片、城市、时间、容量的编辑能力。
+
+#### Registration 管理页
+
+列表筛选：活动 slug、用户名称/ID、状态、申请时间范围。
+
+列表列：
+
+| 列 | 说明 |
+| --- | --- |
+| 活动 | 活动标题 + slug |
+| 用户 | 账户名称 + userId |
+| 状态 | `labelOf(eventRegStatuses, ...)` |
+| 申请时间 | requestedAt |
+| 处理时间 | confirmedAt / declinedAt / waitlistedAt |
+| 操作 | 详情 + 处理按钮（仅 requested 状态） |
+
+详情抽屉：报名信息（活动、用户、状态、时间戳）、用户简要资料。默认不展示联系方式。
+
+处理弹窗：选择 confirm / waitlist / decline，填写原因。
+
+#### API
+
+| 模块 | 方法 | 路径 | 权限 | 说明 |
+| --- | --- | --- | --- | --- |
+| Event | `GET` | `/cupid/event/list` | `cupid:event:list` | 列表，可按 slug/status/city/dateRange 筛选 |
+| Event | `GET` | `/cupid/event/{id}` | `cupid:event:query` | 详情，含多语言字段和报名统计 |
+| Event | `POST` | `/cupid/event/{id}/status` | `cupid:event:changeStatus` | 变更活动状态，body: `{ status, reason }` |
+| Registration | `GET` | `/cupid/eventRegistration/list` | `cupid:eventRegistration:list` | 列表，可按 eventSlug/userId/status/dateRange 筛选 |
+| Registration | `GET` | `/cupid/eventRegistration/{id}` | `cupid:eventRegistration:query` | 详情，含活动摘要和用户信息 |
+| Registration | `POST` | `/cupid/eventRegistration/{id}/review` | `cupid:eventRegistration:review` | 处理报名，body: `{ action: confirm\|waitlist\|decline, reason }` |
+
+8.4 不新增联系方式查看接口。若后续需要在报名详情查看用户联系方式，必须单独增加权限字符，例如 `cupid:eventRegistration:contact`。
+
+#### 通用选项
+
+- `event.status` 必须包含 `draft`、`open`、`waitlist`、`closed`、`completed`。
+- 新增 `event.visibility`，包含 `public`、`registered`、`member`。
+- `event.registrationStatus` 使用 `requested`、`confirmed`、`waitlist`、`declined`、`cancelled`、`attended`。
+- Admin 前端不得维护本地状态文案，全部通过 common options 渲染。
+
+#### 业务规则
+
+**确认（confirm）**：
+
+1. 锁定 Registration（`SELECT ... FOR UPDATE`）并校验状态为 `requested`。
+2. 锁定 Event（`SELECT ... FOR UPDATE`）。
+3. 检查 `occupiedCount < capacity`，其中 `occupiedCount = confirmed + attended`，不足则整体失败。
+4. 若 `consumesMembershipQuota = true`，检查用户活动额度余额，不足则整体失败。
+5. 原子扣减活动额度（`cm_user_entitlement_balances.quota_remaining`，仅针对 `event_registration` 类型），更新条件必须保证余额大于 0。
+6. 更新 Registration 必须带 `where id = ? and status = 'requested' and event_quota_consumed_at is null`，避免重复确认和重复扣减。
+7. 写入 `confirmed_at` 和 `event_quota_consumed_at`。
+8. 写入 `cm_audit_logs`。
+
+**候补（waitlist）**：
+
+1. 锁定 Registration 并校验 `requested`。
+2. 不扣额度，写入 `waitlisted_at`。
+3. 写入 `cm_audit_logs`。
+
+**拒绝（decline）**：
+
+1. 锁定 Registration 并校验 `requested`。
+2. 不扣额度，写入 `declined_at`。
+3. 写入 `cm_audit_logs`。
+
+**状态回滚**（后续 Admin 操作需要时实现）：`confirmed → declined` 需释放已占名额和已扣额度。8.4 不做 waitlist→confirmed 的升级操作（由 C 端或后续 phase 处理）。
+
+**禁止超卖**：所有容量检查必须在同一事务内、`FOR UPDATE` 锁保护下完成。容量统计口径统一为 `confirmed + attended` 占用名额，`waitlist` 不占用名额。
+
+**Event 状态变更**：
+
+- 只允许按本节状态机变更状态。
+- `closed` 不影响已确认的报名。
+- `completed` 为终态，不允许再切回 `open`、`waitlist` 或 `closed`。
+- 所有状态变更写入 `cm_audit_logs`。
+
+#### 权限字符
+
+- `cupid:event:list` / `cupid:event:query` / `cupid:event:changeStatus`
+- `cupid:eventRegistration:list` / `cupid:eventRegistration:query` / `cupid:eventRegistration:review`
+- `cupid:eventRegistration:contact`：8.4 预留，不实现；后续若需要查看联系方式再启用。
+
+角色授权：`cupid_event_manager` 拥有全部 event 和 registration 权限；`cupid_admin` 默认全有。
 
 ### 11.5 Phase 8.5：Inbox 通知
 
