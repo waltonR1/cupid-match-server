@@ -93,7 +93,7 @@
             #{eid}
         </foreach>
           and status = 'ready' and trim(value) != ''
-          and field_name in ('title','summary','city','venue','address','format','audience','curator_note')
+          and field_name in ('title','summary','venue','address','format','audience','curator_note')
         order by event_id, field_name,
                  case locale when #{locale} then 0 when 'zh' then 1 when 'en' then 2 else 3 end
     </select>
