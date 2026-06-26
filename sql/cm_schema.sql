@@ -1055,7 +1055,7 @@ create table cm_events (
 create table cm_event_localized_fields (
   id                 varchar(36) not null comment '活动多语言字段ID',
   event_id           varchar(36) not null comment '活动ID，关联 cm_events.id',
-  field_name         varchar(60) not null comment '字段名称；可选值：title, summary, city, venue, address, format, audience, curator_note',
+  field_name         varchar(60) not null comment '字段名称；可选值：title, summary, venue, address, format, audience, curator_note',
   locale             varchar(8)  not null comment '语言；可选值：zh, fr, en',
   value              text        not null comment '值',
   source             varchar(20) not null default 'manual' comment '来源；可选值：manual, machine',

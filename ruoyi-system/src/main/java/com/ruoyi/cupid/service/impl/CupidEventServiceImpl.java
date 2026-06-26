@@ -21,6 +21,7 @@ import com.ruoyi.cupid.domain.CupidUserMembership;
 import com.ruoyi.cupid.mapper.CupidAuthMapper;
 import com.ruoyi.cupid.mapper.CupidEventMapper;
 import com.ruoyi.cupid.mapper.CupidMembershipMapper;
+import com.ruoyi.cupid.service.ICupidCommonOptionService;
 import com.ruoyi.cupid.service.ICupidEventService;
 
 /**
@@ -41,6 +42,9 @@ public class CupidEventServiceImpl implements ICupidEventService
 
     @Autowired
     private CupidMembershipMapper membershipMapper;
+
+    @Autowired
+    private ICupidCommonOptionService commonOptionService;
 
     @Override
     public Map<String, Object> getEvents(Map<String, String> params, String userId)
@@ -272,6 +276,7 @@ public class CupidEventServiceImpl implements ICupidEventService
         {
             applyLocalizedFields(event,
                     localized.getOrDefault(event.getId(), Map.of()));
+            event.setCity(commonOptionService.label("city", event.getCityCode(), locale));
             applyCounts(event, counts.getOrDefault(event.getId(), Map.of()));
             event.setRelationshipFocus(
                     focuses.getOrDefault(event.getId(), List.of()));
@@ -334,7 +339,6 @@ public class CupidEventServiceImpl implements ICupidEventService
     {
         event.setTitle(valueOrEmpty(fields.get("title")));
         event.setSummary(valueOrEmpty(fields.get("summary")));
-        event.setCity(valueOrDefault(fields.get("city"), event.getCityCode()));
         event.setVenue(valueOrEmpty(fields.get("venue")));
         event.setAddress(valueOrEmpty(fields.get("address")));
         event.setFormat(valueOrEmpty(fields.get("format")));

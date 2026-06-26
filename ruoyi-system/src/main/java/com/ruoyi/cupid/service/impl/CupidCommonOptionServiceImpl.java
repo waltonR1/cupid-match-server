@@ -103,6 +103,9 @@ public class CupidCommonOptionServiceImpl implements ICupidCommonOptionService
                 option("closed", "已关闭", "Ferme", "Closed", false),
                 option("completed", "已结束", "Termine", "Completed", false),
                 option("member", "会员专属", "Membres", "Members only", false));
+        put("event.addressVisibility",
+                option("registered_only", "报名后可见", "Visible apres inscription", "Visible after registration", false),
+                option("confirmed_attendee_only", "确认参加后可见", "Visible apres confirmation", "Visible after confirmation", false));
         put("event.registrationStatus",
                 option("requested", "待确认", "En attente", "Pending", false),
                 option("confirmed", "已确认", "Confirme", "Confirmed", false),
