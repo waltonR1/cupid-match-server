@@ -670,6 +670,167 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         )
     </insert>
 
+    <sql id="adminIntroductionStatusExpr">
+        case
+            when r.status = 'requested' and r.expires_at &lt;= now() then 'expired'
+            when r.status = 'declined' and r.cooldown_until &gt; now() then 'cooldown'
+            else r.status
+        end
+    </sql>
+
+    <sql id="adminIntroductionBaseSelect">
+        select r.id as requestId, r.status as rawStatus,
+               <include refid="adminIntroductionStatusExpr"/> as status,
+               r.message, r.requested_at as requestedAt, r.expires_at as expiresAt,
+               r.responded_at as respondedAt, r.cooldown_until as cooldownUntil,
+               r.entitlement_balance_id as entitlementBalanceId,
+               r.created_at as createdAt, r.updated_at as updatedAt,
+               r.requester_user_id as requesterUserId, ru.account_name as requesterAccountName,
+               r.requester_profile_id as requesterProfileId,
+               (select lf.value from cm_profile_localized_fields lf
+                where lf.profile_id = r.requester_profile_id and lf.field_name = 'profile_name' and lf.locale = 'zh'
+                limit 1) as requesterProfileName,
+               r.target_profile_id as targetProfileId,
+               tp.profile_type as targetProfileType, tp.profile_status as targetProfileStatus,
+               tp.gender as targetGender, tp.birth_year as targetBirthYear,
+               tp.city_code as targetCityCode,
+               (select lf.value from cm_profile_localized_fields lf
+                where lf.profile_id = tp.id and lf.field_name = 'profile_name' and lf.locale = 'zh'
+                limit 1) as targetProfileName,
+               (select lf.value from cm_profile_localized_fields lf
+                where lf.profile_id = tp.id and lf.field_name = 'city' and lf.locale = 'zh'
+                limit 1) as targetCityLabel,
+               (select lf.value from cm_profile_localized_fields lf
+                where lf.profile_id = tp.id and lf.field_name = 'industry' and lf.locale = 'zh'
+                limit 1) as targetIndustryLabel,
+               (select lf.value from cm_profile_localized_fields lf
+                where lf.profile_id = tp.id and lf.field_name = 'summary' and lf.locale = 'zh'
+                limit 1) as targetSummary,
+               (select al.actor_user_id from cm_audit_logs al
+                where al.subject_type = 'private_introduction_request'
+                  and al.subject_id = r.id
+                  and al.action in ('cupid.introduction.accept', 'cupid.introduction.decline')
+                order by al.created_at desc limit 1) as handledByUserId,
+               (select al.created_at from cm_audit_logs al
+                where al.subject_type = 'private_introduction_request'
+                  and al.subject_id = r.id
+                  and al.action in ('cupid.introduction.accept', 'cupid.introduction.decline')
+                order by al.created_at desc limit 1) as handledAt,
+               (select al.reason from cm_audit_logs al
+                where al.subject_type = 'private_introduction_request'
+                  and al.subject_id = r.id
+                  and al.action in ('cupid.introduction.accept', 'cupid.introduction.decline')
+                order by al.created_at desc limit 1) as handledReason
+        from cm_private_introduction_requests r
+        left join cm_users ru on ru.id = r.requester_user_id
+        left join cm_profiles tp on tp.id = r.target_profile_id
+    </sql>
+
+    <select id="selectAdminIntroductionList" parameterType="map" resultType="map">
+        <include refid="adminIntroductionBaseSelect"/>
+        where 1 = 1
+        <if test="requestId != null and requestId != ''">
+            and r.id like concat('%', #{requestId}, '%')
+        </if>
+        <if test="requesterUserId != null and requesterUserId != ''">
+            and r.requester_user_id like concat('%', #{requesterUserId}, '%')
+        </if>
+        <if test="requesterKeyword != null and requesterKeyword != ''">
+            and ru.account_name like concat('%', #{requesterKeyword}, '%')
+        </if>
+        <if test="targetProfileId != null and targetProfileId != ''">
+            and r.target_profile_id like concat('%', #{targetProfileId}, '%')
+        </if>
+        <if test="targetKeyword != null and targetKeyword != ''">
+            and exists (
+                select 1 from cm_profile_localized_fields lf
+                where lf.profile_id = r.target_profile_id
+                  and lf.field_name = 'profile_name'
+                  and lf.value like concat('%', #{targetKeyword}, '%')
+            )
+        </if>
+        <if test="status != null and status != ''">
+            and <include refid="adminIntroductionStatusExpr"/> = #{status}
+        </if>
+        <if test="beginTime != null and beginTime != ''">
+            and r.requested_at &gt;= concat(#{beginTime}, ' 00:00:00')
+        </if>
+        <if test="endTime != null and endTime != ''">
+            and r.requested_at &lt;= concat(#{endTime}, ' 23:59:59')
+        </if>
+        <choose>
+            <when test="sortBy == 'requestedDesc'">order by r.requested_at desc</when>
+            <when test="sortBy == 'updatedDesc'">order by r.updated_at desc</when>
+            <when test="sortBy == 'targetProfileNameAsc'">order by targetProfileName asc, r.requested_at desc</when>
+            <when test="sortBy == 'requesterNameAsc'">order by requesterAccountName asc, r.requested_at desc</when>
+            <otherwise>
+                order by case (<include refid="adminIntroductionStatusExpr"/>)
+                             when 'requested' then 0
+                             when 'accepted' then 1
+                             when 'cooldown' then 2
+                             when 'declined' then 3
+                             when 'expired' then 4
+                             else 9
+                         end,
+                         r.requested_at desc
+            </otherwise>
+        </choose>
+    </select>
+
+    <select id="selectAdminIntroductionDetail" resultType="map">
+        <include refid="adminIntroductionBaseSelect"/>
+        where r.id = #{requestId}
+        limit 1
+    </select>
+
+    <select id="selectAdminIntroductionForUpdate" resultType="map">
+        select r.id as requestId, r.status as rawStatus, r.expires_at as expiresAt,
+               r.entitlement_balance_id as entitlementBalanceId
+        from cm_private_introduction_requests r
+        where r.id = #{requestId}
+        limit 1 for update
+    </select>
+
+    <select id="selectAdminIntroductionAuditLogs" resultType="map">
+        select al.id, al.actor_type as actorType, al.actor_user_id as actorUserId,
+               su.nick_name as actorName, al.action, al.reason, al.created_at as createdAt
+        from cm_audit_logs al
+        left join sys_user su on cast(su.user_id as char) = al.actor_user_id
+        where al.subject_type = 'private_introduction_request'
+          and al.subject_id = #{requestId}
+        order by al.created_at desc
+    </select>
+
+    <update id="updateAdminIntroductionAccepted">
+        update cm_private_introduction_requests
+        set status = 'accepted',
+            responded_at = now(),
+            cooldown_until = null,
+            updated_at = now()
+        where id = #{requestId}
+          and status = 'requested'
+          and (expires_at is null or expires_at &gt; now())
+    </update>
+
+    <update id="updateAdminIntroductionDeclined">
+        update cm_private_introduction_requests
+        set status = 'declined',
+            responded_at = now(),
+            cooldown_until = #{cooldownUntil},
+            updated_at = now()
+        where id = #{requestId}
+          and status = 'requested'
+          and (expires_at is null or expires_at &gt; now())
+    </update>
+
+    <update id="restoreIntroductionEntitlement">
+        update cm_user_entitlement_balances
+        set quota_used = greatest(quota_used - 1, 0),
+            quota_remaining = least(quota_remaining + 1, quota_total),
+            updated_at = now()
+        where id = #{balanceId}
+    </update>
+
     <sql id="selfProfileWhere">
         p.profile_status in ('open', 'review')
         and p.archived_at is null

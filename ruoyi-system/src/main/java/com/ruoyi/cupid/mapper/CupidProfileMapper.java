@@ -72,6 +72,21 @@ public interface CupidProfileMapper
             @Param("afterData") String afterData,
             @Param("reason") String reason);
 
+    List<Map<String, Object>> selectAdminIntroductionList(Map<String, Object> params);
+
+    Map<String, Object> selectAdminIntroductionDetail(@Param("requestId") String requestId);
+
+    Map<String, Object> selectAdminIntroductionForUpdate(@Param("requestId") String requestId);
+
+    List<Map<String, Object>> selectAdminIntroductionAuditLogs(@Param("requestId") String requestId);
+
+    int updateAdminIntroductionAccepted(@Param("requestId") String requestId);
+
+    int updateAdminIntroductionDeclined(@Param("requestId") String requestId,
+            @Param("cooldownUntil") java.util.Date cooldownUntil);
+
+    int restoreIntroductionEntitlement(@Param("balanceId") String balanceId);
+
     List<Map<String, Object>> selectAdminProfileManageList(Map<String, Object> params);
 
     Map<String, Object> selectAdminProfileManageDetail(@Param("profileId") String profileId);

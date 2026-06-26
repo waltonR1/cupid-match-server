@@ -164,6 +164,48 @@ public class CupidAdminReviewController extends BaseController
         return success();
     }
 
+    @PreAuthorize("@ss.hasPermi('cupid:introduction:list')")
+    @GetMapping("/introduction/list")
+    public TableDataInfo introductionList(@RequestParam Map<String, Object> params)
+    {
+        startPage();
+        return getDataTable(reviewService.selectIntroductionList(params));
+    }
+
+    @PreAuthorize("@ss.hasPermi('cupid:introduction:query')")
+    @GetMapping("/introduction/{requestId}")
+    public AjaxResult introductionDetail(@PathVariable String requestId)
+    {
+        return AjaxResult.success(reviewService.selectIntroductionDetail(requestId));
+    }
+
+    @Log(title = "Cupid私人介绍受理", businessType = BusinessType.UPDATE)
+    @PreAuthorize("@ss.hasPermi('cupid:introduction:accept')")
+    @PostMapping("/introduction/{requestId}/accept")
+    public AjaxResult acceptIntroduction(@PathVariable String requestId, @RequestBody Map<String, String> body)
+    {
+        reviewService.acceptIntroduction(requestId, body.get("reason"), String.valueOf(getUserId()));
+        return success();
+    }
+
+    @Log(title = "Cupid私人介绍暂不受理", businessType = BusinessType.UPDATE)
+    @PreAuthorize("@ss.hasPermi('cupid:introduction:decline')")
+    @PostMapping("/introduction/{requestId}/decline")
+    public AjaxResult declineIntroduction(@PathVariable String requestId, @RequestBody Map<String, String> body)
+    {
+        reviewService.declineIntroduction(requestId, body.get("reason"), String.valueOf(getUserId()));
+        return success();
+    }
+
+    @Log(title = "Cupid私人介绍备注", businessType = BusinessType.INSERT)
+    @PreAuthorize("@ss.hasPermi('cupid:introduction:note')")
+    @PostMapping("/introduction/{requestId}/note")
+    public AjaxResult noteIntroduction(@PathVariable String requestId, @RequestBody Map<String, String> body)
+    {
+        reviewService.noteIntroduction(requestId, body.get("note"), String.valueOf(getUserId()));
+        return success();
+    }
+
     private void writeVerificationMaterial(String materialId, HttpServletResponse response, boolean attachment)
             throws IOException
     {

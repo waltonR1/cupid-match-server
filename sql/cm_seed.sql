@@ -615,8 +615,8 @@ insert into sys_role (role_name, role_key, role_sort, data_scope, menu_check_str
 select 'Cupid 审计员', 'cupid_auditor', 14, '1', 1, 1, '0', '0', 'admin', sysdate(), 'Cupid 业务审计只读'
 where not exists (select 1 from sys_role where role_key = 'cupid_auditor' and del_flag = '0');
 
-delete from sys_role_menu where menu_id between 2000 and 2059;
-delete from sys_menu where menu_id between 2000 and 2059;
+delete from sys_role_menu where menu_id between 2000 and 2079;
+delete from sys_menu where menu_id between 2000 and 2079;
 
 insert into sys_menu values
 ('2000', '审核中心', '0', '10', 'cupid', null, '', 'Cupid', 1, 0, 'M', '0', '0', '', 'clipboard', 'admin', sysdate(), '', null, 'Cupid 审核中心目录'),
@@ -649,18 +649,24 @@ insert into sys_menu values
 ('2050', '配置中心', '0', '12', 'cupid-config', null, '', 'CupidConfigRoot', 1, 0, 'M', '0', '0', '', 'dict', 'admin', sysdate(), '', null, 'Cupid 配置中心目录'),
 ('2051', '通用选项', '2050', '1', 'options', 'cupid/options/index', '', 'CupidOptions', 1, 0, 'C', '0', '0', 'cupid:options:list', 'dict', 'admin', sysdate(), '', null, 'Cupid 通用选项管理'),
 ('2052', '选项查询', '2051', '1', '', '', '', '', 1, 0, 'F', '0', '0', 'cupid:options:query', '#', 'admin', sysdate(), '', null, ''),
-('2053', '选项编辑', '2051', '2', '', '', '', '', 1, 0, 'F', '0', '0', 'cupid:options:edit', '#', 'admin', sysdate(), '', null, '');
+('2053', '选项编辑', '2051', '2', '', '', '', '', 1, 0, 'F', '0', '0', 'cupid:options:edit', '#', 'admin', sysdate(), '', null, ''),
+('2060', '关系服务', '0', '13', 'relationship-service', null, '', 'CupidRelationshipRoot', 1, 0, 'M', '0', '0', '', 'peoples', 'admin', sysdate(), '', null, 'Cupid 关系服务目录'),
+('2061', '私人介绍', '2060', '1', 'introduction', 'cupid/introduction/index', '', 'CupidIntroduction', 1, 0, 'C', '0', '0', 'cupid:introduction:list', 'peoples', 'admin', sysdate(), '', null, 'Cupid 私人介绍受理页面'),
+('2062', '私人介绍查询', '2061', '1', '', '', '', '', 1, 0, 'F', '0', '0', 'cupid:introduction:query', '#', 'admin', sysdate(), '', null, ''),
+('2063', '私人介绍受理', '2061', '2', '', '', '', '', 1, 0, 'F', '0', '0', 'cupid:introduction:accept', '#', 'admin', sysdate(), '', null, ''),
+('2064', '私人介绍暂不受理', '2061', '3', '', '', '', '', 1, 0, 'F', '0', '0', 'cupid:introduction:decline', '#', 'admin', sysdate(), '', null, ''),
+('2065', '私人介绍备注', '2061', '4', '', '', '', '', 1, 0, 'F', '0', '0', 'cupid:introduction:note', '#', 'admin', sysdate(), '', null, '');
 
 insert into sys_role_menu (role_id, menu_id)
-select r.role_id, m.menu_id from sys_role r join sys_menu m on m.menu_id between 2000 and 2059
+select r.role_id, m.menu_id from sys_role r join sys_menu m on m.menu_id between 2000 and 2079
 where r.role_key = 'cupid_admin' and r.del_flag = '0';
 
 insert into sys_role_menu (role_id, menu_id)
-select r.role_id, m.menu_id from sys_role r join sys_menu m on m.menu_id between 2000 and 2039
+select r.role_id, m.menu_id from sys_role r join sys_menu m on (m.menu_id between 2000 and 2039 or m.menu_id between 2060 and 2065)
 where r.role_key = 'cupid_reviewer' and r.del_flag = '0';
 
 insert into sys_role_menu (role_id, menu_id)
-select r.role_id, m.menu_id from sys_role r join sys_menu m on m.menu_id in (2000, 2010, 2011, 2020, 2021, 2030, 2031, 2032, 2033, 2034, 2035, 2036)
+select r.role_id, m.menu_id from sys_role r join sys_menu m on m.menu_id in (2000, 2010, 2011, 2020, 2021, 2030, 2031, 2032, 2033, 2034, 2035, 2036, 2060, 2061, 2062)
 where r.role_key = 'cupid_auditor' and r.del_flag = '0';
 
 insert into sys_role_menu (role_id, menu_id)
@@ -1165,7 +1171,7 @@ insert into cm_user_memberships (id, user_id, plan_id, tier, status, started_at,
 
 -- 3A.19 cm_user_entitlement_balances
 insert into cm_user_entitlement_balances (id, user_id, membership_id, entitlement_code, period_started_at, period_ends_at, quota_total, quota_used, quota_remaining, created_at, updated_at) values
-  ('202f036e-42b5-506e-9509-1cfb4960555f', 'efdca298-c977-5502-ad2e-8ba480ca1ea3', 'd052548f-34dc-54f9-aab7-6dca95709306', 'private_introduction', '2026-06-01 00:00:00', '2026-06-30 00:00:00', 15, 0, 15, '2026-01-18 00:00:00', '2026-01-18 00:00:00'),
+  ('202f036e-42b5-506e-9509-1cfb4960555f', 'efdca298-c977-5502-ad2e-8ba480ca1ea3', 'd052548f-34dc-54f9-aab7-6dca95709306', 'private_introduction', '2026-06-01 00:00:00', '2026-06-30 00:00:00', 15, 1, 14, '2026-01-18 00:00:00', '2026-01-18 00:00:00'),
   ('6f796142-1339-5002-980e-8a2c61382c4b', 'efdca298-c977-5502-ad2e-8ba480ca1ea3', 'd052548f-34dc-54f9-aab7-6dca95709306', 'event_registration', '2026-01-18 00:00:00', '2026-07-18 00:00:00', 20, 0, 20, '2026-01-18 00:00:00', '2026-01-18 00:00:00');
 
 -- 3A.20 cm_events
@@ -1600,7 +1606,8 @@ insert into cm_profile_verification_materials (
 -- 5F. Extra private introduction requests (varied statuses)
 insert into cm_private_introduction_requests (id, requester_user_id, requester_profile_id, target_profile_id, status, message, requested_at, expires_at, responded_at, cooldown_until, entitlement_balance_id, created_at, updated_at) values
   ('d5000000-0000-4000-8000-000000000001', 'efdca298-c977-5502-ad2e-8ba480ca1ea3', '503a9c99-2842-54db-8858-24fbd3108e3b', '506ce3c7-b236-5b44-b8d0-459c4250ea03', 'declined', '希望可以认识一下。', '2026-05-10 14:00:00', null, '2026-05-12 10:00:00', null, null, '2026-05-10 14:00:00', '2026-05-12 10:00:00'),
-  ('d5000000-0000-4000-8000-000000000002', 'efdca298-c977-5502-ad2e-8ba480ca1ea3', '503a9c99-2842-54db-8858-24fbd3108e3b', 'f82cb5a2-dfc7-5075-9f2a-f72498fc7642', 'cancelled', null, '2026-05-20 09:00:00', null, null, null, null, '2026-05-20 09:00:00', '2026-05-21 18:00:00');
+  ('d5000000-0000-4000-8000-000000000002', 'efdca298-c977-5502-ad2e-8ba480ca1ea3', '503a9c99-2842-54db-8858-24fbd3108e3b', 'f82cb5a2-dfc7-5075-9f2a-f72498fc7642', 'cancelled', null, '2026-05-20 09:00:00', null, null, null, null, '2026-05-20 09:00:00', '2026-05-21 18:00:00'),
+  ('d5000000-0000-4000-8000-000000000003', 'efdca298-c977-5502-ad2e-8ba480ca1ea3', '503a9c99-2842-54db-8858-24fbd3108e3b', 'f82cb5a2-dfc7-5075-9f2a-f72498fc7642', 'requested', '希望平台评估是否适合安排一次私人介绍。', '2026-06-24 09:30:00', '2026-07-01 09:30:00', null, null, '202f036e-42b5-506e-9509-1cfb4960555f', '2026-06-24 09:30:00', '2026-06-24 09:30:00');
 
 -- 5G. Extra inbox threads and messages (system notifications)
 insert into cm_inbox_threads (id, user_id, category, subject_type, subject_id, status, created_at, updated_at) values

@@ -30,4 +30,14 @@ public interface ICupidAdminReviewService
             String scanStatus, String scanMessage, String reviewerUserId);
 
     void resetVerification(String profileId, String materialType, String reason, String reviewerUserId);
+
+    List<Map<String, Object>> selectIntroductionList(Map<String, Object> params);
+
+    Map<String, Object> selectIntroductionDetail(String requestId);
+
+    void acceptIntroduction(String requestId, String reason, String reviewerUserId);
+
+    void declineIntroduction(String requestId, String reason, String reviewerUserId);
+
+    void noteIntroduction(String requestId, String note, String reviewerUserId);
 }

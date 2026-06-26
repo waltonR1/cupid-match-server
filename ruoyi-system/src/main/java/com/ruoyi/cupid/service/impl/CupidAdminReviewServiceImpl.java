@@ -3,6 +3,7 @@ package com.ruoyi.cupid.service.impl;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.time.temporal.ChronoUnit;
 import com.alibaba.fastjson2.JSON;
 import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.utils.uuid.IdUtils;
@@ -23,6 +24,8 @@ public class CupidAdminReviewServiceImpl implements ICupidAdminReviewService
     private static final Set<String> REVIEW_STATUSES = Set.of("approved", "rejected");
 
     private static final Set<String> MATERIAL_TYPES = Set.of("identity", "education", "income", "marital");
+
+    private static final int INTRODUCTION_COOLDOWN_DAYS = 90;
 
     @Autowired
     private CupidProfileMapper profileMapper;
@@ -214,12 +217,93 @@ public class CupidAdminReviewServiceImpl implements ICupidAdminReviewService
                 Map.of("profile", profile, "verification", after), reason);
     }
 
+    @Override
+    public List<Map<String, Object>> selectIntroductionList(Map<String, Object> params)
+    {
+        return profileMapper.selectAdminIntroductionList(params);
+    }
+
+    @Override
+    public Map<String, Object> selectIntroductionDetail(String requestId)
+    {
+        Map<String, Object> detail =
+                require(profileMapper.selectAdminIntroductionDetail(requestId), "私人介绍申请不存在");
+        detail.put("auditLogs", profileMapper.selectAdminIntroductionAuditLogs(requestId));
+        return detail;
+    }
+
+    @Override
+    @Transactional
+    public void acceptIntroduction(String requestId, String reason, String reviewerUserId)
+    {
+        Map<String, Object> before = requirePendingIntroduction(requestId);
+        if (profileMapper.updateAdminIntroductionAccepted(requestId) != 1)
+        {
+            throw new ServiceException("该申请已处理，不能重复操作");
+        }
+        Map<String, Object> after = profileMapper.selectAdminIntroductionDetail(requestId);
+        insertAudit("private_introduction_request", requestId,
+                "cupid.introduction.accept", reviewerUserId, before, after, reason);
+    }
+
+    @Override
+    @Transactional
+    public void declineIntroduction(String requestId, String reason, String reviewerUserId)
+    {
+        if (!hasText(reason))
+        {
+            throw new ServiceException("暂不受理原因不能为空");
+        }
+        Map<String, Object> before = requirePendingIntroduction(requestId);
+        java.util.Date cooldownUntil = java.util.Date.from(
+                java.time.Instant.now().plus(INTRODUCTION_COOLDOWN_DAYS, ChronoUnit.DAYS));
+        if (profileMapper.updateAdminIntroductionDeclined(requestId, cooldownUntil) != 1)
+        {
+            throw new ServiceException("该申请已处理，不能重复操作");
+        }
+        Object balanceId = before.get("entitlementBalanceId");
+        if (balanceId != null && hasText(String.valueOf(balanceId)))
+        {
+            profileMapper.restoreIntroductionEntitlement(String.valueOf(balanceId));
+        }
+        Map<String, Object> after = profileMapper.selectAdminIntroductionDetail(requestId);
+        insertAudit("private_introduction_request", requestId,
+                "cupid.introduction.decline", reviewerUserId, before, after, reason);
+    }
+
+    @Override
+    @Transactional
+    public void noteIntroduction(String requestId, String note, String reviewerUserId)
+    {
+        if (!hasText(note))
+        {
+            throw new ServiceException("备注不能为空");
+        }
+        Map<String, Object> current =
+                require(profileMapper.selectAdminIntroductionDetail(requestId), "私人介绍申请不存在");
+        insertAudit("private_introduction_request", requestId,
+                "cupid.introduction.note", reviewerUserId, current, current, note);
+    }
+
     private void assertReviewStatus(String status)
     {
         if (!REVIEW_STATUSES.contains(status))
         {
             throw new ServiceException("审核状态不正确");
         }
+    }
+
+    private Map<String, Object> requirePendingIntroduction(String requestId)
+    {
+        Map<String, Object> row =
+                require(profileMapper.selectAdminIntroductionForUpdate(requestId), "私人介绍申请不存在");
+        assertCurrentStatus(row, "rawStatus", "requested", "该申请已处理，不能重复操作");
+        Object expiresAt = row.get("expiresAt");
+        if (expiresAt instanceof java.util.Date && !((java.util.Date) expiresAt).after(new java.util.Date()))
+        {
+            throw new ServiceException("该申请已过期，不能继续处理");
+        }
+        return row;
     }
 
     private CupidProfileVerification buildInitialVerification(String profileId)
