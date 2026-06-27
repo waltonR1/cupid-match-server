@@ -664,6 +664,10 @@ public class CupidEventServiceImpl implements ICupidEventService
 
     private String resolveEventStatus(CupidEvent event)
     {
+        if ("hidden".equals(event.getStatus()))
+        {
+            return "hidden";
+        }
         LocalDate eventDate = event.getEventDate().toInstant()
                 .atZone(ZoneId.systemDefault()).toLocalDate();
         if (eventDate.isBefore(LocalDate.now()))

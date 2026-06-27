@@ -24,7 +24,7 @@ import com.ruoyi.cupid.service.ICupidCommonOptionService;
 @Service
 public class CupidCommonOptionServiceImpl implements ICupidCommonOptionService
 {
-    private static final String VERSION = "2026-06-26-common-options-v9";
+    private static final String VERSION = "2026-06-27-common-options-v10";
     private static final String PROFILE_GROUP_PREFIX = "profile.";
     private static final Set<String> OPTION_STATUSES = Set.of("enabled", "disabled");
 
@@ -102,7 +102,8 @@ public class CupidCommonOptionServiceImpl implements ICupidCommonOptionService
                 option("open", "报名中", "Ouvert", "Open", false),
                 option("waitlist", "候补", "Attente", "Waitlist", false),
                 option("closed", "已关闭", "Ferme", "Closed", false),
-                option("completed", "已结束", "Termine", "Completed", false));
+                option("completed", "已结束", "Termine", "Completed", false),
+                option("hidden", "已隐藏", "Masque", "Hidden", false));
         put("event.visibility",
                 option("public", "公开", "Public", "Public", false),
                 option("registered", "已登录可见", "Utilisateurs enregistres", "Registered users", false),

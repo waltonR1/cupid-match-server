@@ -1139,9 +1139,11 @@ Event：
 draft → open → waitlist → closed → completed
         ↘ closed
         ↘ completed
+
+open / waitlist / closed / completed ↔ hidden
 ```
 
-- Event 状态只使用 `draft`、`open`、`waitlist`、`closed`、`completed`。
+- Event 状态只使用 `draft`、`open`、`waitlist`、`closed`、`completed`、`hidden`。
 - `member` 不是 Event 状态，会员专属来自 `visibility = member`。
 - Admin 可以新增活动，并且仅允许编辑 `draft` 活动的内容。
 - 新建和编辑时只允许保存为 `draft` 或 `open`；发布为 `open` 前必须补齐全部必填内容。
@@ -1149,7 +1151,10 @@ draft → open → waitlist → closed → completed
 - `open` 可切 `waitlist`（转入候补）、`closed`（停止报名）或 `completed`（活动结束）。
 - `waitlist` 可切 `closed` 或 `completed`。
 - `closed` 可切 `open`（重新开放）或 `completed`。
-- `completed` 为终态，8.4 不允许再切回其他状态。
+- `open`、`waitlist`、`closed`、`completed` 均可切为 `hidden`，从 C 端公开活动目录下架。
+- `hidden` 可由 Admin 手工恢复为 `open`、`waitlist`、`closed` 或 `completed`，不记录隐藏前状态。
+- 隐藏不修改已有报名、名额、额度和活动内容；直链详情及“我的活动”保持可用。
+- `completed` 不允许恢复为其他生命周期状态，但允许切为 `hidden`。
 
 Registration：
 
@@ -1223,7 +1228,7 @@ Registration：
 
 #### 通用选项
 
-- `event.status` 必须包含 `draft`、`open`、`waitlist`、`closed`、`completed`。
+- `event.status` 必须包含 `draft`、`open`、`waitlist`、`closed`、`completed`、`hidden`。
 - 新增 `event.visibility`，包含 `public`、`registered`、`member`。
 - `event.registrationStatus` 使用 `requested`、`confirmed`、`waitlist`、`declined`、`cancelled`、`attended`。
 - Admin 前端不得维护本地状态文案，全部通过 common options 渲染。
@@ -1246,7 +1251,8 @@ Registration：
 - 只允许按本节状态机变更状态。
 - `draft` 发布为 `open` 时必须再次执行完整字段校验。
 - `closed` 不影响已确认的报名。
-- `completed` 为终态，不允许再切回 `open`、`waitlist` 或 `closed`。
+- `completed` 不允许直接切回 `open`、`waitlist` 或 `closed`，但可因下架切为 `hidden`。
+- `hidden` 仅控制公开目录展示，不改变 Registration 和权益数据。
 - 所有状态变更必须填写原因并写入 `cm_audit_logs`。
 
 #### 权限字符

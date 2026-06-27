@@ -19,11 +19,7 @@
     </resultMap>
 
     <sql id="eventWhere">
-        and e.status != 'draft'
-        <if test="status == null or status == ''">
-            and e.status in ('open', 'waitlist')
-            and e.event_date &gt;= curdate()
-        </if>
+        and e.status not in ('draft', 'hidden')
         <if test="city != null and city != ''">
             and e.city_code = #{city}
         </if>
@@ -60,7 +56,15 @@
         <where>
             <include refid="eventWhere"/>
         </where>
-        order by e.event_date asc, e.start_time asc
+        order by
+            case
+                when e.status in ('open', 'waitlist') and e.event_date &gt;= curdate() then 0
+                when e.event_date &gt;= curdate() then 1
+                else 2
+            end,
+            case when e.event_date &gt;= curdate() then e.event_date end asc,
+            case when e.event_date &lt; curdate() then e.event_date end desc,
+            e.start_time asc
         limit #{offset}, #{limit}
     </select>
 

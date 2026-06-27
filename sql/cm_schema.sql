@@ -1034,7 +1034,7 @@ create table cm_user_entitlement_balances (
 
 create table cm_events (
   id                    varchar(36)  not null comment '活动ID',
-  status                varchar(20)  not null comment '活动状态；可选值：draft, open, waitlist, closed, completed',
+  status                varchar(20)  not null comment '活动状态；可选值：draft, open, waitlist, closed, completed, hidden',
   visibility            varchar(20)  not null comment '可见范围；可选值：public, registered, member',
   consumes_membership_quota tinyint(1) not null default 0 comment '是否消耗会员活动权益',
   city_code             varchar(80)  not null comment '城市代码',

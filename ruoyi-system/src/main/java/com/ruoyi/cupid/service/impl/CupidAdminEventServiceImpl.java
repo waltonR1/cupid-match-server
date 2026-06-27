@@ -26,7 +26,7 @@ import com.ruoyi.cupid.service.ICupidAdminEventService;
 public class CupidAdminEventServiceImpl implements ICupidAdminEventService
 {
     private static final Set<String> EVENT_STATUSES =
-            Set.of("draft", "open", "waitlist", "closed", "completed");
+            Set.of("draft", "open", "waitlist", "closed", "completed", "hidden");
 
     private static final Set<String> WRITABLE_EVENT_STATUSES = Set.of("draft", "open");
 
@@ -325,15 +325,23 @@ public class CupidAdminEventServiceImpl implements ICupidAdminEventService
         }
         if ("open".equals(currentStatus))
         {
-            return Set.of("waitlist", "closed", "completed").contains(targetStatus);
+            return Set.of("waitlist", "closed", "completed", "hidden").contains(targetStatus);
         }
         if ("waitlist".equals(currentStatus))
         {
-            return Set.of("closed", "completed").contains(targetStatus);
+            return Set.of("closed", "completed", "hidden").contains(targetStatus);
         }
         if ("closed".equals(currentStatus))
         {
-            return Set.of("open", "completed").contains(targetStatus);
+            return Set.of("open", "completed", "hidden").contains(targetStatus);
+        }
+        if ("completed".equals(currentStatus))
+        {
+            return "hidden".equals(targetStatus);
+        }
+        if ("hidden".equals(currentStatus))
+        {
+            return Set.of("open", "waitlist", "closed", "completed").contains(targetStatus);
         }
         return false;
     }
