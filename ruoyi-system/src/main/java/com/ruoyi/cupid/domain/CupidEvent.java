@@ -9,7 +9,6 @@ import java.util.List;
 public class CupidEvent
 {
     private String id;
-    private String slug;
     private String status;
     private String visibility;
     private boolean consumesMembershipQuota;
@@ -31,7 +30,6 @@ public class CupidEvent
     private String address;
     private String format;
     private String audience;
-    private String curatorNote;
     private List<String> relationshipFocus;
 
     /** service 聚合的报名统计 */
@@ -43,8 +41,6 @@ public class CupidEvent
 
     public String getId() { return id; }
     public void setId(String id) { this.id = id; }
-    public String getSlug() { return slug; }
-    public void setSlug(String slug) { this.slug = slug; }
     public String getStatus() { return status; }
     public void setStatus(String status) { this.status = status; }
     public String getVisibility() { return visibility; }
@@ -83,8 +79,6 @@ public class CupidEvent
     public void setFormat(String format) { this.format = format; }
     public String getAudience() { return audience; }
     public void setAudience(String audience) { this.audience = audience; }
-    public String getCuratorNote() { return curatorNote; }
-    public void setCuratorNote(String curatorNote) { this.curatorNote = curatorNote; }
     public List<String> getRelationshipFocus() { return relationshipFocus; }
     public void setRelationshipFocus(List<String> relationshipFocus) { this.relationshipFocus = relationshipFocus; }
     public int getRegisteredCount() { return registeredCount; }

@@ -4,6 +4,7 @@ import java.util.List;
 import java.util.Map;
 import org.apache.ibatis.annotations.Param;
 import com.ruoyi.cupid.domain.CupidEvent;
+import com.ruoyi.cupid.domain.CupidEventRegistration;
 
 /**
  * Cupid Match 活动数据层
@@ -83,7 +84,7 @@ public interface CupidEventMapper
     /**
      * 将已取消或拒绝的报名重新提交
      */
-    int resubmitRegistration(@Param("id") String id);
+    int resubmitRegistration(@Param("id") String id, @Param("status") String status);
 
     /**
      * 标记报名取消
@@ -96,14 +97,116 @@ public interface CupidEventMapper
     int markQuotaReleased(@Param("id") String id);
 
     /**
-     * 原子返还当前周期活动额度
-     */
-    int releaseEventEntitlement(@Param("userId") String userId,
-            @Param("membershipId") String membershipId);
-
-    /**
      * 查询用户报名列表
      */
     List<CupidEvent> selectUserRegistrations(@Param("userId") String userId,
             @Param("locale") String locale);
+
+    // ---- Admin ----
+
+    List<Map<String, Object>> selectAdminEvents(@Param("params") Map<String, Object> params);
+
+    Map<String, Object> selectAdminEventDetail(@Param("id") String id);
+
+    Map<String, Object> selectAdminEventLocalizedFields(
+            @Param("eventId") String eventId, @Param("locale") String locale);
+
+    List<Map<String, Object>> selectAdminEventAgendaItems(
+            @Param("eventId") String eventId, @Param("locale") String locale);
+
+    List<Map<String, Object>> selectEventNoteItems(
+            @Param("eventId") String eventId, @Param("locale") String locale);
+
+    List<String> selectAdminEventLanguageCodes(@Param("eventId") String eventId);
+
+    List<String> selectAdminEventRelationshipFocuses(
+            @Param("eventId") String eventId, @Param("locale") String locale);
+
+    int insertAdminEvent(@Param("id") String id,
+            @Param("status") String status, @Param("visibility") String visibility,
+            @Param("consumesMembershipQuota") boolean consumesMembershipQuota,
+            @Param("cityCode") String cityCode,
+            @Param("addressVisibility") String addressVisibility,
+            @Param("eventDate") String eventDate, @Param("startTime") String startTime,
+            @Param("endTime") String endTime, @Param("capacity") int capacity,
+            @Param("coverImageUrl") String coverImageUrl);
+
+    int insertAdminEventLocalizedField(@Param("id") String id,
+            @Param("eventId") String eventId, @Param("fieldName") String fieldName,
+            @Param("locale") String locale, @Param("value") String value);
+
+    int upsertAdminEventLocalizedField(@Param("id") String id,
+            @Param("eventId") String eventId, @Param("fieldName") String fieldName,
+            @Param("locale") String locale, @Param("value") String value);
+
+    int updateAdminEvent(@Param("id") String id, @Param("status") String status,
+            @Param("visibility") String visibility,
+            @Param("consumesMembershipQuota") boolean consumesMembershipQuota,
+            @Param("cityCode") String cityCode,
+            @Param("addressVisibility") String addressVisibility,
+            @Param("eventDate") String eventDate, @Param("startTime") String startTime,
+            @Param("endTime") String endTime, @Param("capacity") int capacity,
+            @Param("coverImageUrl") String coverImageUrl);
+
+    int deleteAdminEventLanguageCodes(@Param("eventId") String eventId);
+
+    int insertAdminEventLanguageCode(@Param("eventId") String eventId,
+            @Param("languageCode") String languageCode);
+
+    int deleteAdminEventRelationshipFocuses(@Param("eventId") String eventId);
+
+    int insertAdminEventRelationshipFocus(@Param("id") String id,
+            @Param("eventId") String eventId, @Param("focusOrder") int focusOrder,
+            @Param("locale") String locale, @Param("value") String value);
+
+    int deleteAdminEventAgendaLocalizedFields(@Param("eventId") String eventId);
+
+    int deleteAdminEventAgendaItems(@Param("eventId") String eventId);
+
+    int insertAdminEventAgendaItem(@Param("id") String id,
+            @Param("eventId") String eventId, @Param("agendaTime") String agendaTime,
+            @Param("sortOrder") int sortOrder);
+
+    int insertAdminEventAgendaLocalizedField(@Param("id") String id,
+            @Param("agendaItemId") String agendaItemId,
+            @Param("fieldName") String fieldName,
+            @Param("locale") String locale, @Param("value") String value);
+
+    int deleteAdminEventNoteLocalizedFields(@Param("eventId") String eventId);
+
+    int deleteAdminEventNoteItems(@Param("eventId") String eventId);
+
+    int insertAdminEventNoteItem(@Param("id") String id,
+            @Param("eventId") String eventId, @Param("sortOrder") int sortOrder);
+
+    int insertAdminEventNoteLocalizedField(@Param("id") String id,
+            @Param("noteItemId") String noteItemId,
+            @Param("fieldName") String fieldName,
+            @Param("locale") String locale, @Param("value") String value);
+
+    int updateAdminEventStatus(@Param("id") String id, @Param("status") String status);
+
+    int countEventOccupied(@Param("eventId") String eventId);
+
+    Map<String, Object> selectAdminEventRegistrationCounts(@Param("eventId") String eventId);
+
+    List<CupidEventRegistration> selectAdminRegistrations(
+            @Param("params") Map<String, Object> params);
+
+    Map<String, Object> selectAdminRegistrationById(@Param("id") String id);
+
+    CupidEventRegistration selectAdminRegistrationByIdForUpdate(@Param("id") String id);
+
+    String selectAvailableEventEntitlementBalanceForUpdate(
+            @Param("userId") String userId, @Param("membershipId") String membershipId);
+
+    int consumeEventEntitlementById(@Param("balanceId") String balanceId);
+
+    int releaseEventEntitlementById(@Param("balanceId") String balanceId);
+
+    int updateAdminRegistrationStatus(@Param("id") String id,
+            @Param("status") String status,
+            @Param("entitlementBalanceId") String entitlementBalanceId,
+            @Param("consumeQuota") boolean consumeQuota,
+            @Param("releaseQuota") boolean releaseQuota);
 }

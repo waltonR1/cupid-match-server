@@ -24,7 +24,7 @@ import com.ruoyi.cupid.service.ICupidCommonOptionService;
 @Service
 public class CupidCommonOptionServiceImpl implements ICupidCommonOptionService
 {
-    private static final String VERSION = "2026-06-26-common-options-v8";
+    private static final String VERSION = "2026-06-26-common-options-v9";
     private static final String PROFILE_GROUP_PREFIX = "profile.";
     private static final Set<String> OPTION_STATUSES = Set.of("enabled", "disabled");
 
@@ -98,10 +98,14 @@ public class CupidCommonOptionServiceImpl implements ICupidCommonOptionService
                 option("marketing_emails_enabled", "营销邮件", "Emails marketing", "Marketing emails", false),
                 option("analytics_consent_enabled", "数据分析授权", "Consentement analytique", "Analytics consent", false));
         put("event.status",
+                option("draft", "草稿", "Brouillon", "Draft", false),
                 option("open", "报名中", "Ouvert", "Open", false),
                 option("waitlist", "候补", "Attente", "Waitlist", false),
                 option("closed", "已关闭", "Ferme", "Closed", false),
-                option("completed", "已结束", "Termine", "Completed", false),
+                option("completed", "已结束", "Termine", "Completed", false));
+        put("event.visibility",
+                option("public", "公开", "Public", "Public", false),
+                option("registered", "已登录可见", "Utilisateurs enregistres", "Registered users", false),
                 option("member", "会员专属", "Membres", "Members only", false));
         put("event.addressVisibility",
                 option("registered_only", "报名后可见", "Visible apres inscription", "Visible after registration", false),

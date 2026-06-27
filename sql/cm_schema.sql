@@ -10,7 +10,7 @@
 -- 3. 多语言展示内容使用对应领域的多语言表。
 -- 4. JSON 仅用于法律文档章节、消息操作参数和审计快照。
 -- 5. Cupid Match 实体主键及其引用统一使用 36 字符 UUID。
--- 6. 业务含义放在 tier、slug、type 和 code 等字段中，不写入 ID 前缀。
+-- 6. 业务含义放在 tier、type 和 code 等字段中，不写入 ID 前缀。
 
 -- ----------------------------
 -- 清理所有表（按依赖反向顺序）
@@ -31,6 +31,8 @@ drop table if exists cm_favorite_profiles;
 drop table if exists cm_event_registrations;
 drop table if exists cm_event_language_codes;
 drop table if exists cm_event_relationship_focuses;
+drop table if exists cm_event_note_item_localized_fields;
+drop table if exists cm_event_note_items;
 drop table if exists cm_event_agenda_item_localized_fields;
 drop table if exists cm_event_agenda_items;
 drop table if exists cm_event_localized_fields;
@@ -1032,7 +1034,6 @@ create table cm_user_entitlement_balances (
 
 create table cm_events (
   id                    varchar(36)  not null comment '活动ID',
-  slug                  varchar(120) not null comment '标识',
   status                varchar(20)  not null comment '活动状态；可选值：draft, open, waitlist, closed, completed',
   visibility            varchar(20)  not null comment '可见范围；可选值：public, registered, member',
   consumes_membership_quota tinyint(1) not null default 0 comment '是否消耗会员活动权益',
@@ -1046,7 +1047,6 @@ create table cm_events (
   created_at            datetime     not null default current_timestamp comment '创建时间',
   updated_at            datetime     not null default current_timestamp on update current_timestamp comment '更新时间',
   primary key (id),
-  unique key uk_cm_events_slug (slug),
   key idx_cm_events_status_date (status, event_date),
   key idx_cm_events_city (city_code),
   key idx_cm_events_visibility (visibility)
@@ -1055,7 +1055,7 @@ create table cm_events (
 create table cm_event_localized_fields (
   id                 varchar(36) not null comment '活动多语言字段ID',
   event_id           varchar(36) not null comment '活动ID，关联 cm_events.id',
-  field_name         varchar(60) not null comment '字段名称；可选值：title, summary, venue, address, format, audience, curator_note',
+  field_name         varchar(60) not null comment '字段名称；可选值：title, summary, venue, address, format, audience',
   locale             varchar(8)  not null comment '语言；可选值：zh, fr, en',
   value              text        not null comment '值',
   source             varchar(20) not null default 'manual' comment '来源；可选值：manual, machine',
@@ -1089,6 +1089,32 @@ create table cm_event_language_codes (
   key idx_cm_event_language_codes_language (language_code)
 ) engine=innodb comment='活动语言';
 
+create table cm_event_note_items (
+  id                 varchar(36) not null comment '活动说明项ID',
+  event_id           varchar(36) not null comment '活动ID，关联 cm_events.id',
+  sort_order         int         not null default 0 comment '排序',
+  created_at         datetime    not null default current_timestamp comment '创建时间',
+  updated_at         datetime    not null default current_timestamp on update current_timestamp comment '更新时间',
+  primary key (id),
+  key idx_cm_event_note_event_sort (event_id, sort_order)
+) engine=innodb comment='活动说明项';
+
+create table cm_event_note_item_localized_fields (
+  id                 varchar(36) not null comment '活动说明项多语言字段ID',
+  note_item_id       varchar(36) not null comment '说明项ID，关联 cm_event_note_items.id',
+  field_name         varchar(60) not null comment '字段名称；可选值：title, description',
+  locale             varchar(8)  not null comment '语言；可选值：zh, fr, en',
+  value              text        not null comment '值',
+  source             varchar(20) not null default 'manual' comment '来源；可选值：manual, machine',
+  provider           varchar(30) default null comment '翻译提供方；可选值：human, translation_api',
+  status             varchar(20) not null default 'ready' comment '处理状态；可选值：pending, ready, failed',
+  created_at         datetime    not null default current_timestamp comment '创建时间',
+  updated_at         datetime    not null default current_timestamp on update current_timestamp comment '更新时间',
+  primary key (id),
+  unique key uk_cm_event_note_field_locale (note_item_id, field_name, locale),
+  key idx_cm_event_note_localized_lookup (note_item_id, locale, status)
+) engine=innodb comment='活动说明项多语言字段';
+
 create table cm_event_agenda_items (
   id                 varchar(36) not null comment '活动议程项ID',
   event_id           varchar(36) not null comment '活动ID，关联 cm_events.id',
@@ -1119,6 +1145,7 @@ create table cm_event_registrations (
   id                 varchar(36) not null comment '活动报名ID',
   user_id            varchar(36) not null comment '用户ID，关联 cm_users.id',
   event_id           varchar(36) not null comment '活动ID，关联 cm_events.id',
+  entitlement_balance_id varchar(36) default null comment '实际消费的活动权益余额ID，关联 cm_user_entitlement_balances.id',
   status             varchar(20) not null comment '活动报名状态；可选值：requested, confirmed, declined, waitlist, cancelled, attended',
   requested_at       datetime    not null comment '申请时间',
   confirmed_at       datetime    default null comment '确认时间',

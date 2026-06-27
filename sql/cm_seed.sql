@@ -655,7 +655,16 @@ insert into sys_menu values
 ('2062', '私人介绍查询', '2061', '1', '', '', '', '', 1, 0, 'F', '0', '0', 'cupid:introduction:query', '#', 'admin', sysdate(), '', null, ''),
 ('2063', '私人介绍受理', '2061', '2', '', '', '', '', 1, 0, 'F', '0', '0', 'cupid:introduction:accept', '#', 'admin', sysdate(), '', null, ''),
 ('2064', '私人介绍暂不受理', '2061', '3', '', '', '', '', 1, 0, 'F', '0', '0', 'cupid:introduction:decline', '#', 'admin', sysdate(), '', null, ''),
-('2065', '私人介绍备注', '2061', '4', '', '', '', '', 1, 0, 'F', '0', '0', 'cupid:introduction:note', '#', 'admin', sysdate(), '', null, '');
+('2065', '私人介绍备注', '2061', '4', '', '', '', '', 1, 0, 'F', '0', '0', 'cupid:introduction:note', '#', 'admin', sysdate(), '', null, ''),
+('2070', '活动运营', '0', '14', 'cupid-event', null, '', 'CupidEventRoot', 1, 0, 'M', '0', '0', '', 'date', 'admin', sysdate(), '', null, 'Cupid 活动运营目录'),
+('2071', '活动管理', '2070', '1', 'event', 'cupid/event/index', '', 'CupidEvent', 1, 0, 'C', '0', '0', 'cupid:event:list', 'date', 'admin', sysdate(), '', null, 'Cupid 活动管理页面'),
+('2072', '活动查询', '2071', '1', '', '', '', '', 1, 0, 'F', '0', '0', 'cupid:event:query', '#', 'admin', sysdate(), '', null, ''),
+('2073', '活动状态变更', '2071', '2', '', '', '', '', 1, 0, 'F', '0', '0', 'cupid:event:changeStatus', '#', 'admin', sysdate(), '', null, ''),
+('2074', '报名审核', '2070', '2', 'registration', 'cupid/event-registration/index', '', 'CupidEventRegistration', 1, 0, 'C', '0', '0', 'cupid:eventRegistration:list', 'list', 'admin', sysdate(), '', null, 'Cupid 活动报名审核页面'),
+('2075', '报名查询', '2074', '1', '', '', '', '', 1, 0, 'F', '0', '0', 'cupid:eventRegistration:query', '#', 'admin', sysdate(), '', null, ''),
+('2076', '报名处理', '2074', '2', '', '', '', '', 1, 0, 'F', '0', '0', 'cupid:eventRegistration:review', '#', 'admin', sysdate(), '', null, ''),
+('2077', '活动新增', '2071', '3', '', '', '', '', 1, 0, 'F', '0', '0', 'cupid:event:add', '#', 'admin', sysdate(), '', null, ''),
+('2078', '活动编辑', '2071', '4', '', '', '', '', 1, 0, 'F', '0', '0', 'cupid:event:edit', '#', 'admin', sysdate(), '', null, '');
 
 insert into sys_role_menu (role_id, menu_id)
 select r.role_id, m.menu_id from sys_role r join sys_menu m on m.menu_id between 2000 and 2079
@@ -672,6 +681,10 @@ where r.role_key = 'cupid_auditor' and r.del_flag = '0';
 insert into sys_role_menu (role_id, menu_id)
 select r.role_id, m.menu_id from sys_role r join sys_menu m on m.menu_id in (2040, 2041, 2042)
 where r.role_key = 'cupid_support' and r.del_flag = '0';
+
+insert into sys_role_menu (role_id, menu_id)
+select r.role_id, m.menu_id from sys_role r join sys_menu m on m.menu_id between 2070 and 2079
+where r.role_key = 'cupid_event_manager' and r.del_flag = '0';
 
 commit;
 
@@ -1175,10 +1188,10 @@ insert into cm_user_entitlement_balances (id, user_id, membership_id, entitlemen
   ('6f796142-1339-5002-980e-8a2c61382c4b', 'efdca298-c977-5502-ad2e-8ba480ca1ea3', 'd052548f-34dc-54f9-aab7-6dca95709306', 'event_registration', '2026-01-18 00:00:00', '2026-07-18 00:00:00', 20, 0, 20, '2026-01-18 00:00:00', '2026-01-18 00:00:00');
 
 -- 3A.20 cm_events
-insert into cm_events (id, slug, status, visibility, consumes_membership_quota, city_code, address_visibility, event_date, start_time, end_time, capacity, cover_image_url, created_at, updated_at) values
-  ('0ed043fe-531a-511d-940b-5daa55de963e', 'event-001', 'open', 'registered', 0, 'FR:paris', 'registered_only', '2026-05-12', '18:30', '21:00', 12, 'https://images.unsplash.com/photo-1528605248644-14dd04022da1?auto=format&fit=crop&w=1200&q=80', '2026-04-01 00:00:00', '2026-05-01 00:00:00'),
-  ('38f69abd-73b4-5464-8b07-a95a9bb58547', 'event-002', 'waitlist', 'member', 1, 'FR:paris', 'confirmed_attendee_only', '2026-05-20', '19:00', '22:00', 8, 'https://images.unsplash.com/photo-1414235077428-338989a2e8c0?auto=format&fit=crop&w=1200&q=80', '2026-04-01 00:00:00', '2026-05-01 00:00:00'),
-  ('1bcb995a-540c-5c66-9b92-52471c43e587', 'event-003', 'open', 'registered', 1, 'BE:brussels', 'registered_only', '2026-05-28', '14:30', '17:00', 16, 'https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?auto=format&fit=crop&w=1200&q=80', '2026-04-01 00:00:00', '2026-05-01 00:00:00');
+insert into cm_events (id, status, visibility, consumes_membership_quota, city_code, address_visibility, event_date, start_time, end_time, capacity, cover_image_url, created_at, updated_at) values
+  ('0ed043fe-531a-511d-940b-5daa55de963e', 'open', 'registered', 0, 'FR:paris', 'registered_only', '2026-05-12', '18:30', '21:00', 12, 'https://images.unsplash.com/photo-1528605248644-14dd04022da1?auto=format&fit=crop&w=1200&q=80', '2026-04-01 00:00:00', '2026-05-01 00:00:00'),
+  ('38f69abd-73b4-5464-8b07-a95a9bb58547', 'waitlist', 'member', 1, 'FR:paris', 'confirmed_attendee_only', '2026-05-20', '19:00', '22:00', 8, 'https://images.unsplash.com/photo-1414235077428-338989a2e8c0?auto=format&fit=crop&w=1200&q=80', '2026-04-01 00:00:00', '2026-05-01 00:00:00'),
+  ('1bcb995a-540c-5c66-9b92-52471c43e587', 'open', 'registered', 1, 'BE:brussels', 'registered_only', '2026-05-28', '14:30', '17:00', 16, 'https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?auto=format&fit=crop&w=1200&q=80', '2026-04-01 00:00:00', '2026-05-01 00:00:00');
 
 -- 3A.21 cm_event_localized_fields
 insert into cm_event_localized_fields (id, event_id, field_name, locale, value, source, provider, status, created_at, updated_at) values
@@ -1200,9 +1213,6 @@ insert into cm_event_localized_fields (id, event_id, field_name, locale, value, 
   ('9136df29-bd9c-5f70-a2ab-89ea5b633a70', '0ed043fe-531a-511d-940b-5daa55de963e', 'audience', 'zh', '适合 27-35 岁、希望稳定发展的会员', 'manual', 'human', 'ready', '2026-04-01 00:00:00', '2026-05-18 12:07:20'),
   ('f9dc2768-48b0-581d-bce5-f6a206ec1dcb', '0ed043fe-531a-511d-940b-5daa55de963e', 'audience', 'fr', 'Pour 27-35 ans avec intention relationnelle stable', 'manual', 'human', 'ready', '2026-04-01 00:00:00', '2026-05-18 12:07:20'),
   ('c310e57d-21f1-58c7-8c2d-c925ee950cf5', '0ed043fe-531a-511d-940b-5daa55de963e', 'audience', 'en', 'For members aged 27-35 seeking stable development', 'manual', 'human', 'ready', '2026-04-01 00:00:00', '2026-05-18 12:07:20'),
-  ('b184551f-88d2-520f-b9f5-c01da77f9028', '0ed043fe-531a-511d-940b-5daa55de963e', 'curator_note', 'zh', '策展人会在报名后确认资料完整度与参与节奏。', 'manual', 'human', 'ready', '2026-04-01 00:00:00', '2026-05-18 12:07:20'),
-  ('3a6cc4c7-09f9-591f-a5e1-ada9f44ed112', '0ed043fe-531a-511d-940b-5daa55de963e', 'curator_note', 'fr', 'Note du curateur : Le curateur confirme le dossier et le rythme apres la demande.', 'manual', 'human', 'ready', '2026-04-01 00:00:00', '2026-05-18 12:07:20'),
-  ('b9c9e650-5ed7-5193-b653-4ac465f41a52', '0ed043fe-531a-511d-940b-5daa55de963e', 'curator_note', 'en', 'Curator note: A curator reviews profile readiness and pacing after submission.', 'manual', 'human', 'ready', '2026-04-01 00:00:00', '2026-05-18 12:07:20'),
   ('08b7091f-4412-52e4-8598-d4d6513988c3', '38f69abd-73b4-5464-8b07-a95a9bb58547', 'title', 'zh', '左岸晚餐局', 'manual', 'human', 'ready', '2026-04-01 00:00:00', '2026-05-18 12:07:20'),
   ('5986ce9b-c38f-57ff-90f9-ab28b74b5329', '38f69abd-73b4-5464-8b07-a95a9bb58547', 'title', 'fr', 'Diner rive gauche', 'manual', 'human', 'ready', '2026-04-01 00:00:00', '2026-05-18 12:07:20'),
   ('faa6f609-43d4-511c-bae3-0a509ae58783', '38f69abd-73b4-5464-8b07-a95a9bb58547', 'title', 'en', 'Left Bank dinner gathering', 'manual', 'human', 'ready', '2026-04-01 00:00:00', '2026-05-18 12:07:20'),
@@ -1221,9 +1231,6 @@ insert into cm_event_localized_fields (id, event_id, field_name, locale, value, 
   ('72014f57-07f9-5230-b3be-24391ffafcea', '38f69abd-73b4-5464-8b07-a95a9bb58547', 'audience', 'zh', '主要面向已完成资料审核的会员', 'manual', 'human', 'ready', '2026-04-01 00:00:00', '2026-05-18 12:07:20'),
   ('c85132a4-fdaa-5bff-b81e-cf93eefd64a1', '38f69abd-73b4-5464-8b07-a95a9bb58547', 'audience', 'fr', 'Principalement membres verifies', 'manual', 'human', 'ready', '2026-04-01 00:00:00', '2026-05-18 12:07:20'),
   ('4da97f04-6216-560a-bacf-9602d23b3f45', '38f69abd-73b4-5464-8b07-a95a9bb58547', 'audience', 'en', 'Mainly for profile-verified members', 'manual', 'human', 'ready', '2026-04-01 00:00:00', '2026-05-18 12:07:20'),
-  ('b1378a53-05a2-5234-9e48-1744b6571e76', '38f69abd-73b4-5464-8b07-a95a9bb58547', 'curator_note', 'zh', '本场优先邀请已完成资料审核并适合晚餐节奏的会员。', 'manual', 'human', 'ready', '2026-04-01 00:00:00', '2026-05-18 12:07:20'),
-  ('ed59599d-45c7-5822-a54c-3e8952cbcea1', '38f69abd-73b4-5464-8b07-a95a9bb58547', 'curator_note', 'fr', 'Priorite aux membres verifies et adaptes au format diner.', 'manual', 'human', 'ready', '2026-04-01 00:00:00', '2026-05-18 12:07:20'),
-  ('add5a691-2eaa-5aa8-8110-e62885034894', '38f69abd-73b4-5464-8b07-a95a9bb58547', 'curator_note', 'en', 'Priority is given to verified members suited to the dinner format.', 'manual', 'human', 'ready', '2026-04-01 00:00:00', '2026-05-18 12:07:20'),
   ('5e2c742a-cc5e-5a42-ae22-2352ccbd46b7', '1bcb995a-540c-5c66-9b92-52471c43e587', 'title', 'zh', '文化散步与咖啡交流', 'manual', 'human', 'ready', '2026-04-01 00:00:00', '2026-05-18 12:07:20'),
   ('3a52bf89-db02-54ac-9874-b89c9121616b', '1bcb995a-540c-5c66-9b92-52471c43e587', 'title', 'fr', 'Parcours culturel et cafe', 'manual', 'human', 'ready', '2026-04-01 00:00:00', '2026-05-18 12:07:20'),
   ('dcb85612-b2c9-5f50-91a3-0faf759231f4', '1bcb995a-540c-5c66-9b92-52471c43e587', 'title', 'en', 'Culture walk and coffee exchange', 'manual', 'human', 'ready', '2026-04-01 00:00:00', '2026-05-18 12:07:20'),
@@ -1241,12 +1248,36 @@ insert into cm_event_localized_fields (id, event_id, field_name, locale, value, 
   ('9a8802b6-8510-572a-bea3-db0f140aac5c', '1bcb995a-540c-5c66-9b92-52471c43e587', 'format', 'en', 'City walk plus discussion', 'manual', 'human', 'ready', '2026-04-01 00:00:00', '2026-05-18 12:07:20'),
   ('431ae6c2-bae7-5819-b64f-7c8e4173f0d3', '1bcb995a-540c-5c66-9b92-52471c43e587', 'audience', 'zh', '适合首次参加平台活动的新会员', 'manual', 'human', 'ready', '2026-04-01 00:00:00', '2026-05-18 12:07:20'),
   ('77a40a99-e124-5287-8e9c-f6626815321e', '1bcb995a-540c-5c66-9b92-52471c43e587', 'audience', 'fr', 'Ideal pour une premiere participation', 'manual', 'human', 'ready', '2026-04-01 00:00:00', '2026-05-18 12:07:20'),
-  ('3e368fd6-5dfe-53d6-9c79-cf1d95748fcd', '1bcb995a-540c-5c66-9b92-52471c43e587', 'audience', 'en', 'Good for first-time participants', 'manual', 'human', 'ready', '2026-04-01 00:00:00', '2026-05-18 12:07:20'),
-  ('e9516d09-3ceb-51ad-8060-2f5324100aa4', '1bcb995a-540c-5c66-9b92-52471c43e587', 'curator_note', 'zh', '策展说明：适合第一次参加平台活动的会员，策展人会协助控制交流边界。', 'manual', 'human', 'ready', '2026-04-01 00:00:00', '2026-05-18 12:07:20'),
-  ('7ef98175-a68c-5bc5-a0bc-1613dd0c6fbd', '1bcb995a-540c-5c66-9b92-52471c43e587', 'curator_note', 'fr', 'Note du curateur : Format adapte a une premiere participation, avec cadrage du curateur.', 'manual', 'human', 'ready', '2026-04-01 00:00:00', '2026-05-18 12:07:20'),
-  ('2ced69f2-9f68-5554-9c74-8f4c943b98f8', '1bcb995a-540c-5c66-9b92-52471c43e587', 'curator_note', 'en', 'Curator note: Good for first participation, with curator-guided boundaries.', 'manual', 'human', 'ready', '2026-04-01 00:00:00', '2026-05-18 12:07:20');
+  ('3e368fd6-5dfe-53d6-9c79-cf1d95748fcd', '1bcb995a-540c-5c66-9b92-52471c43e587', 'audience', 'en', 'Good for first-time participants', 'manual', 'human', 'ready', '2026-04-01 00:00:00', '2026-05-18 12:07:20');
 
--- 3A.22 cm_event_relationship_focuses
+-- 3A.22 cm_event_note_items
+insert into cm_event_note_items (id, event_id, sort_order, created_at, updated_at) values
+  ('7f13c809-d5b5-5ca6-8fb4-9a67acf1362d', '0ed043fe-531a-511d-940b-5daa55de963e', 1, '2026-04-01 00:00:00', '2026-05-18 12:07:20'),
+  ('2b540c39-95cf-54d2-8ae6-6be251c4b254', '38f69abd-73b4-5464-8b07-a95a9bb58547', 1, '2026-04-01 00:00:00', '2026-05-18 12:07:20'),
+  ('ea365481-9ca7-5e19-b318-0193b796680b', '1bcb995a-540c-5c66-9b92-52471c43e587', 1, '2026-04-01 00:00:00', '2026-05-18 12:07:20');
+
+-- 3A.23 cm_event_note_item_localized_fields
+insert into cm_event_note_item_localized_fields (id, note_item_id, field_name, locale, value, source, provider, status, created_at, updated_at) values
+  ('27006c38-cc71-548d-a6f0-a79588db75e6', '7f13c809-d5b5-5ca6-8fb4-9a67acf1362d', 'title', 'zh', '策展说明', 'manual', 'human', 'ready', '2026-04-01 00:00:00', '2026-05-18 12:07:20'),
+  ('2942ca21-c90b-5284-874a-19fb26dbba53', '7f13c809-d5b5-5ca6-8fb4-9a67acf1362d', 'description', 'zh', '策展人会在报名后确认资料完整度与参与节奏。', 'manual', 'human', 'ready', '2026-04-01 00:00:00', '2026-05-18 12:07:20'),
+  ('b184551f-88d2-520f-b9f5-c01da77f9028', '7f13c809-d5b5-5ca6-8fb4-9a67acf1362d', 'title', 'fr', 'Note du curateur', 'manual', 'human', 'ready', '2026-04-01 00:00:00', '2026-05-18 12:07:20'),
+  ('3a6cc4c7-09f9-591f-a5e1-ada9f44ed112', '7f13c809-d5b5-5ca6-8fb4-9a67acf1362d', 'description', 'fr', 'Le curateur confirme le dossier et le rythme apres la demande.', 'manual', 'human', 'ready', '2026-04-01 00:00:00', '2026-05-18 12:07:20'),
+  ('b9c9e650-5ed7-5193-b653-4ac465f41a52', '7f13c809-d5b5-5ca6-8fb4-9a67acf1362d', 'title', 'en', 'Curator note', 'manual', 'human', 'ready', '2026-04-01 00:00:00', '2026-05-18 12:07:20'),
+  ('74cd14cc-5631-51e4-8cea-24f693ddaf51', '7f13c809-d5b5-5ca6-8fb4-9a67acf1362d', 'description', 'en', 'A curator reviews profile readiness and pacing after submission.', 'manual', 'human', 'ready', '2026-04-01 00:00:00', '2026-05-18 12:07:20'),
+  ('b1378a53-05a2-5234-9e48-1744b6571e76', '2b540c39-95cf-54d2-8ae6-6be251c4b254', 'title', 'zh', '参与说明', 'manual', 'human', 'ready', '2026-04-01 00:00:00', '2026-05-18 12:07:20'),
+  ('ed59599d-45c7-5822-a54c-3e8952cbcea1', '2b540c39-95cf-54d2-8ae6-6be251c4b254', 'description', 'zh', '本场优先邀请已完成资料审核并适合晚餐节奏的会员。', 'manual', 'human', 'ready', '2026-04-01 00:00:00', '2026-05-18 12:07:20'),
+  ('add5a691-2eaa-5aa8-8110-e62885034894', '2b540c39-95cf-54d2-8ae6-6be251c4b254', 'title', 'fr', 'Participation', 'manual', 'human', 'ready', '2026-04-01 00:00:00', '2026-05-18 12:07:20'),
+  ('2f04bc8b-ed29-5a2c-8444-035eae17951f', '2b540c39-95cf-54d2-8ae6-6be251c4b254', 'description', 'fr', 'Priorite aux membres verifies et adaptes au format diner.', 'manual', 'human', 'ready', '2026-04-01 00:00:00', '2026-05-18 12:07:20'),
+  ('8bdc86c9-d378-58b8-8266-b68bd98604d6', '2b540c39-95cf-54d2-8ae6-6be251c4b254', 'title', 'en', 'Participation', 'manual', 'human', 'ready', '2026-04-01 00:00:00', '2026-05-18 12:07:20'),
+  ('cf9d72f1-d8f2-5128-a663-6d85f2886935', '2b540c39-95cf-54d2-8ae6-6be251c4b254', 'description', 'en', 'Priority is given to verified members suited to the dinner format.', 'manual', 'human', 'ready', '2026-04-01 00:00:00', '2026-05-18 12:07:20'),
+  ('e9516d09-3ceb-51ad-8060-2f5324100aa4', 'ea365481-9ca7-5e19-b318-0193b796680b', 'title', 'zh', '首次参与', 'manual', 'human', 'ready', '2026-04-01 00:00:00', '2026-05-18 12:07:20'),
+  ('7ef98175-a68c-5bc5-a0bc-1613dd0c6fbd', 'ea365481-9ca7-5e19-b318-0193b796680b', 'description', 'zh', '适合第一次参加平台活动的会员，策展人会协助控制交流边界。', 'manual', 'human', 'ready', '2026-04-01 00:00:00', '2026-05-18 12:07:20'),
+  ('2ced69f2-9f68-5554-9c74-8f4c943b98f8', 'ea365481-9ca7-5e19-b318-0193b796680b', 'title', 'fr', 'Premiere participation', 'manual', 'human', 'ready', '2026-04-01 00:00:00', '2026-05-18 12:07:20'),
+  ('ad08c502-3242-50ed-838f-4f5b8fd588a2', 'ea365481-9ca7-5e19-b318-0193b796680b', 'description', 'fr', 'Format adapte a une premiere participation, avec cadrage du curateur.', 'manual', 'human', 'ready', '2026-04-01 00:00:00', '2026-05-18 12:07:20'),
+  ('271ab3ac-01aa-5472-8529-7ea920d172b5', 'ea365481-9ca7-5e19-b318-0193b796680b', 'title', 'en', 'First participation', 'manual', 'human', 'ready', '2026-04-01 00:00:00', '2026-05-18 12:07:20'),
+  ('96e7cc06-478f-5c23-b18e-b767198957d2', 'ea365481-9ca7-5e19-b318-0193b796680b', 'description', 'en', 'Good for first participation, with curator-guided boundaries.', 'manual', 'human', 'ready', '2026-04-01 00:00:00', '2026-05-18 12:07:20');
+
+-- 3A.24 cm_event_relationship_focuses
 insert into cm_event_relationship_focuses (id, event_id, focus_order, locale, value, source, provider, status, created_at, updated_at) values
   ('02b6b13f-2190-5b84-b8e8-e3ccc1bb7b4a', '0ed043fe-531a-511d-940b-5daa55de963e', 0, 'zh', '跨文化关系', 'manual', 'human', 'ready', '2026-04-01 00:00:00', '2026-05-18 12:07:20'),
   ('645200ac-4cfe-533a-bb30-d72d43b626cb', '0ed043fe-531a-511d-940b-5daa55de963e', 0, 'fr', 'Relations interculturelles', 'manual', 'human', 'ready', '2026-04-01 00:00:00', '2026-05-18 12:07:20'),
@@ -1267,7 +1298,7 @@ insert into cm_event_relationship_focuses (id, event_id, focus_order, locale, va
   ('1cc6dfad-3f60-5362-bd0d-7c99a8972462', '1bcb995a-540c-5c66-9b92-52471c43e587', 1, 'fr', 'Echange leger', 'manual', 'human', 'ready', '2026-04-01 00:00:00', '2026-05-18 12:07:20'),
   ('99afc51e-defa-51cd-94b4-88f99f66f0de', '1bcb995a-540c-5c66-9b92-52471c43e587', 1, 'en', 'Light conversation', 'manual', 'human', 'ready', '2026-04-01 00:00:00', '2026-05-18 12:07:20');
 
--- 3A.23 cm_event_language_codes
+-- 3A.25 cm_event_language_codes
 insert into cm_event_language_codes (event_id, language_code) values
   ('0ed043fe-531a-511d-940b-5daa55de963e', 'zh'),
   ('0ed043fe-531a-511d-940b-5daa55de963e', 'fr'),
@@ -1278,14 +1309,14 @@ insert into cm_event_language_codes (event_id, language_code) values
   ('1bcb995a-540c-5c66-9b92-52471c43e587', 'fr'),
   ('1bcb995a-540c-5c66-9b92-52471c43e587', 'en');
 
--- 3A.24 cm_event_agenda_items
+-- 3A.26 cm_event_agenda_items
 insert into cm_event_agenda_items (id, event_id, agenda_time, sort_order, created_at, updated_at) values
   ('5853a71e-9a57-5126-82da-bc25a7afb75e', '0ed043fe-531a-511d-940b-5daa55de963e', '18:30 - 19:00', 1, '2026-04-01 00:00:00', '2026-05-01 00:00:00'),
   ('dd835cd9-df78-552a-aa5b-1c5bf84e595c', '0ed043fe-531a-511d-940b-5daa55de963e', '19:00 - 19:45', 2, '2026-04-01 00:00:00', '2026-05-01 00:00:00'),
   ('24bb39e8-5b41-56a5-9270-a600375767dd', '38f69abd-73b4-5464-8b07-a95a9bb58547', '19:00 - 19:30', 1, '2026-04-01 00:00:00', '2026-05-01 00:00:00'),
   ('843e88fb-bf21-593f-a3b0-094f9c75edf9', '1bcb995a-540c-5c66-9b92-52471c43e587', '14:30 - 15:00', 1, '2026-04-01 00:00:00', '2026-05-01 00:00:00');
 
--- 3A.25 cm_event_agenda_item_localized_fields
+-- 3A.27 cm_event_agenda_item_localized_fields
 insert into cm_event_agenda_item_localized_fields (id, agenda_item_id, field_name, locale, value, source, provider, status, created_at, updated_at) values
   ('7e440946-e3a2-5c8d-8cd3-aefbe83e0450', '5853a71e-9a57-5126-82da-bc25a7afb75e', 'title', 'zh', '签到与活动说明', 'manual', 'human', 'ready', '2026-04-01 00:00:00', '2026-05-18 12:07:20'),
   ('a1831cd3-6a85-5aea-80db-3cd4f6af3749', '5853a71e-9a57-5126-82da-bc25a7afb75e', 'title', 'fr', 'Accueil et cadrage de l evenement', 'manual', 'human', 'ready', '2026-04-01 00:00:00', '2026-05-18 12:07:20'),
@@ -1312,28 +1343,28 @@ insert into cm_event_agenda_item_localized_fields (id, agenda_item_id, field_nam
   ('1be260fc-52d1-505d-ae95-8a2888c880b5', '843e88fb-bf21-593f-a3b0-094f9c75edf9', 'description', 'fr', 'Rappel du parcours et du rythme d echange.', 'manual', 'human', 'ready', '2026-04-01 00:00:00', '2026-05-18 12:07:20'),
   ('b3ede8cb-287b-5574-9c76-fe48837fe4d9', '843e88fb-bf21-593f-a3b0-094f9c75edf9', 'description', 'en', 'Overview of the route and interaction rhythm.', 'manual', 'human', 'ready', '2026-04-01 00:00:00', '2026-05-18 12:07:20');
 
--- 3A.26 cm_event_registrations
+-- 3A.28 cm_event_registrations
 insert into cm_event_registrations (id, user_id, event_id, status, requested_at, confirmed_at, declined_at, waitlisted_at, cancelled_at, attended_at, event_quota_consumed_at, event_quota_released_at, created_at, updated_at) values
   ('f44520c6-d6c7-5a4a-a6a2-40aada7743c6', 'efdca298-c977-5502-ad2e-8ba480ca1ea3', '0ed043fe-531a-511d-940b-5daa55de963e', 'cancelled', '2026-05-01 09:00:00', '2026-05-14 01:01:44', null, null, '2026-05-14 01:01:46', null, null, null, '2026-05-01 09:00:00', '2026-05-14 01:01:46'),
   ('85c16633-87ee-5350-9667-b5ec96f2b9e8', 'efdca298-c977-5502-ad2e-8ba480ca1ea3', '38f69abd-73b4-5464-8b07-a95a9bb58547', 'cancelled', '2026-05-01 09:00:00', null, null, null, '2026-05-14 00:37:05', null, null, null, '2026-05-01 09:00:00', '2026-05-14 00:37:05'),
   ('6dcca5e8-969b-5f47-9277-b56dbd051330', 'efdca298-c977-5502-ad2e-8ba480ca1ea3', '1bcb995a-540c-5c66-9b92-52471c43e587', 'cancelled', '2026-05-28 21:28:47', null, null, null, '2026-05-28 21:28:48', null, null, null, '2026-05-17 11:01:31', '2026-05-28 21:28:48');
 
--- 3A.27 cm_favorite_profiles
+-- 3A.29 cm_favorite_profiles
 insert into cm_favorite_profiles (id, user_id, profile_id, created_at, updated_at) values
   ('98ddc269-dbdc-59d7-a1af-9ef27381be0e', 'efdca298-c977-5502-ad2e-8ba480ca1ea3', '506ce3c7-b236-5b44-b8d0-459c4250ea03', '2026-03-12 00:00:00', '2026-03-12 00:00:00'),
   ('f658d6c2-87e9-5f5f-b1d5-9562d3cdbf21', 'efdca298-c977-5502-ad2e-8ba480ca1ea3', 'd7a4c336-b6f4-5079-a4ad-c47b4044a740', '2026-03-28 00:00:00', '2026-03-28 00:00:00');
 
--- 3A.28 cm_private_introduction_requests
+-- 3A.30 cm_private_introduction_requests
 insert into cm_private_introduction_requests (id, requester_user_id, requester_profile_id, target_profile_id, status, message, requested_at, expires_at, responded_at, cooldown_until, entitlement_balance_id, created_at, updated_at) values
   ('426dda67-8ff8-52f7-8426-558af6b32f0b', 'efdca298-c977-5502-ad2e-8ba480ca1ea3', null, 'd7a4c336-b6f4-5079-a4ad-c47b4044a740', 'accepted', null, '2026-05-23 21:31:05', null, '2026-05-27 23:47:13', null, null, '2026-05-23 21:31:05', '2026-05-27 23:47:13');
 
--- 3A.29 cm_inbox_threads
+-- 3A.31 cm_inbox_threads
 insert into cm_inbox_threads (id, user_id, category, subject_type, subject_id, status, created_at, updated_at) values
   ('b8ce280f-3553-56b7-999f-d9cb6caa3acf', 'efdca298-c977-5502-ad2e-8ba480ca1ea3', 'system', 'profile', '506ce3c7-b236-5b44-b8d0-459c4250ea03', 'open', '2026-05-20 09:00:00', '2026-05-28 08:30:00'),
   ('d85453a8-274f-566e-8343-e2534ae2fed7', 'efdca298-c977-5502-ad2e-8ba480ca1ea3', 'system', null, null, 'open', '2026-05-28 06:00:00', '2026-05-28 06:00:00'),
   ('b7698c02-482b-52ce-9c48-ecd94d0a45b1', 'efdca298-c977-5502-ad2e-8ba480ca1ea3', 'system', 'event', '0ed043fe-531a-511d-940b-5daa55de963e', 'open', '2026-05-25 14:00:00', '2026-05-27 10:00:00');
 
--- 3A.30 cm_inbox_messages
+-- 3A.32 cm_inbox_messages
 insert into cm_inbox_messages (id, thread_id, sender_type, sender_user_id, message_type, body, template_code, template_locale, action_type, action_payload, created_at, updated_at) values
   ('dafef4e8-ea97-5808-952a-fcb763a9ee8e', 'b8ce280f-3553-56b7-999f-d9cb6caa3acf', 'system', null, 'system_notice', '你的资料 p-001 平台审核已通过，现状态变更为 open。', 'profile_review_approved', 'zh', null, null, '2026-05-20 09:00:00', '2026-05-20 09:00:00'),
   ('e1b35056-d725-5437-8f19-9590a8edc873', 'b8ce280f-3553-56b7-999f-d9cb6caa3acf', 'system', null, 'text', '你的资料已完成身份认证，可信度已提升。', 'identity_verified', 'zh', null, null, '2026-05-28 08:30:00', '2026-05-28 08:30:00'),
@@ -1341,7 +1372,7 @@ insert into cm_inbox_messages (id, thread_id, sender_type, sender_user_id, messa
   ('f4a77fc1-6370-5719-b596-b4ea5c0e0c14', 'b7698c02-482b-52ce-9c48-ecd94d0a45b1', 'system', null, 'text', '活动地址：巴黎 8 区 Rue du Faubourg Saint-Honore 25 号。请提前 15 分钟到场。', 'event_reminder', 'zh', null, null, '2026-05-27 10:00:00', '2026-05-27 10:00:00'),
   ('0fc92207-16a5-5a1f-ae42-cc856d2b40a6', 'd85453a8-274f-566e-8343-e2534ae2fed7', 'system', null, 'text', '欢迎使用相约巴黎！你可以创建资料、浏览活动、收藏感兴趣的会员。', 'welcome_message', 'zh', null, null, '2026-05-28 06:00:00', '2026-05-28 06:00:00');
 
--- 3A.31 cm_inbox_reads
+-- 3A.33 cm_inbox_reads
 insert into cm_inbox_reads (id, thread_id, user_id, last_read_at, created_at, updated_at) values
   ('59a024c0-aa7b-5075-8dcc-d13d777318a0', 'd85453a8-274f-566e-8343-e2534ae2fed7', 'efdca298-c977-5502-ad2e-8ba480ca1ea3', '2026-05-28 07:00:00', '2026-05-28 07:00:00', '2026-05-28 07:00:00'),
   ('58938e35-a25f-57f3-816b-047224a3777d', 'b8ce280f-3553-56b7-999f-d9cb6caa3acf', 'efdca298-c977-5502-ad2e-8ba480ca1ea3', '2026-05-28 00:13:32', '2026-05-28 00:13:32', '2026-05-28 00:13:32');
@@ -1568,9 +1599,9 @@ insert into cm_user_memberships (id, user_id, plan_id, tier, status, started_at,
   ('f3000000-0000-4000-8000-000000000006', 'f0000000-0000-4000-8000-000000000006', 'f04881cf-b31f-50c5-8e73-c5f861d0bd7f', 'free', 'cancelled', '2026-06-01 00:00:00', null, '2026-06-01 00:00:00', '2026-06-15 00:00:00');
 
 -- 5D. Extra events (varied statuses)
-insert into cm_events (id, slug, status, visibility, consumes_membership_quota, city_code, address_visibility, event_date, start_time, end_time, capacity, cover_image_url, created_at, updated_at) values
-  ('0dd00000-0000-4000-8000-000000000001', 'event-draft-001', 'draft', 'registered', 0, 'FR:paris', 'registered_only', '2026-08-15', '18:00', '21:00', 20, 'https://images.unsplash.com/photo-1540575467063-178a50c2df87?auto=format&fit=crop&w=1200&q=80', now(), now()),
-  ('0cc00000-0000-4000-8000-000000000001', 'event-completed-001', 'completed', 'member', 1, 'FR:lyon', 'confirmed_attendee_only', '2026-04-10', '19:00', '22:00', 10, 'https://images.unsplash.com/photo-1519671482749-fd09be7ccebf?auto=format&fit=crop&w=1200&q=80', '2026-03-01 00:00:00', '2026-04-10 00:00:00');
+insert into cm_events (id, status, visibility, consumes_membership_quota, city_code, address_visibility, event_date, start_time, end_time, capacity, cover_image_url, created_at, updated_at) values
+  ('0dd00000-0000-4000-8000-000000000001', 'draft', 'registered', 0, 'FR:paris', 'registered_only', '2026-08-15', '18:00', '21:00', 20, 'https://images.unsplash.com/photo-1540575467063-178a50c2df87?auto=format&fit=crop&w=1200&q=80', now(), now()),
+  ('0cc00000-0000-4000-8000-000000000001', 'completed', 'member', 1, 'FR:lyon', 'confirmed_attendee_only', '2026-04-10', '19:00', '22:00', 10, 'https://images.unsplash.com/photo-1519671482749-fd09be7ccebf?auto=format&fit=crop&w=1200&q=80', '2026-03-01 00:00:00', '2026-04-10 00:00:00');
 
 -- 5D2. Event localized fields for extra events
 insert into cm_event_localized_fields (id, event_id, field_name, locale, value, source, provider, status, created_at, updated_at) values

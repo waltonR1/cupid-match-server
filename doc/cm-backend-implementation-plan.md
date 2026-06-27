@@ -24,7 +24,7 @@ RuoYi 原生系统表继续承载后台登录、角色、菜单、权限和系�
 
 ## 2. 固定架构边界
 
-- `cm_*` 实体 ID 使用 UUID；业务逻辑通过 `tier`、`slug`、`type`、`code` 等业务键查找，不硬编码 UUID。
+- `cm_*` 实体 ID 使用 UUID；业务逻辑通过 `tier`、`type`、`code` 等业务键查找，不硬编码 UUID。
 - 前台用户只进入 `cm_users`，不进入 RuoYi `sys_user`。
 - 后台员工直接使用 RuoYi `sys_user`、角色、菜单和权限体系；不再通过 `cm_staff_members` 建立第二套业务身份。
 - Java 产品 API 统一返回 RuoYi `code + msg + data?`。

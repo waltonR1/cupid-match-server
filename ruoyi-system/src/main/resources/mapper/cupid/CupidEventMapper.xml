@@ -4,7 +4,6 @@
 
     <resultMap id="EventResult" type="CupidEvent">
         <id property="id" column="id"/>
-        <result property="slug" column="slug"/>
         <result property="status" column="status"/>
         <result property="visibility" column="visibility"/>
         <result property="consumesMembershipQuota" column="consumes_membership_quota"/>
@@ -50,7 +49,7 @@
     </sql>
 
     <select id="selectEvents" resultMap="EventResult">
-        select id, slug, status, visibility, consumes_membership_quota,
+        select id, status, visibility, consumes_membership_quota,
                city_code, address_visibility, event_date, start_time, end_time,
                capacity, cover_image_url, created_at, updated_at
         from cm_events e
@@ -69,14 +68,14 @@
     </select>
 
     <select id="selectEventById" resultMap="EventResult">
-        select id, slug, status, visibility, consumes_membership_quota,
+        select id, status, visibility, consumes_membership_quota,
                city_code, address_visibility, event_date, start_time, end_time,
                capacity, cover_image_url, created_at, updated_at
         from cm_events where id = #{id} limit 1
     </select>
 
     <select id="selectEventByIdForUpdate" resultMap="EventResult">
-        select id, slug, status, visibility, consumes_membership_quota,
+        select id, status, visibility, consumes_membership_quota,
                city_code, address_visibility, event_date, start_time, end_time,
                capacity, cover_image_url, created_at, updated_at
         from cm_events
@@ -93,7 +92,7 @@
             #{eid}
         </foreach>
           and status = 'ready' and trim(value) != ''
-          and field_name in ('title','summary','venue','address','format','audience','curator_note')
+          and field_name in ('title','summary','venue','address','format','audience')
         order by event_id, field_name,
                  case locale when #{locale} then 0 when 'zh' then 1 when 'en' then 2 else 3 end
     </select>
@@ -122,8 +121,34 @@
                  case lf.locale when #{locale} then 0 when 'zh' then 1 when 'en' then 2 else 3 end
     </select>
 
+    <select id="selectEventNoteItems" resultType="java.util.HashMap">
+        select eni.id,
+               eni.sort_order as sortOrder,
+               coalesce(
+                 max(case when lf.locale = #{locale} and lf.field_name = 'title' then lf.value end),
+                 max(case when lf.locale = 'zh' and lf.field_name = 'title' then lf.value end),
+                 max(case when lf.locale = 'en' and lf.field_name = 'title' then lf.value end)
+               ) as title,
+               coalesce(
+                 max(case when lf.locale = #{locale} and lf.field_name = 'description' then lf.value end),
+                 max(case when lf.locale = 'zh' and lf.field_name = 'description' then lf.value end),
+                 max(case when lf.locale = 'en' and lf.field_name = 'description' then lf.value end)
+               ) as description
+        from cm_event_note_items eni
+        left join cm_event_note_item_localized_fields lf
+          on lf.note_item_id = eni.id
+         and lf.status = 'ready'
+         and trim(lf.value) != ''
+         and lf.field_name in ('title', 'description')
+        where eni.event_id = #{eventId}
+        group by eni.id, eni.sort_order
+        having title is not null or description is not null
+        order by eni.sort_order
+    </select>
+
     <select id="selectRegistration" resultType="map">
-        select id, user_id as userId, event_id as eventId, status,
+        select id, user_id as userId, event_id as eventId,
+               entitlement_balance_id as entitlementBalanceId, status,
                requested_at as registeredAt, confirmed_at as confirmedAt,
                attended_at as attendedAt, event_quota_consumed_at as eventQuotaConsumedAt,
                event_quota_released_at as eventQuotaReleasedAt
@@ -133,7 +158,8 @@
     </select>
 
     <select id="selectRegistrationForUpdate" resultType="map">
-        select id, user_id as userId, event_id as eventId, status,
+        select id, user_id as userId, event_id as eventId,
+               entitlement_balance_id as entitlementBalanceId, status,
                requested_at as registeredAt, confirmed_at as confirmedAt,
                attended_at as attendedAt, event_quota_consumed_at as eventQuotaConsumedAt,
                event_quota_released_at as eventQuotaReleasedAt
@@ -166,19 +192,21 @@
     </select>
 
     <insert id="insertRegistration">
-        insert into cm_event_registrations (id, user_id, event_id, status, requested_at)
-        values (#{id}, #{userId}, #{eventId}, #{status}, now())
+        insert into cm_event_registrations (id, user_id, event_id, status, requested_at, waitlisted_at)
+        values (#{id}, #{userId}, #{eventId}, #{status}, now(),
+                case when #{status} = 'waitlist' then now() else null end)
     </insert>
 
     <update id="resubmitRegistration">
         update cm_event_registrations
-        set status = 'requested',
+        set status = #{status},
             requested_at = now(),
             confirmed_at = null,
             declined_at = null,
-            waitlisted_at = null,
+            waitlisted_at = case when #{status} = 'waitlist' then now() else null end,
             cancelled_at = null,
             attended_at = null,
+            entitlement_balance_id = null,
             event_quota_consumed_at = null,
             event_quota_released_at = null,
             updated_at = now()
@@ -201,23 +229,8 @@
           and event_quota_released_at is null
     </update>
 
-    <update id="releaseEventEntitlement">
-        update cm_user_entitlement_balances
-        set quota_used = greatest(quota_used - 1, 0),
-            quota_remaining = least(quota_remaining + 1, quota_total),
-            updated_at = now()
-        where user_id = #{userId}
-          and membership_id = #{membershipId}
-          and entitlement_code = 'event_registration'
-          and period_started_at &lt;= now()
-          and period_ends_at &gt; now()
-          and quota_used &gt; 0
-        order by period_ends_at
-        limit 1
-    </update>
-
     <select id="selectUserRegistrations" resultMap="EventResult">
-        select e.id, e.slug, e.status, e.visibility, e.consumes_membership_quota,
+        select e.id, e.status, e.visibility, e.consumes_membership_quota,
                e.city_code, e.address_visibility, e.event_date,
                e.start_time, e.end_time, e.capacity, e.cover_image_url,
                e.created_at, e.updated_at,
@@ -227,5 +240,434 @@
         where r.user_id = #{userId}
         order by e.event_date desc
     </select>
+
+    <!-- Admin: Event list -->
+    <select id="selectAdminEvents" resultType="java.util.HashMap">
+        select e.id, e.status, e.visibility,
+               e.consumes_membership_quota as consumesMembershipQuota,
+               e.city_code as cityCode,
+               e.address_visibility as addressVisibility,
+               e.event_date as eventDate,
+               e.start_time as startTime,
+               e.end_time as endTime,
+               e.capacity,
+               (select count(1)
+                  from cm_event_registrations r
+                 where r.event_id = e.id
+                   and r.status in ('confirmed', 'attended')) as occupiedCount,
+               e.cover_image_url as coverImageUrl,
+               e.created_at as createdAt,
+               e.updated_at as updatedAt,
+               lf.value as title
+        from cm_events e
+        left join cm_event_localized_fields lf on lf.event_id = e.id
+            and lf.field_name = 'title' and lf.locale = coalesce(#{params.locale}, 'zh')
+        <where>
+            <if test="params.keyword != null and params.keyword != ''">
+                and lf.value like concat('%', #{params.keyword}, '%')
+            </if>
+            <if test="params.status != null and params.status != ''">
+                and e.status = #{params.status}
+            </if>
+            <if test="params.city != null and params.city != ''">
+                and e.city_code = #{params.city}
+            </if>
+            <if test="params.dateFrom != null and params.dateFrom != ''">
+                and e.event_date &gt;= #{params.dateFrom}
+            </if>
+            <if test="params.dateTo != null and params.dateTo != ''">
+                and e.event_date &lt;= #{params.dateTo}
+            </if>
+        </where>
+        <choose>
+            <when test="params.sortBy == 'createdDesc'">
+                order by e.created_at desc
+            </when>
+            <otherwise>
+                order by e.event_date desc, e.start_time desc
+            </otherwise>
+        </choose>
+    </select>
+
+    <!-- Admin: Event detail -->
+    <select id="selectAdminEventDetail" resultType="java.util.HashMap">
+        select e.id, e.status, e.visibility,
+               e.consumes_membership_quota as consumesMembershipQuota,
+               e.city_code as cityCode,
+               e.address_visibility as addressVisibility,
+               e.event_date as eventDate,
+               e.start_time as startTime,
+               e.end_time as endTime,
+               e.capacity,
+               e.cover_image_url as coverImageUrl,
+               e.created_at as createdAt,
+               e.updated_at as updatedAt
+        from cm_events e
+        where e.id = #{id}
+    </select>
+
+    <select id="selectAdminEventLocalizedFields" resultType="java.util.HashMap">
+        select
+            max(case when field_name = 'title' then value end) as title,
+            max(case when field_name = 'summary' then value end) as summary,
+            max(case when field_name = 'venue' then value end) as venue,
+            max(case when field_name = 'address' then value end) as address,
+            max(case when field_name = 'format' then value end) as format,
+            max(case when field_name = 'audience' then value end) as audience
+        from cm_event_localized_fields
+        where event_id = #{eventId}
+          and locale = #{locale}
+          and field_name in ('title','summary','venue','address','format','audience')
+    </select>
+
+    <select id="selectAdminEventAgendaItems" resultType="java.util.HashMap">
+        select eai.id,
+               eai.agenda_time as time,
+               eai.sort_order as sortOrder,
+               max(case when lf.field_name = 'title' then lf.value end) as title,
+               max(case when lf.field_name = 'description' then lf.value end) as description
+        from cm_event_agenda_items eai
+        left join cm_event_agenda_item_localized_fields lf
+          on lf.agenda_item_id = eai.id
+         and lf.locale = #{locale}
+         and lf.field_name in ('title', 'description')
+        where eai.event_id = #{eventId}
+        group by eai.id, eai.agenda_time, eai.sort_order
+        order by eai.sort_order
+    </select>
+
+    <select id="selectAdminEventLanguageCodes" resultType="string">
+        select language_code
+        from cm_event_language_codes
+        where event_id = #{eventId}
+        order by language_code
+    </select>
+
+    <select id="selectAdminEventRelationshipFocuses" resultType="string">
+        select value
+        from cm_event_relationship_focuses
+        where event_id = #{eventId}
+          and locale = #{locale}
+          and status = 'ready'
+        order by focus_order
+    </select>
+
+    <insert id="insertAdminEvent">
+        insert into cm_events (
+            id, status, visibility, consumes_membership_quota,
+            city_code, address_visibility, event_date, start_time, end_time,
+            capacity, cover_image_url, created_at, updated_at
+        ) values (
+            #{id}, #{status}, #{visibility}, #{consumesMembershipQuota},
+            #{cityCode}, #{addressVisibility}, #{eventDate}, #{startTime}, #{endTime},
+            #{capacity}, #{coverImageUrl}, now(), now()
+        )
+    </insert>
+
+    <update id="updateAdminEvent">
+        update cm_events
+        set status = #{status},
+            visibility = #{visibility},
+            consumes_membership_quota = #{consumesMembershipQuota},
+            city_code = #{cityCode},
+            address_visibility = #{addressVisibility},
+            event_date = #{eventDate},
+            start_time = #{startTime},
+            end_time = #{endTime},
+            capacity = #{capacity},
+            cover_image_url = #{coverImageUrl},
+            updated_at = now()
+        where id = #{id}
+          and status = 'draft'
+    </update>
+
+    <delete id="deleteAdminEventLanguageCodes">
+        delete from cm_event_language_codes
+        where event_id = #{eventId}
+    </delete>
+
+    <insert id="insertAdminEventLanguageCode">
+        insert into cm_event_language_codes (
+            event_id, language_code
+        ) values (
+            #{eventId}, #{languageCode}
+        )
+    </insert>
+
+    <delete id="deleteAdminEventRelationshipFocuses">
+        delete from cm_event_relationship_focuses
+        where event_id = #{eventId}
+    </delete>
+
+    <insert id="insertAdminEventRelationshipFocus">
+        insert into cm_event_relationship_focuses (
+            id, event_id, focus_order, locale, value, source, provider, status,
+            created_at, updated_at
+        ) values (
+            #{id}, #{eventId}, #{focusOrder}, #{locale}, #{value},
+            'manual', 'human', 'ready', now(), now()
+        )
+    </insert>
+
+    <insert id="insertAdminEventLocalizedField">
+        insert into cm_event_localized_fields (
+            id, event_id, field_name, locale, value, source, provider, status,
+            created_at, updated_at
+        ) values (
+            #{id}, #{eventId}, #{fieldName}, #{locale}, #{value},
+            'manual', 'human', 'ready', now(), now()
+        )
+    </insert>
+
+    <insert id="upsertAdminEventLocalizedField">
+        insert into cm_event_localized_fields (
+            id, event_id, field_name, locale, value, source, provider, status,
+            created_at, updated_at
+        ) values (
+            #{id}, #{eventId}, #{fieldName}, #{locale}, #{value},
+            'manual', 'human', 'ready', now(), now()
+        )
+        on duplicate key update
+            value = values(value),
+            source = 'manual',
+            provider = 'human',
+            status = 'ready',
+            updated_at = now()
+    </insert>
+
+    <delete id="deleteAdminEventAgendaLocalizedFields">
+        delete lf from cm_event_agenda_item_localized_fields lf
+        join cm_event_agenda_items i on i.id = lf.agenda_item_id
+        where i.event_id = #{eventId}
+    </delete>
+
+    <delete id="deleteAdminEventAgendaItems">
+        delete from cm_event_agenda_items
+        where event_id = #{eventId}
+    </delete>
+
+    <insert id="insertAdminEventAgendaItem">
+        insert into cm_event_agenda_items (
+            id, event_id, agenda_time, sort_order, created_at, updated_at
+        ) values (
+            #{id}, #{eventId}, #{agendaTime}, #{sortOrder}, now(), now()
+        )
+    </insert>
+
+    <insert id="insertAdminEventAgendaLocalizedField">
+        insert into cm_event_agenda_item_localized_fields (
+            id, agenda_item_id, field_name, locale, value, source, provider,
+            status, created_at, updated_at
+        ) values (
+            #{id}, #{agendaItemId}, #{fieldName}, #{locale}, #{value},
+            'manual', 'human', 'ready', now(), now()
+        )
+    </insert>
+
+    <delete id="deleteAdminEventNoteLocalizedFields">
+        delete lf from cm_event_note_item_localized_fields lf
+        join cm_event_note_items i on i.id = lf.note_item_id
+        where i.event_id = #{eventId}
+    </delete>
+
+    <delete id="deleteAdminEventNoteItems">
+        delete from cm_event_note_items
+        where event_id = #{eventId}
+    </delete>
+
+    <insert id="insertAdminEventNoteItem">
+        insert into cm_event_note_items (
+            id, event_id, sort_order, created_at, updated_at
+        ) values (
+            #{id}, #{eventId}, #{sortOrder}, now(), now()
+        )
+    </insert>
+
+    <insert id="insertAdminEventNoteLocalizedField">
+        insert into cm_event_note_item_localized_fields (
+            id, note_item_id, field_name, locale, value, source, provider,
+            status, created_at, updated_at
+        ) values (
+            #{id}, #{noteItemId}, #{fieldName}, #{locale}, #{value},
+            'manual', 'human', 'ready', now(), now()
+        )
+    </insert>
+
+    <update id="updateAdminEventStatus">
+        update cm_events set status = #{status}, updated_at = now()
+        where id = #{id}
+    </update>
+
+    <select id="countEventOccupied" resultType="int">
+        select count(1) from cm_event_registrations
+        where event_id = #{eventId} and status in ('confirmed', 'attended')
+    </select>
+
+    <select id="selectAdminEventRegistrationCounts" resultType="java.util.HashMap">
+        select sum(case when status = 'confirmed' then 1 else 0 end) as confirmedCount,
+               sum(case when status = 'attended' then 1 else 0 end) as attendedCount,
+               sum(case when status = 'waitlist' then 1 else 0 end) as waitlistCount
+        from cm_event_registrations
+        where event_id = #{eventId}
+    </select>
+
+    <!-- Admin: Registration list -->
+    <select id="selectAdminRegistrations" resultType="com.ruoyi.cupid.domain.CupidEventRegistration">
+        select r.id, r.user_id as userId, r.event_id as eventId,
+               r.entitlement_balance_id as entitlementBalanceId, r.status,
+               r.requested_at as requestedAt,
+               r.confirmed_at as confirmedAt,
+               r.declined_at as declinedAt,
+               r.waitlisted_at as waitlistedAt,
+               r.cancelled_at as cancelledAt,
+               r.attended_at as attendedAt,
+               r.event_quota_consumed_at as eventQuotaConsumedAt,
+               r.event_quota_released_at as eventQuotaReleasedAt,
+               r.created_at as createdAt,
+               r.updated_at as updatedAt,
+               u.account_name as userAccountName,
+               lf.value as eventTitle,
+               e.event_date as eventDate
+        from cm_event_registrations r
+        join cm_events e on e.id = r.event_id
+        left join cm_users u on u.id = r.user_id
+        left join cm_event_localized_fields lf on lf.event_id = e.id
+            and lf.field_name = 'title'
+            and lf.locale = coalesce(#{params.locale}, 'zh')
+        <where>
+            <if test="params.eventId != null and params.eventId != ''">
+                and e.id = #{params.eventId}
+            </if>
+            <if test="params.eventTitle != null and params.eventTitle != ''">
+                and lf.value like concat('%', #{params.eventTitle}, '%')
+            </if>
+            <if test="params.userKeyword != null and params.userKeyword != ''">
+                and (r.user_id like concat('%', #{params.userKeyword}, '%')
+                    or u.account_name like concat('%', #{params.userKeyword}, '%'))
+            </if>
+            <if test="params.status != null and params.status != ''">
+                and r.status = #{params.status}
+            </if>
+            <if test="params.dateFrom != null and params.dateFrom != ''">
+                and r.requested_at &gt;= #{params.dateFrom}
+            </if>
+            <if test="params.dateTo != null and params.dateTo != ''">
+                and r.requested_at &lt;= #{params.dateTo}
+            </if>
+        </where>
+        <choose>
+            <when test="params.sortBy == 'updatedDesc'">
+                order by r.updated_at desc
+            </when>
+            <when test="params.sortBy == 'eventTitleAsc'">
+                order by lf.value asc, r.requested_at desc
+            </when>
+            <when test="params.sortBy == 'userNameAsc'">
+                order by u.account_name asc, r.requested_at desc
+            </when>
+            <otherwise>
+                order by r.requested_at desc
+            </otherwise>
+        </choose>
+    </select>
+
+    <!-- Admin: Registration detail -->
+    <select id="selectAdminRegistrationById" resultType="java.util.HashMap">
+        select r.id, r.user_id as userId, r.event_id as eventId,
+               r.entitlement_balance_id as entitlementBalanceId, r.status,
+               r.requested_at as requestedAt,
+               r.confirmed_at as confirmedAt,
+               r.declined_at as declinedAt,
+               r.waitlisted_at as waitlistedAt,
+               r.cancelled_at as cancelledAt,
+               r.attended_at as attendedAt,
+               r.event_quota_consumed_at as eventQuotaConsumedAt,
+               r.event_quota_released_at as eventQuotaReleasedAt,
+               r.created_at as createdAt,
+               r.updated_at as updatedAt,
+               u.account_name as userAccountName,
+               lf.value as eventTitle,
+               e.event_date as eventDate,
+               e.capacity, e.consumes_membership_quota as consumesMembershipQuota
+        from cm_event_registrations r
+        join cm_events e on e.id = r.event_id
+        left join cm_users u on u.id = r.user_id
+        left join cm_event_localized_fields lf on lf.event_id = e.id
+            and lf.field_name = 'title'
+            and lf.locale = 'zh'
+        where r.id = #{id}
+    </select>
+
+    <select id="selectAdminRegistrationByIdForUpdate"
+            resultType="com.ruoyi.cupid.domain.CupidEventRegistration">
+        select r.id, r.user_id as userId, r.event_id as eventId,
+               r.entitlement_balance_id as entitlementBalanceId, r.status,
+               r.requested_at as requestedAt,
+               r.confirmed_at as confirmedAt,
+               r.declined_at as declinedAt,
+               r.waitlisted_at as waitlistedAt,
+               r.cancelled_at as cancelledAt,
+               r.attended_at as attendedAt,
+               r.event_quota_consumed_at as eventQuotaConsumedAt,
+               r.event_quota_released_at as eventQuotaReleasedAt,
+               r.created_at as createdAt,
+               r.updated_at as updatedAt
+        from cm_event_registrations r
+        where r.id = #{id} for update
+    </select>
+
+    <select id="selectAvailableEventEntitlementBalanceForUpdate" resultType="string">
+        select id
+        from cm_user_entitlement_balances
+        where user_id = #{userId}
+          and membership_id = #{membershipId}
+          and entitlement_code = 'event_registration'
+          and period_started_at &lt;= now()
+          and period_ends_at &gt; now()
+          and quota_remaining &gt; 0
+        order by period_ends_at
+        limit 1
+        for update
+    </select>
+
+    <update id="consumeEventEntitlementById">
+        update cm_user_entitlement_balances
+        set quota_used = quota_used + 1,
+            quota_remaining = quota_remaining - 1,
+            updated_at = now()
+        where id = #{balanceId}
+          and quota_remaining &gt; 0
+    </update>
+
+    <update id="releaseEventEntitlementById">
+        update cm_user_entitlement_balances
+        set quota_used = greatest(quota_used - 1, 0),
+            quota_remaining = least(quota_remaining + 1, quota_total),
+            updated_at = now()
+        where id = #{balanceId}
+          and quota_used &gt; 0
+          and quota_remaining &lt; quota_total
+    </update>
+
+    <update id="updateAdminRegistrationStatus">
+        update cm_event_registrations
+        set status = #{status},
+            requested_at = case when #{status} = 'requested' then now() else requested_at end,
+            confirmed_at = case when #{status} = 'confirmed' and confirmed_at is null then now() else confirmed_at end,
+            declined_at = case when #{status} = 'declined' then now() else declined_at end,
+            waitlisted_at = case when #{status} = 'waitlist' then now() else waitlisted_at end,
+            cancelled_at = case when #{status} = 'cancelled' then now() else cancelled_at end,
+            attended_at = case when #{status} = 'attended' then now() else attended_at end,
+            <if test="consumeQuota">
+                entitlement_balance_id = #{entitlementBalanceId},
+                event_quota_consumed_at = now(),
+                event_quota_released_at = null,
+            </if>
+            <if test="releaseQuota">
+                event_quota_released_at = now(),
+            </if>
+            updated_at = now()
+        where id = #{id}
+    </update>
 
 </mapper>

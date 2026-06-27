@@ -1118,6 +1118,7 @@ API：
 | `id` | `id` | UUID |
 | `userId` | `user_id` | 用户ID |
 | `eventId` | `event_id` | 活动ID |
+| `entitlementBalanceId` | `entitlement_balance_id` | 实际消费的活动权益余额ID |
 | `status` | `status` | requested / confirmed / declined / waitlist / cancelled / attended |
 | `requestedAt` | `requested_at` | 申请时间 |
 | `confirmedAt` | `confirmed_at` | 确认时间 |
@@ -1142,26 +1143,21 @@ draft → open → waitlist → closed → completed
 
 - Event 状态只使用 `draft`、`open`、`waitlist`、`closed`、`completed`。
 - `member` 不是 Event 状态，会员专属来自 `visibility = member`。
-- 8.4 只允许 Admin 手动变更 Event 状态，不做活动内容编辑。
-- `draft` 可切 `open` 或 `closed`。
+- Admin 可以新增活动，并且仅允许编辑 `draft` 活动的内容。
+- 新建和编辑时只允许保存为 `draft` 或 `open`；发布为 `open` 前必须补齐全部必填内容。
+- 独立状态变更只允许 `draft` 切 `open`，不能绕过发布字段校验。
 - `open` 可切 `waitlist`（转入候补）、`closed`（停止报名）或 `completed`（活动结束）。
 - `waitlist` 可切 `closed` 或 `completed`。
 - `closed` 可切 `open`（重新开放）或 `completed`。
 - `completed` 为终态，8.4 不允许再切回其他状态。
 
-Registration（Admin 操作范围，不覆盖 C 端自助取消）：
+Registration：
 
-```
-requested → confirmed
-          → waitlist
-          → declined
-```
-
-- 8.4 Admin 只处理 `requested`，不能处理 `confirmed`、`waitlist`、`declined`、`cancelled` 或 `attended`。
-- `confirmed` 扣减会员活动额度并占用名额。
-- `waitlist` 不扣减额度，不占用 confirmed 名额。
-- `declined` 不扣减额度，但记录处理时间。
-- `waitlist → confirmed`、`confirmed → attended`、`confirmed → declined` 等后续状态变更不在 8.4 实现。
+- Admin 可以将任意持久化报名状态纠正为另一个状态，但目标状态不能与当前状态相同。
+- `confirmed` 和 `attended` 占用名额；其他状态不占用名额。
+- 进入占位状态时检查容量，并按活动规则扣减额度。
+- 离开占位状态时返还 `entitlement_balance_id` 指向的原额度记录。
+- 所有状态纠正必须填写原因并写入 `cm_audit_logs`。
 
 #### 页面
 
@@ -1170,54 +1166,58 @@ requested → confirmed
 
 #### Event 管理页
 
-列表筛选：活动 slug、状态、城市、活动日期范围、排序（日期/创建时间）。
+列表筛选：活动标题、状态、城市、活动日期范围、排序（日期/创建时间）。
 
 列表列：
 
 | 列 | 说明 |
 | --- | --- |
-| 活动 | 标题 + slug（小字） |
+| 活动 | 标题 |
 | 状态 | `labelOf(eventStatuses, ...)` |
 | 可见范围 | `labelOf(eventVisibilityOptions, ...)` |
 | 城市 | `optionLabel('profile.city', ...)` |
 | 日期 | eventDate |
 | 时段 | startTime – endTime |
 | 容量 | occupiedCount / capacity（confirmed + attended） |
-| 操作 | 详情按钮 + 状态变更按钮 |
+| 操作 | 详情、编辑、报名管理、状态变更 |
 
-详情抽屉：活动基本信息（标题、slug、状态、可见范围、日期、时间、城市、容量）、多语言描述、agenda items、报名统计（confirmed/attended/waitlist 数量）。
+详情抽屉：活动基本信息（标题、状态、可见范围、日期、时间、城市、容量）、活动说明、note items、agenda items 和报名统计。
 
-状态变更弹窗：选择目标状态，填写原因。变更写入 `cm_audit_logs`。8.4 不提供活动标题、描述、议程、图片、城市、时间、容量的编辑能力。
+新增/编辑弹窗：维护标题、可见范围、城市、语言、地址可见性、日期时间、名额、额度规则、封面、说明、场地、地址、形式、人群、关系主题、note items 和 agenda items。只有草稿可再次编辑；保存为报名中时，每条 note/agenda 均必须完整。
+
+状态变更弹窗：选择目标状态并填写必填原因。发布为 `open` 时后端重新校验完整活动内容；变更及完整活动内容快照写入 `cm_audit_logs`。
 
 #### Registration 管理页
 
-列表筛选：活动 slug、用户名称/ID、状态、申请时间范围。
+列表筛选：活动标题、用户名称/ID、状态、申请时间范围。
 
 列表列：
 
 | 列 | 说明 |
 | --- | --- |
-| 活动 | 活动标题 + slug |
+| 活动 | 活动标题 |
 | 用户 | 账户名称 + userId |
 | 状态 | `labelOf(eventRegStatuses, ...)` |
 | 申请时间 | requestedAt |
 | 处理时间 | confirmedAt / declinedAt / waitlistedAt |
-| 操作 | 详情 + 处理按钮（仅 requested 状态） |
+| 操作 | 详情 + 状态纠正按钮 |
 
 详情抽屉：报名信息（活动、用户、状态、时间戳）、用户简要资料。默认不展示联系方式。
 
-处理弹窗：选择 confirm / waitlist / decline，填写原因。
+状态纠正弹窗：从完整报名状态列表选择目标状态（排除当前状态），并填写必填原因。
 
 #### API
 
 | 模块 | 方法 | 路径 | 权限 | 说明 |
 | --- | --- | --- | --- | --- |
-| Event | `GET` | `/cupid/event/list` | `cupid:event:list` | 列表，可按 slug/status/city/dateRange 筛选 |
+| Event | `GET` | `/cupid/event/list` | `cupid:event:list` | 列表，可按 keyword/status/city/dateRange 筛选 |
 | Event | `GET` | `/cupid/event/{id}` | `cupid:event:query` | 详情，含多语言字段和报名统计 |
-| Event | `POST` | `/cupid/event/{id}/status` | `cupid:event:changeStatus` | 变更活动状态，body: `{ status, reason }` |
-| Registration | `GET` | `/cupid/eventRegistration/list` | `cupid:eventRegistration:list` | 列表，可按 eventSlug/userId/status/dateRange 筛选 |
+| Event | `POST` | `/cupid/event` | `cupid:event:add` | 新增活动 |
+| Event | `PUT` | `/cupid/event/{id}` | `cupid:event:edit` | 编辑草稿活动 |
+| Event | `POST` | `/cupid/event/{id}/status` | `cupid:event:changeStatus` | 变更活动状态，body: `{ status, reason }`，reason 必填 |
+| Registration | `GET` | `/cupid/eventRegistration/list` | `cupid:eventRegistration:list` | 列表，可按 eventTitle/userKeyword/status/dateRange/sortBy 筛选 |
 | Registration | `GET` | `/cupid/eventRegistration/{id}` | `cupid:eventRegistration:query` | 详情，含活动摘要和用户信息 |
-| Registration | `POST` | `/cupid/eventRegistration/{id}/review` | `cupid:eventRegistration:review` | 处理报名，body: `{ action: confirm\|waitlist\|decline, reason }` |
+| Registration | `POST` | `/cupid/eventRegistration/{id}/review` | `cupid:eventRegistration:review` | 纠正报名状态，body: `{ status, reason }` |
 
 8.4 不新增联系方式查看接口。若后续需要在报名详情查看用户联系方式，必须单独增加权限字符，例如 `cupid:eventRegistration:contact`。
 
@@ -1230,43 +1230,28 @@ requested → confirmed
 
 #### 业务规则
 
-**确认（confirm）**：
+**报名状态纠正**：
 
-1. 锁定 Registration（`SELECT ... FOR UPDATE`）并校验状态为 `requested`。
-2. 锁定 Event（`SELECT ... FOR UPDATE`）。
-3. 检查 `occupiedCount < capacity`，其中 `occupiedCount = confirmed + attended`，不足则整体失败。
-4. 若 `consumesMembershipQuota = true`，检查用户活动额度余额，不足则整体失败。
-5. 原子扣减活动额度（`cm_user_entitlement_balances.quota_remaining`，仅针对 `event_registration` 类型），更新条件必须保证余额大于 0。
-6. 更新 Registration 必须带 `where id = ? and status = 'requested' and event_quota_consumed_at is null`，避免重复确认和重复扣减。
-7. 写入 `confirmed_at` 和 `event_quota_consumed_at`。
-8. 写入 `cm_audit_logs`。
-
-**候补（waitlist）**：
-
-1. 锁定 Registration 并校验 `requested`。
-2. 不扣额度，写入 `waitlisted_at`。
-3. 写入 `cm_audit_logs`。
-
-**拒绝（decline）**：
-
-1. 锁定 Registration 并校验 `requested`。
-2. 不扣额度，写入 `declined_at`。
-3. 写入 `cm_audit_logs`。
-
-**状态回滚**（后续 Admin 操作需要时实现）：`confirmed → declined` 需释放已占名额和已扣额度。8.4 不做 waitlist→confirmed 的升级操作（由 C 端或后续 phase 处理）。
+1. 按 Event、Registration 顺序执行 `SELECT ... FOR UPDATE`。
+2. 目标为 `confirmed` 或 `attended` 且当前不占位时，检查 `occupiedCount < capacity`。
+3. 活动需要额度且进入占位状态时，锁定并扣减当前有效的活动权益余额，同时记录 `entitlement_balance_id`。
+4. 离开占位状态时，按 `entitlement_balance_id` 返还原额度记录，不按当前会员周期猜测。
+5. 写入目标状态的时间戳，同时保留此前已经发生过的生命周期时间戳。
+6. 写入包含纠正原因、前后快照的 `cm_audit_logs`。
 
 **禁止超卖**：所有容量检查必须在同一事务内、`FOR UPDATE` 锁保护下完成。容量统计口径统一为 `confirmed + attended` 占用名额，`waitlist` 不占用名额。
 
 **Event 状态变更**：
 
 - 只允许按本节状态机变更状态。
+- `draft` 发布为 `open` 时必须再次执行完整字段校验。
 - `closed` 不影响已确认的报名。
 - `completed` 为终态，不允许再切回 `open`、`waitlist` 或 `closed`。
-- 所有状态变更写入 `cm_audit_logs`。
+- 所有状态变更必须填写原因并写入 `cm_audit_logs`。
 
 #### 权限字符
 
-- `cupid:event:list` / `cupid:event:query` / `cupid:event:changeStatus`
+- `cupid:event:list` / `cupid:event:query` / `cupid:event:add` / `cupid:event:edit` / `cupid:event:changeStatus`
 - `cupid:eventRegistration:list` / `cupid:eventRegistration:query` / `cupid:eventRegistration:review`
 - `cupid:eventRegistration:contact`：8.4 预留，不实现；后续若需要查看联系方式再启用。
 

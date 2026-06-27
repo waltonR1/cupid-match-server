@@ -12,7 +12,7 @@
 - `cm_*` 实体表的代理主键及其引用统一使用 36 字符 UUID；Java 运行时使用 `IdUtils.fastUUID()`。
 - seed 生成器把 mock 的可读 ID 确定性映射为 UUIDv5，同一份源数据重复生成时 ID 保持稳定。
 - ID 只表达身份，不承载实体类型或业务含义；禁止根据 `u-`、`p-` 等前缀编写判断。
-- `tier`、`slug`、`type`、`entitlement_code` 等稳定业务含义保留在独立字段。
+- `tier`、`type`、`entitlement_code` 等稳定业务含义保留在独立字段。
 - 前台产品用户使用 `cm_users`，不复用 RuoYi `sys_user`。
 - 后台员工直接使用 RuoYi `sys_user`、`sys_role`、`sys_user_role` 和 `sys_menu` 表达账号、角色与权限，不另建业务 staff 映射。
 - 不建立 `cm_staff_members`；后台员工直接复用 RuoYi 原生账号和授权体系。
@@ -46,7 +46,6 @@
 
 `cm_events` 中保留：
 
-- `slug`
 - `status`
 - `visibility`
 - `consumes_membership_quota`

@@ -101,7 +101,7 @@ public class CupidEventServiceImpl implements ICupidEventService
         Map<String, Object> detail = buildDirectoryItem(event);
         detail.putAll(resolveAddress(event, userId, registration));
         detail.put("languageCodes", loadLanguageCodes(eventId));
-        detail.put("curatorNote", valueOrEmpty(event.getCuratorNote()));
+        detail.put("noteItems", loadNoteItems(eventId, normalizeLocale(locale)));
         detail.put("agendaItems", loadAgendaItems(eventId, normalizeLocale(locale)));
         detail.put("registration", resolveRegistrationState(event, userId, registration));
         detail.put("eventEntitlement", buildEventEntitlement(userId));
@@ -157,19 +157,20 @@ public class CupidEventServiceImpl implements ICupidEventService
                     registrationState("event_quota_exhausted", null), userId);
         }
 
+        String registrationStatus = shouldWaitlist(event) ? "waitlist" : "requested";
         if (existing == null)
         {
             registrationId = IdUtils.fastUUID();
-            eventMapper.insertRegistration(registrationId, userId, eventId, "requested");
+            eventMapper.insertRegistration(registrationId, userId, eventId, registrationStatus);
         }
         else
         {
-            eventMapper.resubmitRegistration(registrationId);
+            eventMapper.resubmitRegistration(registrationId, registrationStatus);
         }
 
         loadCounts(event);
         return buildRegistrationResponse(
-                event, registrationState("requested", registrationId), userId);
+                event, registrationState(registrationStatus, registrationId), userId);
     }
 
     @Override
@@ -210,10 +211,10 @@ public class CupidEventServiceImpl implements ICupidEventService
         if (registration.get("eventQuotaConsumedAt") != null
                 && registration.get("eventQuotaReleasedAt") == null)
         {
-            CupidUserMembership membership =
-                    authMapper.selectActiveMembershipByUserId(userId);
-            if (membership == null
-                    || eventMapper.releaseEventEntitlement(userId, membership.getId()) != 1
+            String entitlementBalanceId =
+                    (String) registration.get("entitlementBalanceId");
+            if (entitlementBalanceId == null
+                    || eventMapper.releaseEventEntitlementById(entitlementBalanceId) != 1
                     || eventMapper.markQuotaReleased(registrationId) != 1)
             {
                 throw new CupidApiException(
@@ -343,7 +344,6 @@ public class CupidEventServiceImpl implements ICupidEventService
         event.setAddress(valueOrEmpty(fields.get("address")));
         event.setFormat(valueOrEmpty(fields.get("format")));
         event.setAudience(valueOrEmpty(fields.get("audience")));
-        event.setCuratorNote(valueOrEmpty(fields.get("curator_note")));
     }
 
     private void applyCounts(CupidEvent event, Map<String, Integer> counts)
@@ -399,11 +399,15 @@ public class CupidEventServiceImpl implements ICupidEventService
         return new ArrayList<>(grouped.values());
     }
 
+    private List<Map<String, Object>> loadNoteItems(String eventId, String locale)
+    {
+        return eventMapper.selectEventNoteItems(eventId, locale);
+    }
+
     private Map<String, Object> buildDirectoryItem(CupidEvent event)
     {
         Map<String, Object> item = new LinkedHashMap<>();
         item.put("id", event.getId());
-        item.put("slug", event.getSlug());
         item.put("status", resolveEventStatus(event));
         item.put("title", valueOrEmpty(event.getTitle()));
         item.put("summary", valueOrEmpty(event.getSummary()));
@@ -667,6 +671,11 @@ public class CupidEventServiceImpl implements ICupidEventService
             return "completed";
         }
         return event.getStatus();
+    }
+
+    private boolean shouldWaitlist(CupidEvent event)
+    {
+        return "waitlist".equals(event.getStatus()) || event.getRemainingSeats() <= 0;
     }
 
     private String normalizeLocale(String locale)
