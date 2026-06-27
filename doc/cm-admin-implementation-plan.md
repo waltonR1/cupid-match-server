@@ -377,7 +377,8 @@ perms = ''
 | 活动管理 | 活动运营 | `event` | `cupid/event/index` | `cupid:event:list` |
 | 报名审核 | 活动运营 | `registration` | `cupid/event-registration/index` | `cupid:eventRegistration:list` |
 | App 用户管理 | 用户服务 | `user` | `cupid/user/index` | `cupid:user:list` |
-| 系统通知 | 用户服务 | `inbox` | `cupid/inbox/index` | `cupid:inbox:list` |
+| 通知发布 | 用户服务 | `inbox` | `cupid/inbox/index` | `cupid:inbox:send` |
+| 通知模板 | 用户服务 | `inbox-template` | `cupid/inbox-template/index` | `cupid:inboxTemplate:list` |
 | Staff Task | 运营协作 | `task` | `cupid/staff-task/index` | `cupid:staffTask:list` |
 | 业务审计 | 运营协作 | `audit` | `cupid/audit/index` | `cupid:audit:list` |
 | 通用选项 | 配置中心 | `options` | `cupid/options/index` | `cupid:options:list` |
@@ -405,7 +406,8 @@ query = ''
 - `CupidEvent`
 - `CupidEventRegistration`
 - `CupidUser`
-- `CupidInbox`
+- `CupidInboxPublisher`
+- `CupidInboxTemplate`
 - `CupidStaffTask`
 - `CupidAudit`
 - `CupidOptions`
@@ -421,7 +423,8 @@ query = ''
 | Event | `cupid:event:query`、`cupid:event:edit`、`cupid:event:changeStatus` |
 | Event Registration | `cupid:eventRegistration:query`、`cupid:eventRegistration:review` |
 | User | `cupid:user:query`、`cupid:user:changeStatus` |
-| Inbox | `cupid:inbox:query`、`cupid:inbox:notify` |
+| Inbox 发布 | `cupid:inbox:preview`、`cupid:inbox:send`、`cupid:inbox:broadcast` |
+| Inbox 模板 | `cupid:inboxTemplate:query`、`cupid:inboxTemplate:add`、`cupid:inboxTemplate:edit`、`cupid:inboxTemplate:changeStatus` |
 | Staff Task | `cupid:staffTask:query`、`cupid:staffTask:add`、`cupid:staffTask:edit` |
 | Audit | `cupid:audit:query` |
 | Options | `cupid:options:query`、`cupid:options:edit` |
@@ -446,7 +449,7 @@ query = ''
 | `cupid_admin` | 全部 Cupid 运营能力，不默认拥有 RuoYi 系统菜单 |
 | `cupid_reviewer` | Profile、Photo、Verification 和 Introduction 审核 |
 | `cupid_event_manager` | Event 和 Event Registration |
-| `cupid_support` | App User、Inbox 和 Staff Task |
+| `cupid_support` | App User、Inbox 单发和 Staff Task |
 | `cupid_auditor` | 业务审计只读 |
 
 不创建含义重叠的 `cupid_operator`。新增角色前必须先证明现有角色无法准确表达职责。
@@ -458,7 +461,7 @@ query = ''
 | `cupid_admin` | 固定路由 | 全部 | 全部 | 全部 | 全部 | 全部 |
 | `cupid_reviewer` | 固定路由 | 全部 | 全部 | 否 | 否 | 否 |
 | `cupid_event_manager` | 固定路由 | 否 | 否 | 全部 | 否 | 否 |
-| `cupid_support` | 固定路由 | 否 | 否 | 否 | 全部 | Staff Task |
+| `cupid_support` | 固定路由 | 否 | 否 | 否 | App User + Inbox 单发 | Staff Task |
 | `cupid_auditor` | 固定路由 | 否 | 否 | 否 | 否 | Audit 只读 |
 
 “全部”表示同时授予：
@@ -1265,27 +1268,243 @@ Registration：
 
 ### 11.5 Phase 8.5：Inbox 通知
 
-页面：
+#### 终态定义
 
-- `src/views/cupid/inbox/index.vue`
+Phase 8.5 将 Cupid Inbox 的“站内通知”能力推进到终态，不宣告未来受控沟通能力完成：
+
+- 后台不提供“查看全部 C 端线程和消息”的能力。
+- 后台只提供模板管理、预览、单用户通知和群发通知。
+- 人工单发和群发统一显示为“平台管理员”，写入 `category = system` 线程，C 端不可回复。
+- 自动业务通知显示为“系统通知”，同样写入 `system` 线程。
+- 继续复用现有 `cm_inbox_threads`、`cm_inbox_messages`、`cm_inbox_reads` 和 `/api/inbox/**`。
+- 现有 C 端仅允许向 `chat + open` 线程发送文本，因此无需新增禁止回复分支；8.5 不创建后台 chat 线程。
+- 保留现有 `POST /api/inbox/threads/{id}/messages`、`ICupidInboxService.sendMessage` 和 `chat` category，作为未来受控沟通预留；8.5 不删除、不扩展，也不在 C 端 API/hook/page 接入。
+- 不复用 `sys_notice`、`sys_notice_read`，不将 `cm_users` 写入 `sys_user`。
+
+Phase 8.5 分为：
+
+1. 8.5.1：通知模板与模板管理。
+2. 8.5.2：单用户预览和发送。
+3. 8.5.3：简易群发。
+4. 8.5.4：业务状态自动通知。
+5. 8.5.5：完整验收。
+
+#### 8.5.1：模板结构与管理
+
+新增 `cm_inbox_templates`：
+
+| 字段 | 说明 |
+| --- | --- |
+| `id` | UUID |
+| `template_code` | 稳定 code，唯一；创建后不可修改 |
+| `message_type` | `text / system_notice / status_update / action_prompt` |
+| `subject_type` | 可空；限定模板对应业务对象 |
+| `action_type` | 可空；由模板定义，发送请求不能覆盖 |
+| `status` | `enabled / disabled` |
+| `created_at / updated_at` | 时间戳 |
+
+新增 `cm_inbox_template_localized_fields`：
+
+| 字段 | 说明 |
+| --- | --- |
+| `id` | UUID |
+| `template_id` | 模板 ID |
+| `locale` | `zh / fr / en` |
+| `name` | 后台展示名称 |
+| `body` | 纯文本模板正文 |
+| `created_at / updated_at` | 时间戳 |
+
+约束：
+
+- `uk_cm_inbox_template_code(template_code)`。
+- `uk_cm_inbox_template_locale(template_id, locale)`。
+- 模板正文使用受控 `{{variableName}}`；禁止执行 SpEL、FreeMarker 或任意表达式。
+- Java 集中声明每个 template code 允许的变量；未知、缺失或未替换变量均拒绝保存预览或发送。
+- `cm_inbox_messages` 增加可空 `dedupe_key varchar(160)` 和唯一索引；自动通知和群发使用，普通单发可为空。
+- 同步更新 `cm_schema.sql`、`cm_seed.sql`，并提供现有数据库可手工执行的 Phase 8.5 增量 SQL。
+
+初始模板至少包含：
+
+- `welcome_message`
+- `profile_review_approved / profile_review_rejected`
+- `photo_review_approved / photo_review_rejected`
+- `verification_approved / verification_rejected`
+- `event_registration_status_changed`
+- `private_introduction_status_changed`
+
+模板管理页面：`src/views/cupid/inbox-template/index.vue`
+
+- 列表展示 code、message type、subject type、三语完整度、状态和更新时间。
+- 支持新增模板、编辑三语 name/body、启用和停用。
+- 编辑时不可修改 template code。
+- message type、subject type、action type 使用后端 common options。
+- 保存前校验三语正文、占位符和允许变量。
+- 已被历史消息使用的模板允许停用，不允许删除；8.5 不提供模板删除接口。
+
+模板 API：
+
+| 方法 | 路径 | 权限 |
+| --- | --- | --- |
+| `GET` | `/cupid/inboxTemplate/list` | `cupid:inboxTemplate:list` |
+| `GET` | `/cupid/inboxTemplate/{id}` | `cupid:inboxTemplate:query` |
+| `POST` | `/cupid/inboxTemplate` | `cupid:inboxTemplate:add` |
+| `PUT` | `/cupid/inboxTemplate/{id}` | `cupid:inboxTemplate:edit` |
+| `POST` | `/cupid/inboxTemplate/{id}/status` | `cupid:inboxTemplate:changeStatus` |
+
+Common Options 增加并递增静态版本：
+
+- `inbox.messageType`
+- `inbox.templateStatus`
+- `inbox.senderType`
+- `inbox.category`
+- `inbox.threadStatus`
+
+`message.subjectType` 继续复用。Admin 不保留本地 label 兼容。
+
+#### 8.5.2：单用户通知
+
+页面：`src/views/cupid/inbox/index.vue`
+
+该页面是“通知发布”工作台，不展示线程列表或历史消息。包含：
+
+- 目标用户搜索与选择。
+- 模板/自定义正文模式。
+- 语言选择；默认目标用户 `preferred_locale`。
+- subject type 和 subject 搜索。
+- 预览区。
+- 确认发送。
 
 API：
 
-- `GET /cupid/inbox/list`
-- `GET /cupid/inbox/{threadId}`
-- `POST /cupid/inbox/notify`
+| 方法 | 路径 | 权限 | 说明 |
+| --- | --- | --- | --- |
+| `GET` | `/cupid/inbox/templates` | `cupid:inbox:preview` | 已启用模板 |
+| `POST` | `/cupid/inbox/preview` | `cupid:inbox:preview` | 只渲染，不写库 |
+| `POST` | `/cupid/inbox/notify` | `cupid:inbox:send` | 单用户发送 |
 
-要求：
+规则：
 
-- 建立 `CupidInboxThread` 和 `CupidInboxMessage`。
-- 不修改或复用 `sys_notice`、`sys_notice_read` 承载 C 端通知。
-- RuoYi“通知公告”继续只面向 `sys_user` 后台员工。
-- 支持查询系统通知线程、模板、语言和目标用户。
-- 提供发送前预览。
-- 不允许伪造用户聊天消息。
-- 模板 code、locale、用户和消息类型必须校验。
-- 自定义正文权限与模板发送权限需要分开时，再增加更细权限，不提前拆分。
-- Phase 8.5 完成后，再统一接入资料审核、照片审核和认证审核结果通知；不在 Phase 8.2.x 提前实现审核通知。
+- userId 必须存在于 `cm_users`。
+- 模板必须 enabled；locale 只接受 `zh/fr/en`。
+- subject 必须与目标用户存在真实业务关联，避免泄露其他用户资料、活动报名、介绍或会员信息。
+- 模板定义 message type、subject type 和 action type，前端不能覆盖。
+- 自定义正文 trim 后 1–4000 字，不允许 action payload。
+- 预览结果不能直接作为发送正文；发送事务必须重新加载模板和渲染。
+- 人工模板和自定义通知均写 `sender_type = staff`，`sender_user_id = 当前 sys_user.user_id`；C 端统一显示“平台管理员”。
+- 线程始终为 `category = system`，所以 C 端不能回复。
+- 人工单发属于工作人员联系，目标用户 `staff_contact_enabled = false` 时拒绝发送；业务必达的自动通知不走人工单发接口。
+- 有 subject 时复用同一用户、同一 subject 的 open system 线程；无 subject 时复用该用户的通用 open system 线程。
+- 插入消息、touch thread 和写 `cm_audit_logs` 在同一事务完成。
+- C 端消息展示根据 sender type 显示三语“平台管理员/系统通知”标签；不暴露真实 sys_user 用户名或 ID，不给 system 线程渲染回复输入框。
+
+#### 8.5.3：简易群发
+
+不新增 broadcast/broadcast_recipient 表，不实现批次历史和失败恢复。
+
+支持接收范围：
+
+- 全部有效 C 端用户。
+- 指定会员等级。
+- 手工选择多个用户。
+
+API：
+
+| 方法 | 路径 | 权限 | 说明 |
+| --- | --- | --- | --- |
+| `POST` | `/cupid/inbox/broadcast/preview` | `cupid:inbox:broadcast` | 返回预计人数、少量用户样例和最终文案 |
+| `POST` | `/cupid/inbox/broadcast` | `cupid:inbox:broadcast` | 分批群发 |
+
+规则：
+
+- 前端只能提交固定 scope 和参数，不能提交 SQL、字段名或表达式。
+- HTTP 请求内按固定批大小处理，例如每批 100 人；每个用户使用独立事务，单个失败不回滚其他用户。
+- 每用户写入必须调用独立 Bean 的 `REQUIRES_NEW` 方法，不能在同类循环中依赖 self-invocation。
+- 每个用户复用自己的通用 system 线程，写入独立消息，不共享 thread/message。
+- 群发生成 `broadcastId`；每条消息使用 `broadcast:{broadcastId}:{userId}` 作为 dedupe key。
+- sender type 为 staff，C 端显示“平台管理员”，用户不可回复。
+- 模板群发按每个用户 preferred locale 分别渲染；自定义正文使用发送者选择的单一语言。
+- 普通公告尊重 `service_announcements_enabled`；业务必达通知不通过群发接口发送。
+- 响应返回 broadcastId、目标数、成功数、失败数和最多 20 条失败摘要。
+- `cm_audit_logs` 记录 scope、模板、语言、目标数、成功数和失败数，不记录完整用户 ID 数组。
+- 不支持失败重试；再次群发必须创建新的 broadcastId 并重新确认。
+
+#### 8.5.4：业务自动通知
+
+接入：
+
+- 资料审核通过/拒绝。
+- 照片审核通过/拒绝。
+- 身份、学历、收入、婚姻认证通过/拒绝。
+- Event Registration 状态纠正。
+- 私人介绍受理/暂不受理。
+
+规则：
+
+- 业务 Service 发布结构化领域事件，不拼模板正文、不直接操作 Inbox Mapper。
+- 使用 `@TransactionalEventListener(AFTER_COMMIT)`，监听器调用独立 Bean 上 `REQUIRES_NEW` 的通知方法。
+- 通知失败只记录错误日志，不回滚核心业务。
+- 自动消息使用 `sender_type = system`，并提供稳定 dedupe key。
+- family profile 根据 active ownership 找到接收用户。
+- 拒绝原因可以作为模板变量，但内部备注不得发送。
+- 自动消息也写入 system 线程，C 端不可回复。
+- 不在 8.5 实现 Event Reminder、会员到期调度、失败重试队列或外部推送。
+
+后端职责：
+
+- `CupidInboxServiceImpl`：保持现有 C 端读取、已读和 chat 用户消息能力。
+- `CupidInboxNotificationService`：模板渲染、subject 校验、线程复用和消息写入。
+- `CupidAdminInboxServiceImpl`：单发、群发和预览。
+- `CupidInboxTemplateServiceImpl`：模板 CRUD 和占位符校验。
+- `CupidInboxAdminController`、`CupidInboxTemplateAdminController`：权限和请求边界。
+- 业务 Service、Controller 不得复制通知 SQL。
+
+#### 菜单与权限
+
+“用户服务”下新增：
+
+- “通知发布”：`cupid/inbox/index`，菜单权限 `cupid:inbox:send`。
+- “通知模板”：`cupid/inbox-template/index`，菜单权限 `cupid:inboxTemplate:list`。
+
+功能权限：
+
+- `cupid:inbox:preview`
+- `cupid:inbox:send`
+- `cupid:inbox:broadcast`
+- `cupid:inboxTemplate:list/query/add/edit/changeStatus`
+
+角色：
+
+- `cupid_admin`：全部权限。
+- `cupid_support`：preview/send，可单发；默认无 broadcast 和模板编辑权限。
+- `cupid_auditor`：不进入 Inbox 后台；发送历史通过 Phase 8.7 业务审计查看。
+
+菜单和授权写入 `cm_seed.sql` 与 Phase 8.5 增量 SQL，不修改 RuoYi 原始 SQL。
+
+#### 8.5.5：验收
+
+1. 后台不存在查看全部 C 端线程或历史消息的页面/API。
+2. 模板可新增、编辑三语文案、启停；code 不可修改且不能删除。
+3. 模板未知变量、缺失变量、非法 message/subject/action 类型均被拒绝。
+4. preview 不写数据库，send 必须重新渲染。
+5. 单发和群发写入 staff 消息，保存真实 sys_user ID，C 端显示“平台管理员”且不能回复。
+6. 自动业务通知写入 system 消息，失败不回滚业务。
+7. 全部用户、会员等级、手工用户三种群发范围正确，禁用公告用户被排除。
+8. 群发每位用户具有独立消息，失败不影响其他用户，响应统计准确。
+9. dedupe key 阻止自动通知和同一 broadcastId 重复写入。
+10. C 端线程、消息、未读、已读和游标分页保持正常。
+11. 人工单发、群发、模板变更和自动通知均写入 `cm_audit_logs`。
+12. `sys_notice`、`sys_notice_read` 和 `sys_user` 没有 Cupid 兼容分支。
+13. Maven package、Admin build、C 端 type-check/check:i18n、XML 解析和 diff check 全部通过。
+
+#### 明确不做
+
+- 不查看全部 C 端线程和消息。
+- 不创建后台 chat，不允许 C 端回复管理员通知。
+- 不实现未来受控沟通；保留现有 chat 发送后端预留，但不创建 chat 线程或开放发送入口。
+- 不编辑、撤回或删除历史消息。
+- 不建立群发批次表，不做批次历史、失败恢复或定时群发。
+- 不做复杂用户画像、营销编排、短信、邮件、WebSocket 或 Push。
+- 不开放任意 action payload。
 
 ### 11.6 Phase 8.6：App User 管理
 
