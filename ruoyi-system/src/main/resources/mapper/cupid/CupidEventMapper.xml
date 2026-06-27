@@ -20,6 +20,10 @@
 
     <sql id="eventWhere">
         and e.status != 'draft'
+        <if test="status == null or status == ''">
+            and e.status in ('open', 'waitlist')
+            and e.event_date &gt;= curdate()
+        </if>
         <if test="city != null and city != ''">
             and e.city_code = #{city}
         </if>
@@ -56,7 +60,7 @@
         <where>
             <include refid="eventWhere"/>
         </where>
-        order by e.event_date asc
+        order by e.event_date asc, e.start_time asc
         limit #{offset}, #{limit}
     </select>
 
