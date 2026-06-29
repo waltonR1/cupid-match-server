@@ -1,8 +1,11 @@
 package com.ruoyi.framework.web.service;
 
 import java.util.Collections;
+import java.util.Comparator;
+import java.util.List;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -13,6 +16,7 @@ import com.ruoyi.common.core.domain.model.CupidLoginUser;
 import com.ruoyi.common.core.redis.RedisCache;
 import com.ruoyi.common.utils.StringUtils;
 import com.ruoyi.common.utils.uuid.IdUtils;
+import com.ruoyi.cupid.service.ICupidTokenService;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.SignatureAlgorithm;
@@ -22,7 +26,7 @@ import jakarta.servlet.http.HttpServletRequest;
  * Cupid Match 用户令牌服务
  */
 @Service
-public class CupidTokenService
+public class CupidTokenService implements ICupidTokenService
 {
     private static final String SESSION_KEY_PREFIX = "cupid:session:";
     private static final String USER_SESSION_KEY_PREFIX = "cupid:user-sessions:";
@@ -46,7 +50,7 @@ public class CupidTokenService
     private int expireTime;
 
     /**
-     * 创建前台用户会话和JWT
+     * 创建前台用户会话和 JWT
      */
     public String createToken(String identityId, String userId)
     {
@@ -61,10 +65,10 @@ public class CupidTokenService
     }
 
     /**
-     * 从JWT和Redis会话中恢复已认证用户身份
+     * 从 JWT 和 Redis 会话中恢复已认证用户身份
      *
      * @param request HTTP请求
-     * @return 用户身份，令牌或会话无效时返回null
+     * @return 用户身份，令牌或会话无效时返回 null
      */
     public CupidLoginUser getUserPrincipal(HttpServletRequest request)
     {
@@ -125,6 +129,7 @@ public class CupidTokenService
     /**
      * 注销用户的全部令牌会话
      */
+    @Override
     public void deleteUserTokens(String userId)
     {
         if (userId == null)
@@ -132,6 +137,64 @@ public class CupidTokenService
             return;
         }
         afterCommit(() -> deleteUserTokensNow(userId));
+    }
+
+    @Override
+    public CupidLoginUser selectSession(String sessionId)
+    {
+        return StringUtils.hasText(sessionId) ? getSession(sessionId) : null;
+    }
+
+    @Override
+    public List<CupidLoginUser> selectUserSessions(String userId)
+    {
+        if (!StringUtils.hasText(userId))
+        {
+            return List.of();
+        }
+        Set<String> sessionIds = redisCache.getCacheSet(getUserSessionKey(userId));
+        if (sessionIds == null || sessionIds.isEmpty())
+        {
+            return List.of();
+        }
+        return sessionIds.stream()
+                .map(this::getSession)
+                .filter(session -> session != null && userId.equals(session.getUserId()))
+                .sorted(Comparator.comparingLong(CupidLoginUser::getCreatedAt).reversed())
+                .collect(Collectors.toList());
+    }
+
+    @Override
+    public int countUserSessions(String userId)
+    {
+        return selectUserSessions(userId).size();
+    }
+
+    @Override
+    public Set<String> selectOnlineUserIds()
+    {
+        Set<String> empty = Collections.emptySet();
+        java.util.Collection<String> keys = redisCache.keys(USER_SESSION_KEY_PREFIX + "*");
+        if (keys == null || keys.isEmpty())
+        {
+            return empty;
+        }
+        return keys.stream()
+                .map(key -> key.substring(USER_SESSION_KEY_PREFIX.length()))
+                .filter(StringUtils::hasText)
+                .collect(Collectors.toSet());
+    }
+
+    @Override
+    public boolean deleteUserSession(String userId, String sessionId)
+    {
+        CupidLoginUser session = selectSession(sessionId);
+        if (session == null || !userId.equals(session.getUserId()))
+        {
+            return false;
+        }
+        deleteToken(sessionId);
+        return true;
     }
 
     private CupidLoginUser createSession(String identityId, String userId)
@@ -154,7 +217,7 @@ public class CupidTokenService
 
     private void storeSession(CupidLoginUser session)
     {
-        // 会话详情用于JWT认证，用户会话集合用于批量注销该用户的全部登录设备。
+        // 会话详情用于 JWT 认证，用户会话集合用于批量注销该用户的全部登录设备。
         redisCache.setCacheObject(getSessionKey(session.getId()), session, expireTime, TimeUnit.MINUTES);
         String userSessionKey = getUserSessionKey(session.getUserId());
         redisCache.setCacheSet(userSessionKey, Collections.singleton(session.getId()));
@@ -204,7 +267,7 @@ public class CupidTokenService
 
     private void afterCommit(Runnable operation)
     {
-        // 避免数据库事务回滚后Redis中仍然保留无效会话。
+        // 避免数据库事务回滚后 Redis 中仍然保留无效会话。
         if (!TransactionSynchronizationManager.isSynchronizationActive())
         {
             operation.run();

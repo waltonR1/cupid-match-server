@@ -4,7 +4,9 @@ import java.util.List;
 import java.util.Map;
 import org.apache.ibatis.annotations.Param;
 
-/** Inbox 鍚庡彴鍗曞彂/缇ゅ彂璁板綍鏁版嵁灞傘€?*/
+/**
+ * Inbox 后台单发/群发记录数据层
+ */
 public interface CupidInboxDispatchMapper
 {
     int insertBroadcast(Map<String, Object> params);

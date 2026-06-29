@@ -1,0 +1,210 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.cupid.mapper.CupidAdminUserMapper">
+    <select id="selectAdminUsers" resultType="map">
+        select u.id,
+               u.account_name as accountName,
+               u.avatar_url as avatarUrl,
+               u.preferred_locale as preferredLocale,
+               u.status,
+               u.created_at as createdAt,
+               u.updated_at as updatedAt,
+               m.id as membershipId,
+               m.tier as membershipTier,
+               m.status as membershipStatus,
+               m.expires_at as membershipExpiresAt,
+               (select count(1) from cm_profiles p
+                 join cm_profile_ownerships o on o.profile_id = p.id and o.status = 'active'
+                where o.user_id = u.id and p.archived_at is null) as profileCount,
+               (select count(1) from cm_profiles p
+                 join cm_profile_ownerships o on o.profile_id = p.id and o.status = 'active'
+                where o.user_id = u.id and p.profile_type = 'self' and p.archived_at is null) as selfProfileCount,
+               (select p.profile_status from cm_profiles p
+                 join cm_profile_ownerships o on o.profile_id = p.id and o.status = 'active'
+                where o.user_id = u.id and p.profile_type = 'self' and p.archived_at is null
+                order by p.updated_at desc limit 1) as selfProfileStatus
+        from cm_users u
+        left join cm_user_memberships m on m.id = (
+            select um.id from cm_user_memberships um
+            where um.user_id = u.id
+            order by case when um.status = 'active' and (um.expires_at is null or um.expires_at > now()) then 0 else 1 end,
+                     coalesce(um.expires_at, '9999-12-31 23:59:59') desc,
+                     um.created_at desc
+            limit 1
+        )
+        <where>
+            <if test="keyword != null and keyword != ''">
+                (
+                    u.id like concat('%', #{keyword}, '%')
+                    or u.account_name like concat('%', #{keyword}, '%')
+                    or exists (
+                        select 1 from cm_auth_identities ai
+                        where ai.user_id = u.id
+                          and ai.identifier like concat('%', #{keyword}, '%')
+                    )
+                )
+            </if>
+            <if test="status != null and status != ''">
+                and u.status = #{status}
+            </if>
+            <if test="membershipTier != null and membershipTier != ''">
+                and m.tier = #{membershipTier}
+            </if>
+            <if test="onlineOnly != null and onlineOnly">
+                <choose>
+                    <when test="onlineUserIds != null and onlineUserIds.size() > 0">
+                        and u.id in
+                        <foreach collection="onlineUserIds" item="userId" open="(" separator="," close=")">
+                            #{userId}
+                        </foreach>
+                    </when>
+                    <otherwise>
+                        and 1 = 0
+                    </otherwise>
+                </choose>
+            </if>
+            <if test="offlineOnly != null and offlineOnly">
+                <choose>
+                    <when test="onlineUserIds != null and onlineUserIds.size() > 0">
+                        and u.id not in
+                        <foreach collection="onlineUserIds" item="userId" open="(" separator="," close=")">
+                            #{userId}
+                        </foreach>
+                    </when>
+                    <otherwise>
+                        and 1 = 1
+                    </otherwise>
+                </choose>
+            </if>
+        </where>
+        order by u.created_at desc, u.id desc
+    </select>
+
+    <select id="selectAdminUserDetail" resultType="map">
+        select u.id,
+               u.account_name as accountName,
+               u.avatar_url as avatarUrl,
+               u.preferred_locale as preferredLocale,
+               u.status,
+               u.created_at as createdAt,
+               u.updated_at as updatedAt,
+               m.id as membershipId,
+               m.plan_id as planId,
+               m.tier as membershipTier,
+               m.status as membershipStatus,
+               m.started_at as membershipStartedAt,
+               m.expires_at as membershipExpiresAt,
+               s.mfa_enabled as mfaEnabled,
+               s.mfa_method as mfaMethod,
+               s.mfa_enabled_at as mfaEnabledAt,
+               p.preferred_city_code as preferredCityCode,
+               p.preferred_contact_channel as preferredContactChannel,
+               p.staff_contact_enabled as staffContactEnabled,
+               p.family_assist_enabled as familyAssistEnabled,
+               p.introduction_updates_enabled as introductionUpdatesEnabled,
+               p.event_reminders_enabled as eventRemindersEnabled,
+               p.service_announcements_enabled as serviceAnnouncementsEnabled,
+               p.marketing_emails_enabled as marketingEmailsEnabled,
+               p.analytics_consent_enabled as analyticsConsentEnabled,
+               (select count(1) from cm_auth_identities ai where ai.user_id = u.id) as identityCount,
+               (select count(1) from cm_profiles cp
+                 join cm_profile_ownerships co on co.profile_id = cp.id and co.status = 'active'
+                where co.user_id = u.id and cp.archived_at is null) as profileCount,
+               (select count(1) from cm_profiles cp
+                 join cm_profile_ownerships co on co.profile_id = cp.id and co.status = 'active'
+                where co.user_id = u.id and cp.profile_status = 'open' and cp.archived_at is null) as openProfileCount,
+               (select count(1) from cm_event_registrations er where er.user_id = u.id) as eventRegistrationCount
+        from cm_users u
+        left join cm_user_memberships m on m.id = (
+            select um.id from cm_user_memberships um
+            where um.user_id = u.id
+            order by case when um.status = 'active' and (um.expires_at is null or um.expires_at > now()) then 0 else 1 end,
+                     coalesce(um.expires_at, '9999-12-31 23:59:59') desc,
+                     um.created_at desc
+            limit 1
+        )
+        left join cm_user_security_settings s on s.user_id = u.id
+        left join cm_user_preferences p on p.user_id = u.id
+        where u.id = #{id}
+        limit 1
+    </select>
+
+    <select id="selectUserProfiles" resultType="map">
+        select p.id as profileId,
+               p.profile_type as profileType,
+               p.profile_status as profileStatus,
+               p.birth_year as birthYear,
+               p.city_code as cityCode,
+               p.country_code as countryCode,
+               p.updated_at as updatedAt,
+               co.relationship_to_profile as relationshipToProfile,
+               (select lf.value from cm_profile_localized_fields lf
+                 where lf.profile_id = p.id and lf.field_name = 'profile_name' and lf.locale = 'zh'
+                 limit 1) as profileName
+        from cm_profiles p
+        join cm_profile_ownerships co on co.profile_id = p.id and co.status = 'active'
+        where co.user_id = #{userId}
+          and p.archived_at is null
+        order by case when p.profile_type = 'self' then 0 else 1 end, p.updated_at desc, p.id desc
+    </select>
+
+    <select id="selectUserRecentEvents" resultType="map">
+        select r.id as registrationId,
+               r.event_id as eventId,
+               r.status,
+               r.requested_at as requestedAt,
+               r.updated_at as updatedAt,
+               e.event_date as eventDate,
+               e.start_time as startTime,
+               e.end_time as endTime,
+               (select lf.value from cm_event_localized_fields lf
+                 where lf.event_id = e.id and lf.field_name = 'title' and lf.locale = 'zh'
+                 limit 1) as eventTitle
+        from cm_event_registrations r
+        join cm_events e on e.id = r.event_id
+        where r.user_id = #{userId}
+        order by coalesce(r.updated_at, r.requested_at) desc, r.id desc
+        limit 5
+    </select>
+
+    <select id="selectUserIdentities" resultType="map">
+        select ai.id,
+               ai.provider,
+               ai.identifier,
+               ai.verified_at as verifiedAt,
+               ai.created_at as createdAt,
+               case
+                   when ai.provider = 'email' and locate('@', ai.identifier) > 2
+                       then concat(left(ai.identifier, 2), '***', substring(ai.identifier, locate('@', ai.identifier)))
+                   when ai.provider = 'phone' and length(ai.identifier) >= 7
+                       then concat(left(ai.identifier, 3), '****', right(ai.identifier, 4))
+                   else ai.identifier
+               end as maskedIdentifier
+        from cm_auth_identities ai
+        where ai.user_id = #{userId}
+        order by ai.created_at desc, ai.id desc
+    </select>
+
+    <select id="selectUserProfileContacts" resultType="map">
+        select p.id as profileId,
+               p.profile_type as profileType,
+               c.phone,
+               c.email,
+               c.wechat,
+               c.preferred_channel as preferredChannel,
+               c.visibility
+        from cm_profile_contacts c
+        join cm_profiles p on p.id = c.profile_id
+        join cm_profile_ownerships o on o.profile_id = p.id and o.status = 'active'
+        where o.user_id = #{userId}
+          and p.archived_at is null
+        order by case when p.profile_type = 'self' then 0 else 1 end, p.updated_at desc, p.id desc
+    </select>
+
+    <update id="updateUserStatus">
+        update cm_users
+        set status = #{status},
+            updated_at = now()
+        where id = #{id}
+    </update>
+</mapper>

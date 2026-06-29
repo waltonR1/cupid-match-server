@@ -6,26 +6,26 @@ import org.apache.ibatis.annotations.Param;
 import com.ruoyi.cupid.domain.CupidCommonOptionValue;
 
 /**
- * Cupid Match 通用选项数据层。
+ * Cupid Match 通用选项数据层
  */
 public interface CupidCommonOptionMapper
 {
     /**
-     * 查询前台可见的启用选项。
+     * 查询前台可见的启用选项
      *
      * @return 启用选项
      */
     List<CupidCommonOptionValue> selectEnabledOptions();
 
     /**
-     * 查询所有可回显选项，包含停用项。
+     * 查询所有可回显选项，包含停用项
      *
      * @return 所有选项
      */
     List<CupidCommonOptionValue> selectAllOptions();
 
     /**
-     * 查询动态选项版本。
+     * 查询动态选项版本
      *
      * @return 版本时间戳
      */

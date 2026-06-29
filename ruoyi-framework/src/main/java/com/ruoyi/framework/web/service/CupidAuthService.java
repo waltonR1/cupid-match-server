@@ -208,6 +208,10 @@ public class CupidAuthService
         {
             throw new CupidApiException(HttpStatus.UNAUTHORIZED, "unauthorized");
         }
+        if ("banned".equals(user.getStatus()))
+        {
+            throw new CupidApiException(HttpStatus.FORBIDDEN, "account_banned");
+        }
         if ("suspended".equals(user.getStatus()))
         {
             throw new CupidApiException(HttpStatus.FORBIDDEN, "account_suspended");

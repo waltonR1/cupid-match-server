@@ -675,6 +675,17 @@ insert into sys_menu values
 ('2087', '模板编辑', '2084', '3', '', '', '', '', 1, 0, 'F', '0', '0', 'cupid:inboxTemplate:edit', '#', 'admin', sysdate(), '', null, ''),
 ('2088', '模板启停', '2084', '4', '', '', '', '', 1, 0, 'F', '0', '0', 'cupid:inboxTemplate:changeStatus', '#', 'admin', sysdate(), '', null, '');
 
+insert into sys_menu values('2089', 'App 用户管理', '2080', '3', 'user', 'cupid/user/index', '', 'CupidUser', 1, 0, 'C', '0', '0', 'cupid:user:list', 'user', 'admin', sysdate(), '', null, 'Cupid App 用户管理');
+insert into sys_menu values('2090', '用户查询', '2089', '1', '', '', '', '', 1, 0, 'F', '0', '0', 'cupid:user:query', '#', 'admin', sysdate(), '', null, '');
+insert into sys_menu values('2091', '用户状态变更', '2089', '2', '', '', '', '', 1, 0, 'F', '0', '0', 'cupid:user:status', '#', 'admin', sysdate(), '', null, '');
+insert into sys_menu values('2092', '用户会话查询', '2089', '3', '', '', '', '', 1, 0, 'F', '0', '0', 'cupid:user:session:list', '#', 'admin', sysdate(), '', null, '');
+insert into sys_menu values('2093', '用户会话强退', '2089', '4', '', '', '', '', 1, 0, 'F', '0', '0', 'cupid:user:session:kick', '#', 'admin', sysdate(), '', null, '');
+insert into sys_menu values('2094', '查看完整敏感信息', '2089', '5', '', '', '', '', 1, 0, 'F', '0', '0', 'cupid:user:sensitive', '#', 'admin', sysdate(), '', null, '');
+insert into sys_menu values('2095', '会员管理', '2080', '4', 'membership', 'cupid/membership/index', '', 'CupidMembership', 1, 0, 'C', '0', '0', 'cupid:membership:list', 'money', 'admin', sysdate(), '', null, 'Cupid 会员管理');
+insert into sys_menu values('2096', '会员查询', '2095', '1', '', '', '', '', 1, 0, 'F', '0', '0', 'cupid:membership:query', '#', 'admin', sysdate(), '', null, '');
+insert into sys_menu values('2097', '会员状态变更', '2095', '2', '', '', '', '', 1, 0, 'F', '0', '0', 'cupid:membership:status', '#', 'admin', sysdate(), '', null, '');
+insert into sys_menu values('2098', '会员资料编辑', '2095', '3', '', '', '', '', 1, 0, 'F', '0', '0', 'cupid:membership:edit', '#', 'admin', sysdate(), '', null, '');
+
 insert into sys_role_menu (role_id, menu_id)
 select r.role_id, m.menu_id from sys_role r join sys_menu m on m.menu_id between 2000 and 2099
 where r.role_key = 'cupid_admin' and r.del_flag = '0';
@@ -693,6 +704,10 @@ where r.role_key = 'cupid_support' and r.del_flag = '0';
 
 insert into sys_role_menu (role_id, menu_id)
 select r.role_id, m.menu_id from sys_role r join sys_menu m on m.menu_id in (2080, 2081, 2082)
+where r.role_key = 'cupid_support' and r.del_flag = '0';
+
+insert into sys_role_menu (role_id, menu_id)
+select r.role_id, m.menu_id from sys_role r join sys_menu m on m.menu_id in (2089, 2090, 2092)
 where r.role_key = 'cupid_support' and r.del_flag = '0';
 
 insert into sys_role_menu (role_id, menu_id)

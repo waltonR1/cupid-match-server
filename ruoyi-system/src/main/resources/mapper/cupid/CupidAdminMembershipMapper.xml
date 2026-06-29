@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.cupid.mapper.CupidAdminMembershipMapper">
+
+    <select id="selectAdminMemberships" resultType="map">
+        select m.id,
+               m.user_id as userId,
+               u.account_name as accountName,
+               u.status as userStatus,
+               m.plan_id as planId,
+               m.tier,
+               m.status,
+               m.started_at as startedAt,
+               m.expires_at as expiresAt,
+               m.created_at as createdAt,
+               m.updated_at as updatedAt
+        from cm_user_memberships m
+        join cm_users u on u.id = m.user_id
+        <where>
+            <if test="keyword != null and keyword != ''">
+                (
+                    m.id like concat('%', #{keyword}, '%')
+                    or m.user_id like concat('%', #{keyword}, '%')
+                    or u.account_name like concat('%', #{keyword}, '%')
+                )
+            </if>
+            <if test="status != null and status != ''">
+                and m.status = #{status}
+            </if>
+            <if test="tier != null and tier != ''">
+                and m.tier = #{tier}
+            </if>
+        </where>
+        order by m.created_at desc, m.id desc
+    </select>
+
+    <select id="selectAdminMembershipDetail" resultType="map">
+        select m.id,
+               m.user_id as userId,
+               u.account_name as accountName,
+               u.status as userStatus,
+               u.preferred_locale as preferredLocale,
+               m.plan_id as planId,
+               m.tier,
+               m.status,
+               m.started_at as startedAt,
+               m.expires_at as expiresAt,
+               m.created_at as createdAt,
+               m.updated_at as updatedAt,
+               p.billing_type as billingType,
+               p.billing_period as billingPeriod,
+               p.validity_months as validityMonths,
+               p.private_introduction_quota as privateIntroductionQuota,
+               p.event_quota as eventQuota,
+               p.staff_support_level as staffSupportLevel,
+               p.concierge_priority as conciergePriority
+        from cm_user_memberships m
+        join cm_users u on u.id = m.user_id
+        left join cm_membership_plans p on p.id = m.plan_id
+        where m.id = #{id}
+        limit 1
+    </select>
+
+    <select id="selectPlanByTier" resultType="map">
+        select id, tier
+        from cm_membership_plans
+        where tier = #{tier}
+          and is_active = 1
+        limit 1
+    </select>
+
+    <update id="updateMembershipStatus">
+        update cm_user_memberships
+        set status = #{status},
+            updated_at = now()
+        where id = #{id}
+    </update>
+
+    <update id="updateMembershipFields">
+        update cm_user_memberships
+        set plan_id = #{planId},
+            tier = #{tier},
+            started_at = #{startedAt},
+            expires_at = #{expiresAt},
+            updated_at = now()
+        where id = #{id}
+    </update>
+</mapper>
