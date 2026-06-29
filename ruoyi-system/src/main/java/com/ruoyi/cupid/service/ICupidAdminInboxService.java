@@ -19,4 +19,12 @@ public interface ICupidAdminInboxService
     Map<String, Object> previewBroadcast(Map<String, Object> body);
 
     Map<String, Object> broadcast(Map<String, Object> body, String staffUserId);
+
+    List<Map<String, Object>> selectBroadcastHistory(Map<String, Object> params);
+
+    Map<String, Object> selectBroadcastDetail(String id);
+
+    List<Map<String, Object>> selectSingleHistory(Map<String, Object> params);
+
+    Map<String, Object> selectSingleDetail(String id);
 }

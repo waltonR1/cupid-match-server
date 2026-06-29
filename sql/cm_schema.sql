@@ -23,6 +23,9 @@ drop table if exists cm_audit_logs;
 drop table if exists cm_staff_task_localized_fields;
 drop table if exists cm_staff_tasks;
 drop table if exists cm_staff_members;
+drop table if exists cm_inbox_broadcast_targets;
+drop table if exists cm_inbox_broadcasts;
+drop table if exists cm_inbox_single_dispatches;
 drop table if exists cm_inbox_reads;
 drop table if exists cm_inbox_messages;
 drop table if exists cm_inbox_threads;
@@ -1286,6 +1289,60 @@ create table cm_inbox_reads (
 -- 后台运营
 -- ----------------------------
 -- 后台员工直接使用 RuoYi 的 sys_user、角色和权限体系，不进入 cm_users。
+
+create table cm_inbox_broadcasts (
+  id                 varchar(36)  not null comment '后台群发记录ID',
+  staff_user_id      varchar(36)  not null comment '后台发送人ID，对应 sys_user.user_id 的字符串值',
+  scope              varchar(30)  not null comment '群发范围：all_active, membership_tier, selected_users',
+  tier               varchar(30)  default null comment '会员等级筛选值',
+  mode               varchar(20)  not null comment '发送模式：template, custom',
+  template_code      varchar(80)  default null comment '模板编码',
+  locale             varchar(8)   default null comment '后台预览语言或默认语言',
+  subject_type       varchar(40)  default null comment '模板业务对象类型',
+  payload_json       json         not null comment '原始请求快照',
+  target_count       int          not null default 0 comment '目标用户数',
+  success_count      int          not null default 0 comment '成功数',
+  failure_count      int          not null default 0 comment '失败数',
+  created_at         datetime     not null default current_timestamp comment '创建时间',
+  updated_at         datetime     not null default current_timestamp on update current_timestamp comment '更新时间',
+  primary key (id),
+  key idx_cm_inbox_broadcasts_staff_created (staff_user_id, created_at),
+  key idx_cm_inbox_broadcasts_template_created (template_code, created_at)
+) engine=innodb comment='后台站内信群发记录';
+
+create table cm_inbox_broadcast_targets (
+  id                 varchar(36)  not null comment '后台群发目标记录ID',
+  broadcast_id       varchar(36)  not null comment '群发记录ID，对应 cm_inbox_broadcasts.id',
+  user_id            varchar(36)  not null comment '目标用户ID，对应 cm_users.id',
+  message_id         varchar(36)  default null comment '实际创建的消息ID，对应 cm_inbox_messages.id',
+  status             varchar(20)  not null comment '发送状态：success, failure',
+  error_message      varchar(500) default null comment '失败原因',
+  created_at         datetime     not null default current_timestamp comment '创建时间',
+  primary key (id),
+  key idx_cm_inbox_broadcast_targets_broadcast (broadcast_id, created_at),
+  key idx_cm_inbox_broadcast_targets_user_status (user_id, status)
+) engine=innodb comment='后台站内信群发明细';
+
+create table cm_inbox_single_dispatches (
+  id                 varchar(36)  not null comment '后台单发记录ID',
+  staff_user_id      varchar(36)  not null comment '后台发送人ID，对应 sys_user.user_id 的字符串值',
+  user_id            varchar(36)  not null comment '目标用户ID，对应 cm_users.id',
+  message_id         varchar(36)  default null comment '实际创建的消息ID，对应 cm_inbox_messages.id',
+  mode               varchar(20)  not null comment '发送模式：template, custom',
+  template_code      varchar(80)  default null comment '模板编码',
+  locale             varchar(8)   default null comment '发送语言',
+  subject_type       varchar(40)  default null comment '业务对象类型',
+  subject_id         varchar(36)  default null comment '业务对象ID',
+  payload_json       json         not null comment '原始请求快照',
+  status             varchar(20)  not null comment '发送状态：pending, success, failure',
+  error_message      varchar(500) default null comment '失败原因',
+  created_at         datetime     not null default current_timestamp comment '创建时间',
+  updated_at         datetime     not null default current_timestamp on update current_timestamp comment '更新时间',
+  primary key (id),
+  key idx_cm_inbox_single_dispatches_staff_created (staff_user_id, created_at),
+  key idx_cm_inbox_single_dispatches_user_created (user_id, created_at),
+  key idx_cm_inbox_single_dispatches_status_created (status, created_at)
+) engine=innodb comment='后台站内信单发记录';
 
 create table cm_staff_tasks (
   id                    varchar(36) not null comment '后台任务ID',

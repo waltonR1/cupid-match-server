@@ -12,12 +12,12 @@ import com.alibaba.fastjson2.JSON;
 import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.utils.uuid.IdUtils;
 import com.ruoyi.cupid.mapper.CupidCommonOptionMapper;
+import com.ruoyi.cupid.mapper.CupidInboxDispatchMapper;
 import com.ruoyi.cupid.mapper.CupidInboxNotificationMapper;
 import com.ruoyi.cupid.service.ICupidAdminInboxService;
 import com.ruoyi.cupid.service.ICupidInboxNotificationService;
 import com.ruoyi.cupid.service.ICupidInboxTemplateService;
 
-/** Cupid Match 后台单发、群发和预览。 */
 @Service
 public class CupidAdminInboxServiceImpl implements ICupidAdminInboxService
 {
@@ -35,6 +35,9 @@ public class CupidAdminInboxServiceImpl implements ICupidAdminInboxService
     @Autowired
     private CupidCommonOptionMapper commonOptionMapper;
 
+    @Autowired
+    private CupidInboxDispatchMapper dispatchMapper;
+
     @Override
     public List<Map<String, Object>> searchUsers(String keyword)
     {
@@ -48,8 +51,7 @@ public class CupidAdminInboxServiceImpl implements ICupidAdminInboxService
         {
             return List.of();
         }
-        return notificationMapper.searchSubjects(userId, subjectType,
-                keyword == null ? null : keyword.trim());
+        return notificationMapper.searchSubjects(userId, subjectType, keyword == null ? null : keyword.trim());
     }
 
     @Override
@@ -67,7 +69,28 @@ public class CupidAdminInboxServiceImpl implements ICupidAdminInboxService
     @Override
     public void send(Map<String, Object> body, String staffUserId)
     {
-        notificationService.sendStaffNotification(body, staffUserId, null);
+        String dispatchId = IdUtils.fastUUID();
+        Map<String, Object> record = new HashMap<>();
+        record.put("id", dispatchId);
+        record.put("staffUserId", staffUserId);
+        record.put("userId", body.get("userId"));
+        record.put("mode", body.get("mode"));
+        record.put("templateCode", body.get("templateCode"));
+        record.put("locale", body.get("locale"));
+        record.put("subjectType", body.get("subjectType"));
+        record.put("subjectId", body.get("subjectId"));
+        record.put("payloadJson", JSON.toJSONString(body));
+        dispatchMapper.insertSingleDispatch(record);
+        try
+        {
+            String messageId = notificationService.sendStaffNotification(body, staffUserId, null);
+            dispatchMapper.updateSingleDispatchSuccess(dispatchId, messageId);
+        }
+        catch (RuntimeException ex)
+        {
+            dispatchMapper.updateSingleDispatchFailure(dispatchId, safeMessage(ex));
+            throw ex;
+        }
     }
 
     @Override
@@ -96,6 +119,18 @@ public class CupidAdminInboxServiceImpl implements ICupidAdminInboxService
     {
         List<Map<String, Object>> users = broadcastUsers(body);
         String broadcastId = IdUtils.fastUUID();
+        Map<String, Object> broadcastRecord = new HashMap<>();
+        broadcastRecord.put("id", broadcastId);
+        broadcastRecord.put("staffUserId", staffUserId);
+        broadcastRecord.put("scope", body.get("scope"));
+        broadcastRecord.put("tier", body.get("tier"));
+        broadcastRecord.put("mode", body.get("mode"));
+        broadcastRecord.put("templateCode", body.get("templateCode"));
+        broadcastRecord.put("locale", body.get("locale"));
+        broadcastRecord.put("subjectType", body.get("subjectType"));
+        broadcastRecord.put("payloadJson", JSON.toJSONString(body));
+        dispatchMapper.insertBroadcast(broadcastRecord);
+
         int succeeded = 0;
         List<Map<String, Object>> failures = new ArrayList<>();
         for (Map<String, Object> user : users)
@@ -106,29 +141,73 @@ public class CupidAdminInboxServiceImpl implements ICupidAdminInboxService
             request.put("locale", user.get("preferredLocale"));
             try
             {
-                notificationService.sendStaffAnnouncement(request, staffUserId,
+                String messageId = notificationService.sendStaffAnnouncement(request, staffUserId,
                         "broadcast:" + broadcastId + ":" + userId);
+                dispatchMapper.insertBroadcastTarget(buildBroadcastTargetRecord(broadcastId, userId, messageId,
+                        "success", null));
                 succeeded++;
             }
             catch (RuntimeException ex)
             {
+                String errorMessage = safeMessage(ex);
+                dispatchMapper.insertBroadcastTarget(buildBroadcastTargetRecord(broadcastId, userId, null,
+                        "failure", errorMessage));
                 if (failures.size() < 20)
                 {
-                    failures.add(Map.of("userId", userId, "message", safeMessage(ex)));
+                    failures.add(Map.of("userId", userId, "message", errorMessage));
                 }
             }
         }
+        dispatchMapper.updateBroadcastCounts(broadcastId, users.size(), succeeded, users.size() - succeeded);
+
         Map<String, Object> result = new HashMap<>();
         result.put("broadcastId", broadcastId);
         result.put("targetCount", users.size());
         result.put("successCount", succeeded);
         result.put("failureCount", users.size() - succeeded);
         result.put("failures", failures);
-        commonOptionMapper.insertAdminAuditLog(IdUtils.fastUUID(), "staff", staffUserId,
-                "inbox_broadcast", broadcastId, "cupid.inbox.broadcast", null,
+
+        commonOptionMapper.insertAdminAuditLog(IdUtils.fastUUID(), "staff", staffUserId, "inbox_broadcast",
+                broadcastId, "cupid.inbox.broadcast", null,
                 JSON.toJSONString(Map.of("scope", body.get("scope"), "targetCount", users.size(),
-                        "successCount", succeeded, "failureCount", users.size() - succeeded)), null);
+                        "successCount", succeeded, "failureCount", users.size() - succeeded)),
+                null);
         return result;
+    }
+
+    @Override
+    public List<Map<String, Object>> selectBroadcastHistory(Map<String, Object> params)
+    {
+        return dispatchMapper.selectBroadcastHistory(params);
+    }
+
+    @Override
+    public Map<String, Object> selectBroadcastDetail(String id)
+    {
+        Map<String, Object> detail = dispatchMapper.selectBroadcastDetail(id);
+        if (detail == null)
+        {
+            throw new ServiceException("群发记录不存在");
+        }
+        detail.put("targets", dispatchMapper.selectBroadcastTargets(id));
+        return detail;
+    }
+
+    @Override
+    public List<Map<String, Object>> selectSingleHistory(Map<String, Object> params)
+    {
+        return dispatchMapper.selectSingleHistory(params);
+    }
+
+    @Override
+    public Map<String, Object> selectSingleDetail(String id)
+    {
+        Map<String, Object> detail = dispatchMapper.selectSingleDetail(id);
+        if (detail == null)
+        {
+            throw new ServiceException("单发记录不存在");
+        }
+        return detail;
     }
 
     @SuppressWarnings("unchecked")
@@ -140,8 +219,7 @@ public class CupidAdminInboxServiceImpl implements ICupidAdminInboxService
             throw new ServiceException("群发范围无效");
         }
         String tier = body.get("tier") == null ? null : String.valueOf(body.get("tier"));
-        List<String> userIds = body.get("userIds") instanceof List<?>
-                ? (List<String>) body.get("userIds") : List.of();
+        List<String> userIds = body.get("userIds") instanceof List<?> ? (List<String>) body.get("userIds") : List.of();
         if ("membership_tier".equals(scope) && !StringUtils.hasText(tier))
         {
             throw new ServiceException("请选择会员等级");
@@ -151,6 +229,19 @@ public class CupidAdminInboxServiceImpl implements ICupidAdminInboxService
             throw new ServiceException("请选择目标用户");
         }
         return notificationMapper.selectBroadcastUsers(scope, tier, userIds);
+    }
+
+    private Map<String, Object> buildBroadcastTargetRecord(String broadcastId, String userId, String messageId,
+            String status, String errorMessage)
+    {
+        Map<String, Object> targetRecord = new HashMap<>();
+        targetRecord.put("id", IdUtils.fastUUID());
+        targetRecord.put("broadcastId", broadcastId);
+        targetRecord.put("userId", userId);
+        targetRecord.put("messageId", messageId);
+        targetRecord.put("status", status);
+        targetRecord.put("errorMessage", errorMessage);
+        return targetRecord;
     }
 
     private static String safeMessage(RuntimeException ex)

@@ -1,0 +1,144 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.cupid.mapper.CupidInboxDispatchMapper">
+    <insert id="insertBroadcast">
+        insert into cm_inbox_broadcasts (
+            id, staff_user_id, scope, tier, mode, template_code, locale,
+            subject_type, payload_json, target_count, success_count, failure_count
+        ) values (
+            #{id}, #{staffUserId}, #{scope}, #{tier}, #{mode}, #{templateCode}, #{locale},
+            #{subjectType}, #{payloadJson}, 0, 0, 0
+        )
+    </insert>
+
+    <insert id="insertBroadcastTarget">
+        insert into cm_inbox_broadcast_targets (
+            id, broadcast_id, user_id, message_id, status, error_message
+        ) values (
+            #{id}, #{broadcastId}, #{userId}, #{messageId}, #{status}, #{errorMessage}
+        )
+    </insert>
+
+    <update id="updateBroadcastCounts">
+        update cm_inbox_broadcasts
+        set target_count = #{targetCount},
+            success_count = #{successCount},
+            failure_count = #{failureCount},
+            updated_at = current_timestamp
+        where id = #{id}
+    </update>
+
+    <select id="selectBroadcastHistory" resultType="map">
+        select b.id, b.scope, b.tier, b.mode, b.template_code as templateCode,
+               b.locale, b.subject_type as subjectType, b.target_count as targetCount,
+               b.success_count as successCount, b.failure_count as failureCount,
+               b.created_at as createdAt, b.updated_at as updatedAt,
+               u.user_name as staffUserName
+        from cm_inbox_broadcasts b
+        left join sys_user u on cast(u.user_id as char) = b.staff_user_id
+        <where>
+            <if test="staffUserId != null and staffUserId != ''">
+                b.staff_user_id = #{staffUserId}
+            </if>
+            <if test="mode != null and mode != ''">
+                and b.mode = #{mode}
+            </if>
+            <if test="templateCode != null and templateCode != ''">
+                and b.template_code = #{templateCode}
+            </if>
+        </where>
+        order by b.created_at desc, b.id desc
+    </select>
+
+    <select id="selectBroadcastDetail" resultType="map">
+        select b.id, b.staff_user_id as staffUserId, b.scope, b.tier, b.mode,
+               b.template_code as templateCode, b.locale, b.subject_type as subjectType,
+               b.payload_json as payloadJson, b.target_count as targetCount,
+               b.success_count as successCount, b.failure_count as failureCount,
+               b.created_at as createdAt, b.updated_at as updatedAt,
+               u.user_name as staffUserName
+        from cm_inbox_broadcasts b
+        left join sys_user u on cast(u.user_id as char) = b.staff_user_id
+        where b.id = #{id}
+        limit 1
+    </select>
+
+    <select id="selectBroadcastTargets" resultType="map">
+        select t.id, t.user_id as userId, t.message_id as messageId, t.status,
+               t.error_message as errorMessage, t.created_at as createdAt,
+               u.account_name as accountName
+        from cm_inbox_broadcast_targets t
+        left join cm_users u on u.id = t.user_id
+        where t.broadcast_id = #{broadcastId}
+        order by t.created_at desc, t.id desc
+    </select>
+
+    <insert id="insertSingleDispatch">
+        insert into cm_inbox_single_dispatches (
+            id, staff_user_id, user_id, message_id, mode, template_code, locale,
+            subject_type, subject_id, payload_json, status, error_message
+        ) values (
+            #{id}, #{staffUserId}, #{userId}, null, #{mode}, #{templateCode}, #{locale},
+            #{subjectType}, #{subjectId}, #{payloadJson}, 'pending', null
+        )
+    </insert>
+
+    <update id="updateSingleDispatchSuccess">
+        update cm_inbox_single_dispatches
+        set message_id = #{messageId},
+            status = 'success',
+            error_message = null,
+            updated_at = current_timestamp
+        where id = #{id}
+    </update>
+
+    <update id="updateSingleDispatchFailure">
+        update cm_inbox_single_dispatches
+        set status = 'failure',
+            error_message = #{errorMessage},
+            updated_at = current_timestamp
+        where id = #{id}
+    </update>
+
+    <select id="selectSingleHistory" resultType="map">
+        select d.id, d.user_id as userId, d.message_id as messageId, d.mode,
+               d.template_code as templateCode, d.locale, d.subject_type as subjectType,
+               d.subject_id as subjectId, d.status, d.error_message as errorMessage,
+               d.created_at as createdAt, d.updated_at as updatedAt,
+               u.account_name as accountName, su.user_name as staffUserName
+        from cm_inbox_single_dispatches d
+        left join cm_users u on u.id = d.user_id
+        left join sys_user su on cast(su.user_id as char) = d.staff_user_id
+        <where>
+            <if test="staffUserId != null and staffUserId != ''">
+                d.staff_user_id = #{staffUserId}
+            </if>
+            <if test="userId != null and userId != ''">
+                and d.user_id = #{userId}
+            </if>
+            <if test="mode != null and mode != ''">
+                and d.mode = #{mode}
+            </if>
+            <if test="status != null and status != ''">
+                and d.status = #{status}
+            </if>
+        </where>
+        order by d.created_at desc, d.id desc
+    </select>
+
+    <select id="selectSingleDetail" resultType="map">
+        select d.id, d.staff_user_id as staffUserId, d.user_id as userId, d.message_id as messageId,
+               d.mode, d.template_code as templateCode, d.locale,
+               d.subject_type as subjectType, d.subject_id as subjectId,
+               d.payload_json as payloadJson, d.status, d.error_message as errorMessage,
+               d.created_at as createdAt, d.updated_at as updatedAt,
+               u.account_name as accountName, su.user_name as staffUserName,
+               m.body as messageBody, m.message_type as messageType
+        from cm_inbox_single_dispatches d
+        left join cm_users u on u.id = d.user_id
+        left join sys_user su on cast(su.user_id as char) = d.staff_user_id
+        left join cm_inbox_messages m on m.id = d.message_id
+        where d.id = #{id}
+        limit 1
+    </select>
+</mapper>

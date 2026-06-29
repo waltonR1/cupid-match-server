@@ -4,6 +4,7 @@ import java.util.Map;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -12,6 +13,7 @@ import org.springframework.web.bind.annotation.RestController;
 import com.ruoyi.common.annotation.Log;
 import com.ruoyi.common.core.controller.BaseController;
 import com.ruoyi.common.core.domain.AjaxResult;
+import com.ruoyi.common.core.page.TableDataInfo;
 import com.ruoyi.common.enums.BusinessType;
 import com.ruoyi.cupid.service.ICupidAdminInboxService;
 
@@ -74,5 +76,35 @@ public class CupidInboxAdminController extends BaseController
     public AjaxResult broadcast(@RequestBody Map<String, Object> body)
     {
         return success(inboxService.broadcast(body, String.valueOf(getUserId())));
+    }
+
+    @PreAuthorize("@ss.hasAnyPermi('cupid:inbox:send,cupid:inbox:broadcast')")
+    @GetMapping("/broadcast/list")
+    public TableDataInfo broadcastList(@RequestParam Map<String, Object> params)
+    {
+        startPage();
+        return getDataTable(inboxService.selectBroadcastHistory(params));
+    }
+
+    @PreAuthorize("@ss.hasAnyPermi('cupid:inbox:send,cupid:inbox:broadcast')")
+    @GetMapping("/broadcast/{id}")
+    public AjaxResult broadcastDetail(@PathVariable String id)
+    {
+        return success(inboxService.selectBroadcastDetail(id));
+    }
+
+    @PreAuthorize("@ss.hasAnyPermi('cupid:inbox:send,cupid:inbox:broadcast')")
+    @GetMapping("/single/list")
+    public TableDataInfo singleList(@RequestParam Map<String, Object> params)
+    {
+        startPage();
+        return getDataTable(inboxService.selectSingleHistory(params));
+    }
+
+    @PreAuthorize("@ss.hasAnyPermi('cupid:inbox:send,cupid:inbox:broadcast')")
+    @GetMapping("/single/{id}")
+    public AjaxResult singleDetail(@PathVariable String id)
+    {
+        return success(inboxService.selectSingleDetail(id));
     }
 }
