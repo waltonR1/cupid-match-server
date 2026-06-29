@@ -24,7 +24,7 @@ import com.ruoyi.cupid.service.ICupidCommonOptionService;
 @Service
 public class CupidCommonOptionServiceImpl implements ICupidCommonOptionService
 {
-    private static final String VERSION = "2026-06-27-common-options-v10";
+    private static final String VERSION = "2026-06-29-common-options-v12";
     private static final String PROFILE_GROUP_PREFIX = "profile.";
     private static final Set<String> OPTION_STATUSES = Set.of("enabled", "disabled");
 
@@ -125,6 +125,30 @@ public class CupidCommonOptionServiceImpl implements ICupidCommonOptionService
                 option("cancelled", "已取消", "Annule", "Cancelled", false),
                 option("expired", "已过期", "Expire", "Expired", false),
                 option("cooldown", "冷却中", "Attente", "Cooldown", false));
+        put("inbox.messageType",
+                option("text", "普通通知", "Notification standard", "Standard notification", false),
+                option("system_notice", "系统通知", "Avis systeme", "System notice", false),
+                option("status_update", "状态更新", "Mise a jour du statut", "Status update", false),
+                option("action_prompt", "操作提示", "Action requise", "Action prompt", false));
+        put("inbox.templateStatus",
+                option("enabled", "已启用", "Active", "Enabled", false),
+                option("disabled", "已停用", "Desactive", "Disabled", false));
+        put("inbox.senderType",
+                option("system", "系统通知", "Notification systeme", "System notice", false),
+                option("staff", "平台管理员", "Administrateur de la plateforme", "Platform administrator", false),
+                option("user", "用户", "Utilisateur", "User", false));
+        put("inbox.category",
+                option("system", "系统通知", "Notification systeme", "System notice", false),
+                option("chat", "沟通", "Discussion", "Chat", false));
+        put("inbox.threadStatus",
+                option("open", "进行中", "Ouvert", "Open", false),
+                option("closed", "已关闭", "Ferme", "Closed", false),
+                option("archived", "已归档", "Archive", "Archived", false));
+        put("inbox.actionType",
+                option("view_profile", "查看资料", "Voir le profil", "View profile", false),
+                option("view_event", "查看活动", "Voir evenement", "View event", false),
+                option("view_introduction", "查看私人介绍", "Voir introduction", "View introduction", false),
+                option("view_membership", "查看会员", "Voir abonnement", "View membership", false));
         put("membership.status",
                 option("active", "生效中", "Actif", "Active", false),
                 option("expired", "已到期", "Expire", "Expired", false),

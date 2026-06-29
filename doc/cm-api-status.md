@@ -76,6 +76,25 @@
 | `POST /api/inbox/threads/:id/read` | 标记线程已读 | 完成 | 已使用 | `use-messages-inbox.ts` |
 | `POST /api/inbox/threads/:id/messages` | 在允许的线程中发送消息 | 完成 | 未接入 | 产品 UI 尚未开放发送功能 |
 
+### 8.1 后台通知发布
+
+| API | 用途 | 后端状态 | 后台状态 | 后台入口 |
+| --- | --- | --- | --- | --- |
+| `GET /cupid/inbox/users` | 搜索通知目标用户 | 完成 | 已使用 | 通知发布 |
+| `GET /cupid/inbox/subjects` | 搜索与目标用户关联的业务对象 | 完成 | 已使用 | 通知发布 |
+| `GET /cupid/inbox/templates` | 查询启用模板 | 完成 | 已使用 | 通知发布 |
+| `POST /cupid/inbox/preview` | 单发内容预览 | 完成 | 已使用 | 通知发布 |
+| `POST /cupid/inbox/notify` | 单用户通知 | 完成 | 已使用 | 通知发布 |
+| `POST /cupid/inbox/broadcast/preview` | 群发范围和内容预览 | 完成 | 已使用 | 通知发布 |
+| `POST /cupid/inbox/broadcast` | 简易群发 | 完成 | 已使用 | 通知发布 |
+| `GET /cupid/inboxTemplate/list` | 模板列表 | 完成 | 已使用 | 通知模板 |
+| `GET /cupid/inboxTemplate/:id` | 模板详情 | 完成 | 已使用 | 通知模板 |
+| `POST /cupid/inboxTemplate` | 新增三语模板 | 完成 | 已使用 | 通知模板 |
+| `PUT /cupid/inboxTemplate/:id` | 编辑模板 | 完成 | 已使用 | 通知模板 |
+| `POST /cupid/inboxTemplate/:id/status` | 模板启停 | 完成 | 已使用 | 通知模板 |
+
+后台不提供查看全部 C 端线程或历史消息的接口。资料、照片、认证、活动报名和私人介绍状态变更通过事务提交后的领域事件自动通知。
+
 ## 9. Events
 
 | API | 用途 | 后端状态 | 前端状态 | 前端入口 |

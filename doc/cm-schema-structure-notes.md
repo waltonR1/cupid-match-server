@@ -30,6 +30,10 @@
 
 这些数据不参与常规筛选、排序或唯一约束，使用 JSON 可以降低表结构复杂度。
 
+Inbox 通知模板使用 `cm_inbox_templates` 保存稳定 code 和行为字段，使用
+`cm_inbox_template_localized_fields` 保存三语名称与正文。消息仅保存发送时渲染后的正文，
+并通过 `cm_inbox_messages.dedupe_key` 防止自动通知和同一群发任务重复写入。
+
 ## 扁平化主表字段
 
 主表只保存稳定事实和高频查询字段。

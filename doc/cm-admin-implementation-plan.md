@@ -1004,8 +1004,7 @@ C 端账号中心：
   - 当前实现：`cupid.verification.review`
   - 后续可细化为 `cupid.verification.material.approve`、`cupid.verification.material.reject`
 - Controller 写操作接入 RuoYi `@Log`。
-- 审核通知不在 Phase 8.2.2 实现；等 Phase 8.5 Cupid Inbox 完成后，再统一接入认证、资料和照片审核结果通知。
-- 通过后是否通知用户可配置，默认可以先不发，账号中心状态即时更新即可。
+- 审核通知由 Phase 8.5 Cupid Inbox 统一承接，认证、资料和照片审核结果均在事务提交后发送。
 
 迁移与兼容：
 
@@ -1044,7 +1043,7 @@ Phase 8.2.3 位于 Phase 8.2.2 和 Phase 8.2.4 之间。它不阻塞认证审核
 - 如已通过认证需要撤销或重新认证，后台使用“重置认证状态”，将该类型汇总状态改回 `unverified`，历史材料和审核记录保留。
 - 后台可继续完善 Profile 内部字段、精选和备注；面向 C 端展示的资料字段如需后台编辑，必须进入独立资料编辑能力，不混入审核中心。
 - 拒绝原因继续使用快捷文本和备注，不引入结构化 reason code。
-- 审核通知等待 Phase 8.5 Cupid Inbox 完成后统一接入，不在 8.2.3 提前实现。
+- 审核通知已由 Phase 8.5 Cupid Inbox 统一接入。
 
 验收口径：
 
@@ -1268,6 +1267,8 @@ Registration：
 
 ### 11.5 Phase 8.5：Inbox 通知
 
+**当前状态：代码实现完成，构建通过；在当前数据库完成结构同步并重启后进行真实数据验收。**
+
 #### 终态定义
 
 Phase 8.5 将 Cupid Inbox 的“站内通知”能力推进到终态，不宣告未来受控沟通能力完成：
@@ -1367,6 +1368,7 @@ Common Options 增加并递增静态版本：
 
 该页面是“通知发布”工作台，不展示线程列表或历史消息。包含：
 
+- 默认进入群发模式；无群发权限的角色默认进入“定向通知”。
 - 目标用户搜索与选择。
 - 模板/自定义正文模式。
 - 语言选择；默认目标用户 `preferred_locale`。
@@ -1422,7 +1424,7 @@ API：
 - 每个用户复用自己的通用 system 线程，写入独立消息，不共享 thread/message。
 - 群发生成 `broadcastId`；每条消息使用 `broadcast:{broadcastId}:{userId}` 作为 dedupe key。
 - sender type 为 staff，C 端显示“平台管理员”，用户不可回复。
-- 模板群发按每个用户 preferred locale 分别渲染；自定义正文使用发送者选择的单一语言。
+- 模板和自定义群发均按每个用户 preferred locale 分别选择对应语言正文；自定义正文必须填写中、法、英三语。
 - 普通公告尊重 `service_announcements_enabled`；业务必达通知不通过群发接口发送。
 - 响应返回 broadcastId、目标数、成功数、失败数和最多 20 条失败摘要。
 - `cm_audit_logs` 记录 scope、模板、语言、目标数、成功数和失败数，不记录完整用户 ID 数组。

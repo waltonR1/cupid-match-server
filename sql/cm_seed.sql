@@ -615,8 +615,8 @@ insert into sys_role (role_name, role_key, role_sort, data_scope, menu_check_str
 select 'Cupid 审计员', 'cupid_auditor', 14, '1', 1, 1, '0', '0', 'admin', sysdate(), 'Cupid 业务审计只读'
 where not exists (select 1 from sys_role where role_key = 'cupid_auditor' and del_flag = '0');
 
-delete from sys_role_menu where menu_id between 2000 and 2079;
-delete from sys_menu where menu_id between 2000 and 2079;
+delete from sys_role_menu where menu_id between 2000 and 2099;
+delete from sys_menu where menu_id between 2000 and 2099;
 
 insert into sys_menu values
 ('2000', '审核中心', '0', '10', 'cupid', null, '', 'Cupid', 1, 0, 'M', '0', '0', '', 'clipboard', 'admin', sysdate(), '', null, 'Cupid 审核中心目录'),
@@ -664,10 +664,19 @@ insert into sys_menu values
 ('2075', '报名查询', '2074', '1', '', '', '', '', 1, 0, 'F', '0', '0', 'cupid:eventRegistration:query', '#', 'admin', sysdate(), '', null, ''),
 ('2076', '报名处理', '2074', '2', '', '', '', '', 1, 0, 'F', '0', '0', 'cupid:eventRegistration:review', '#', 'admin', sysdate(), '', null, ''),
 ('2077', '活动新增', '2071', '3', '', '', '', '', 1, 0, 'F', '0', '0', 'cupid:event:add', '#', 'admin', sysdate(), '', null, ''),
-('2078', '活动编辑', '2071', '4', '', '', '', '', 1, 0, 'F', '0', '0', 'cupid:event:edit', '#', 'admin', sysdate(), '', null, '');
+('2078', '活动编辑', '2071', '4', '', '', '', '', 1, 0, 'F', '0', '0', 'cupid:event:edit', '#', 'admin', sysdate(), '', null, ''),
+('2080', '用户服务', '0', '15', 'cupid-service', null, '', 'CupidUserServiceRoot', 1, 0, 'M', '0', '0', '', 'message', 'admin', sysdate(), '', null, 'Cupid 用户服务目录'),
+('2081', '通知发布', '2080', '1', 'inbox', 'cupid/inbox/index', '', 'CupidInbox', 1, 0, 'C', '0', '0', 'cupid:inbox:send', 'message', 'admin', sysdate(), '', null, 'Cupid C端通知发布'),
+('2082', '通知预览', '2081', '1', '', '', '', '', 1, 0, 'F', '0', '0', 'cupid:inbox:preview', '#', 'admin', sysdate(), '', null, ''),
+('2083', '通知群发', '2081', '2', '', '', '', '', 1, 0, 'F', '0', '0', 'cupid:inbox:broadcast', '#', 'admin', sysdate(), '', null, ''),
+('2084', '通知模板', '2080', '2', 'inbox-template', 'cupid/inbox-template/index', '', 'CupidInboxTemplate', 1, 0, 'C', '0', '0', 'cupid:inboxTemplate:list', 'edit', 'admin', sysdate(), '', null, 'Cupid 通知模板管理'),
+('2085', '模板查询', '2084', '1', '', '', '', '', 1, 0, 'F', '0', '0', 'cupid:inboxTemplate:query', '#', 'admin', sysdate(), '', null, ''),
+('2086', '模板新增', '2084', '2', '', '', '', '', 1, 0, 'F', '0', '0', 'cupid:inboxTemplate:add', '#', 'admin', sysdate(), '', null, ''),
+('2087', '模板编辑', '2084', '3', '', '', '', '', 1, 0, 'F', '0', '0', 'cupid:inboxTemplate:edit', '#', 'admin', sysdate(), '', null, ''),
+('2088', '模板启停', '2084', '4', '', '', '', '', 1, 0, 'F', '0', '0', 'cupid:inboxTemplate:changeStatus', '#', 'admin', sysdate(), '', null, '');
 
 insert into sys_role_menu (role_id, menu_id)
-select r.role_id, m.menu_id from sys_role r join sys_menu m on m.menu_id between 2000 and 2079
+select r.role_id, m.menu_id from sys_role r join sys_menu m on m.menu_id between 2000 and 2099
 where r.role_key = 'cupid_admin' and r.del_flag = '0';
 
 insert into sys_role_menu (role_id, menu_id)
@@ -680,6 +689,10 @@ where r.role_key = 'cupid_auditor' and r.del_flag = '0';
 
 insert into sys_role_menu (role_id, menu_id)
 select r.role_id, m.menu_id from sys_role r join sys_menu m on m.menu_id in (2040, 2041, 2042)
+where r.role_key = 'cupid_support' and r.del_flag = '0';
+
+insert into sys_role_menu (role_id, menu_id)
+select r.role_id, m.menu_id from sys_role r join sys_menu m on m.menu_id in (2080, 2081, 2082)
 where r.role_key = 'cupid_support' and r.del_flag = '0';
 
 insert into sys_role_menu (role_id, menu_id)
@@ -1358,13 +1371,54 @@ insert into cm_favorite_profiles (id, user_id, profile_id, created_at, updated_a
 insert into cm_private_introduction_requests (id, requester_user_id, requester_profile_id, target_profile_id, status, message, requested_at, expires_at, responded_at, cooldown_until, entitlement_balance_id, created_at, updated_at) values
   ('426dda67-8ff8-52f7-8426-558af6b32f0b', 'efdca298-c977-5502-ad2e-8ba480ca1ea3', null, 'd7a4c336-b6f4-5079-a4ad-c47b4044a740', 'accepted', null, '2026-05-23 21:31:05', null, '2026-05-27 23:47:13', null, null, '2026-05-23 21:31:05', '2026-05-27 23:47:13');
 
--- 3A.31 cm_inbox_threads
+-- 3A.31 cm_inbox_templates
+insert into cm_inbox_templates (id, template_code, message_type, subject_type, action_type, status) values
+  ('10000000-0000-5000-8000-000000000001', 'welcome_message', 'system_notice', null, null, 'enabled'),
+  ('10000000-0000-5000-8000-000000000002', 'profile_review_approved', 'status_update', 'profile', null, 'enabled'),
+  ('10000000-0000-5000-8000-000000000003', 'profile_review_rejected', 'status_update', 'profile', null, 'enabled'),
+  ('10000000-0000-5000-8000-000000000004', 'photo_review_approved', 'status_update', 'profile', null, 'enabled'),
+  ('10000000-0000-5000-8000-000000000005', 'photo_review_rejected', 'status_update', 'profile', null, 'enabled'),
+  ('10000000-0000-5000-8000-000000000006', 'verification_approved', 'status_update', 'profile', null, 'enabled'),
+  ('10000000-0000-5000-8000-000000000007', 'verification_rejected', 'status_update', 'profile', null, 'enabled'),
+  ('10000000-0000-5000-8000-000000000008', 'event_registration_status_changed', 'status_update', 'event', null, 'enabled'),
+  ('10000000-0000-5000-8000-000000000009', 'private_introduction_status_changed', 'status_update', 'private_introduction_request', null, 'enabled');
+
+insert into cm_inbox_template_localized_fields (id, template_id, locale, name, body) values
+  ('11000000-0000-5000-8000-000000000001', '10000000-0000-5000-8000-000000000001', 'zh', '欢迎通知', '欢迎使用 Cupid Match。'),
+  ('11000000-0000-5000-8000-000000000002', '10000000-0000-5000-8000-000000000001', 'fr', 'Bienvenue', 'Bienvenue sur Cupid Match.'),
+  ('11000000-0000-5000-8000-000000000003', '10000000-0000-5000-8000-000000000001', 'en', 'Welcome', 'Welcome to Cupid Match.'),
+  ('11000000-0000-5000-8000-000000000004', '10000000-0000-5000-8000-000000000002', 'zh', '资料审核通过', '你的资料 {{profileName}} 已通过审核。'),
+  ('11000000-0000-5000-8000-000000000005', '10000000-0000-5000-8000-000000000002', 'fr', 'Profil approuve', 'Votre profil {{profileName}} a ete approuve.'),
+  ('11000000-0000-5000-8000-000000000006', '10000000-0000-5000-8000-000000000002', 'en', 'Profile approved', 'Your profile {{profileName}} was approved.'),
+  ('11000000-0000-5000-8000-000000000007', '10000000-0000-5000-8000-000000000003', 'zh', '资料审核未通过', '你的资料 {{profileName}} 未通过审核：{{reason}}'),
+  ('11000000-0000-5000-8000-000000000008', '10000000-0000-5000-8000-000000000003', 'fr', 'Profil refuse', 'Votre profil {{profileName}} a ete refuse : {{reason}}'),
+  ('11000000-0000-5000-8000-000000000009', '10000000-0000-5000-8000-000000000003', 'en', 'Profile rejected', 'Your profile {{profileName}} was rejected: {{reason}}'),
+  ('11000000-0000-5000-8000-000000000010', '10000000-0000-5000-8000-000000000004', 'zh', '照片审核通过', '资料 {{profileName}} 的照片已通过审核。'),
+  ('11000000-0000-5000-8000-000000000011', '10000000-0000-5000-8000-000000000004', 'fr', 'Photo approuvee', 'La photo du profil {{profileName}} a ete approuvee.'),
+  ('11000000-0000-5000-8000-000000000012', '10000000-0000-5000-8000-000000000004', 'en', 'Photo approved', 'A photo for {{profileName}} was approved.'),
+  ('11000000-0000-5000-8000-000000000013', '10000000-0000-5000-8000-000000000005', 'zh', '照片审核未通过', '资料 {{profileName}} 的照片未通过审核：{{reason}}'),
+  ('11000000-0000-5000-8000-000000000014', '10000000-0000-5000-8000-000000000005', 'fr', 'Photo refusee', 'La photo du profil {{profileName}} a ete refusee : {{reason}}'),
+  ('11000000-0000-5000-8000-000000000015', '10000000-0000-5000-8000-000000000005', 'en', 'Photo rejected', 'A photo for {{profileName}} was rejected: {{reason}}'),
+  ('11000000-0000-5000-8000-000000000016', '10000000-0000-5000-8000-000000000006', 'zh', '认证审核通过', '你的{{verificationType}}认证已通过。'),
+  ('11000000-0000-5000-8000-000000000017', '10000000-0000-5000-8000-000000000006', 'fr', 'Verification approuvee', 'Votre verification {{verificationType}} a ete approuvee.'),
+  ('11000000-0000-5000-8000-000000000018', '10000000-0000-5000-8000-000000000006', 'en', 'Verification approved', 'Your {{verificationType}} verification was approved.'),
+  ('11000000-0000-5000-8000-000000000019', '10000000-0000-5000-8000-000000000007', 'zh', '认证审核未通过', '你的{{verificationType}}认证未通过：{{reason}}'),
+  ('11000000-0000-5000-8000-000000000020', '10000000-0000-5000-8000-000000000007', 'fr', 'Verification refusee', 'Votre verification {{verificationType}} a ete refusee : {{reason}}'),
+  ('11000000-0000-5000-8000-000000000021', '10000000-0000-5000-8000-000000000007', 'en', 'Verification rejected', 'Your {{verificationType}} verification was rejected: {{reason}}'),
+  ('11000000-0000-5000-8000-000000000022', '10000000-0000-5000-8000-000000000008', 'zh', '活动报名状态更新', '活动《{{eventTitle}}》的报名状态已更新为 {{status}}。'),
+  ('11000000-0000-5000-8000-000000000023', '10000000-0000-5000-8000-000000000008', 'fr', 'Statut inscription evenement', 'Le statut de votre inscription a {{eventTitle}} est maintenant {{status}}.'),
+  ('11000000-0000-5000-8000-000000000024', '10000000-0000-5000-8000-000000000008', 'en', 'Event registration updated', 'Your registration for {{eventTitle}} is now {{status}}.'),
+  ('11000000-0000-5000-8000-000000000025', '10000000-0000-5000-8000-000000000009', 'zh', '私人介绍状态更新', '你的私人介绍申请状态已更新为 {{status}}。'),
+  ('11000000-0000-5000-8000-000000000026', '10000000-0000-5000-8000-000000000009', 'fr', 'Statut introduction privee', 'Votre demande introduction privee est maintenant {{status}}.'),
+  ('11000000-0000-5000-8000-000000000027', '10000000-0000-5000-8000-000000000009', 'en', 'Private introduction updated', 'Your private introduction request is now {{status}}.');
+
+-- 3A.32 cm_inbox_threads
 insert into cm_inbox_threads (id, user_id, category, subject_type, subject_id, status, created_at, updated_at) values
   ('b8ce280f-3553-56b7-999f-d9cb6caa3acf', 'efdca298-c977-5502-ad2e-8ba480ca1ea3', 'system', 'profile', '506ce3c7-b236-5b44-b8d0-459c4250ea03', 'open', '2026-05-20 09:00:00', '2026-05-28 08:30:00'),
-  ('d85453a8-274f-566e-8343-e2534ae2fed7', 'efdca298-c977-5502-ad2e-8ba480ca1ea3', 'system', null, null, 'open', '2026-05-28 06:00:00', '2026-05-28 06:00:00'),
+  ('d85453a8-274f-566e-8343-e2534ae2fed7', 'efdca298-c977-5502-ad2e-8ba480ca1ea3', 'system', null, null, 'open', '2026-05-28 06:00:00', '2026-06-01 09:00:00'),
   ('b7698c02-482b-52ce-9c48-ecd94d0a45b1', 'efdca298-c977-5502-ad2e-8ba480ca1ea3', 'system', 'event', '0ed043fe-531a-511d-940b-5daa55de963e', 'open', '2026-05-25 14:00:00', '2026-05-27 10:00:00');
 
--- 3A.32 cm_inbox_messages
+-- 3A.33 cm_inbox_messages
 insert into cm_inbox_messages (id, thread_id, sender_type, sender_user_id, message_type, body, template_code, template_locale, action_type, action_payload, created_at, updated_at) values
   ('dafef4e8-ea97-5808-952a-fcb763a9ee8e', 'b8ce280f-3553-56b7-999f-d9cb6caa3acf', 'system', null, 'system_notice', '你的资料 p-001 平台审核已通过，现状态变更为 open。', 'profile_review_approved', 'zh', null, null, '2026-05-20 09:00:00', '2026-05-20 09:00:00'),
   ('e1b35056-d725-5437-8f19-9590a8edc873', 'b8ce280f-3553-56b7-999f-d9cb6caa3acf', 'system', null, 'text', '你的资料已完成身份认证，可信度已提升。', 'identity_verified', 'zh', null, null, '2026-05-28 08:30:00', '2026-05-28 08:30:00'),
@@ -1372,7 +1426,7 @@ insert into cm_inbox_messages (id, thread_id, sender_type, sender_user_id, messa
   ('f4a77fc1-6370-5719-b596-b4ea5c0e0c14', 'b7698c02-482b-52ce-9c48-ecd94d0a45b1', 'system', null, 'text', '活动地址：巴黎 8 区 Rue du Faubourg Saint-Honore 25 号。请提前 15 分钟到场。', 'event_reminder', 'zh', null, null, '2026-05-27 10:00:00', '2026-05-27 10:00:00'),
   ('0fc92207-16a5-5a1f-ae42-cc856d2b40a6', 'd85453a8-274f-566e-8343-e2534ae2fed7', 'system', null, 'text', '欢迎使用相约巴黎！你可以创建资料、浏览活动、收藏感兴趣的会员。', 'welcome_message', 'zh', null, null, '2026-05-28 06:00:00', '2026-05-28 06:00:00');
 
--- 3A.33 cm_inbox_reads
+-- 3A.34 cm_inbox_reads
 insert into cm_inbox_reads (id, thread_id, user_id, last_read_at, created_at, updated_at) values
   ('59a024c0-aa7b-5075-8dcc-d13d777318a0', 'd85453a8-274f-566e-8343-e2534ae2fed7', 'efdca298-c977-5502-ad2e-8ba480ca1ea3', '2026-05-28 07:00:00', '2026-05-28 07:00:00', '2026-05-28 07:00:00'),
   ('58938e35-a25f-57f3-816b-047224a3777d', 'b8ce280f-3553-56b7-999f-d9cb6caa3acf', 'efdca298-c977-5502-ad2e-8ba480ca1ea3', '2026-05-28 00:13:32', '2026-05-28 00:13:32', '2026-05-28 00:13:32');
@@ -1633,13 +1687,12 @@ insert into cm_private_introduction_requests (id, requester_user_id, requester_p
 
 -- 5G. Extra inbox threads and messages (system notifications)
 insert into cm_inbox_threads (id, user_id, category, subject_type, subject_id, status, created_at, updated_at) values
-  ('d6000000-0000-4000-8000-000000000001', 'efdca298-c977-5502-ad2e-8ba480ca1ea3', 'system', null, null, 'open', '2026-06-01 09:00:00', '2026-06-01 09:00:00'),
   ('d6000000-0000-4000-8000-000000000002', 'd0000000-0000-4000-8000-000000000004', 'system', null, null, 'open', '2026-05-01 12:00:00', '2026-05-01 12:00:00'),
   ('d6000000-0000-4000-8000-000000000003', 'e0000000-0000-4000-8000-000000000005', 'system', null, null, 'open', '2026-06-01 08:00:00', '2026-06-01 08:00:00');
 
 -- 5G2. Extra inbox messages
 insert into cm_inbox_messages (id, thread_id, sender_type, sender_user_id, message_type, body, template_code, template_locale, action_type, action_payload, created_at, updated_at) values
-  ('d6100000-0000-4000-8000-000000000001', 'd6000000-0000-4000-8000-000000000001', 'system', null, 'system_notice', '您的会员即将到期，请及时续费以保持权益。', 'membership_expiring', 'zh', null, null, '2026-06-01 09:00:00', '2026-06-01 09:00:00'),
+  ('d6100000-0000-4000-8000-000000000001', 'd85453a8-274f-566e-8343-e2534ae2fed7', 'system', null, 'system_notice', '您的会员即将到期，请及时续费以保持权益。', 'membership_expiring', 'zh', null, null, '2026-06-01 09:00:00', '2026-06-01 09:00:00'),
   ('d6100000-0000-4000-8000-000000000002', 'd6000000-0000-4000-8000-000000000002', 'system', null, 'system_notice', '您的账号已被停用，如有疑问请联系客服。', 'account_deactivated', 'zh', null, null, '2026-05-01 12:00:00', '2026-05-01 12:00:00'),
   ('d6100000-0000-4000-8000-000000000003', 'd6000000-0000-4000-8000-000000000003', 'system', null, 'system_notice', '您的账号已被暂停，如需恢复请联系客服。', 'account_suspended', 'zh', null, null, '2026-06-01 08:00:00', '2026-06-01 08:00:00');
 

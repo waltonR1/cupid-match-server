@@ -1,0 +1,119 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.cupid.mapper.CupidInboxNotificationMapper">
+    <select id="selectUser" resultType="map">
+        select u.id, u.account_name as accountName, u.preferred_locale as preferredLocale, u.status,
+               coalesce(p.staff_contact_enabled, 1) as staffContactEnabled,
+               coalesce(p.service_announcements_enabled, 1) as serviceAnnouncementsEnabled
+        from cm_users u left join cm_user_preferences p on p.user_id = u.id
+        where u.id = #{userId} limit 1
+    </select>
+
+    <select id="searchUsers" resultType="map">
+        select id, account_name as accountName, preferred_locale as preferredLocale, status
+        from cm_users
+        where status = 'active'
+        <if test="keyword != null and keyword != ''">
+            and (id like concat('%', #{keyword}, '%') or account_name like concat('%', #{keyword}, '%'))
+        </if>
+        order by account_name, id limit 30
+    </select>
+
+    <select id="searchSubjects" resultType="map">
+        <choose>
+            <when test="subjectType == 'profile'">
+                select distinct p.id,
+                    coalesce((select lf.value from cm_profile_localized_fields lf where lf.profile_id = p.id and lf.field_name = 'profile_name' and lf.locale = 'zh' limit 1), p.id) as label
+                from cm_profiles p join cm_profile_ownerships o on o.profile_id = p.id and o.status = 'active'
+                where o.user_id = #{userId}
+                <if test="keyword != null and keyword != ''">and (p.id like concat('%', #{keyword}, '%') or exists (select 1 from cm_profile_localized_fields lf where lf.profile_id = p.id and lf.field_name = 'profile_name' and lf.value like concat('%', #{keyword}, '%')))</if>
+            </when>
+            <when test="subjectType == 'event'">
+                select distinct e.id, coalesce(lf.value, e.id) as label
+                from cm_event_registrations r join cm_events e on e.id = r.event_id
+                left join cm_event_localized_fields lf on lf.event_id = e.id and lf.field_name = 'title' and lf.locale = 'zh'
+                where r.user_id = #{userId}
+                <if test="keyword != null and keyword != ''">and (e.id like concat('%', #{keyword}, '%') or lf.value like concat('%', #{keyword}, '%'))</if>
+            </when>
+            <when test="subjectType == 'private_introduction_request'">
+                select r.id, concat('私人介绍 · ', coalesce(lf.value, r.target_profile_id)) as label
+                from cm_private_introduction_requests r
+                left join cm_profile_localized_fields lf on lf.profile_id = r.target_profile_id and lf.field_name = 'profile_name' and lf.locale = 'zh'
+                where r.requester_user_id = #{userId}
+                <if test="keyword != null and keyword != ''">and (r.id like concat('%', #{keyword}, '%') or lf.value like concat('%', #{keyword}, '%'))</if>
+            </when>
+            <when test="subjectType == 'membership'">
+                select m.id, concat(m.tier, ' · ', m.status) as label from cm_user_memberships m
+                where m.user_id = #{userId}
+                <if test="keyword != null and keyword != ''">and (m.id like concat('%', #{keyword}, '%') or m.tier like concat('%', #{keyword}, '%'))</if>
+            </when>
+            <otherwise>select null id, null label where 1 = 0</otherwise>
+        </choose>
+        limit 30
+    </select>
+
+    <select id="selectBroadcastUsers" resultType="map">
+        select distinct u.id, u.account_name as accountName, u.preferred_locale as preferredLocale
+        from cm_users u
+        left join cm_user_preferences p on p.user_id = u.id
+        left join cm_user_memberships m on m.user_id = u.id and m.status = 'active'
+        where u.status = 'active' and coalesce(p.service_announcements_enabled, 1) = 1
+        <choose>
+            <when test="scope == 'membership_tier'">and m.tier = #{tier}</when>
+            <when test="scope == 'selected_users'">
+                and u.id in
+                <foreach collection="userIds" item="id" open="(" separator="," close=")">#{id}</foreach>
+            </when>
+            <otherwise>and 1 = 1</otherwise>
+        </choose>
+        order by u.id
+    </select>
+
+    <select id="countSubjectAccess" resultType="int">
+        select count(*) from (
+            <choose>
+                <when test="subjectType == 'profile'">
+                    select o.profile_id as id from cm_profile_ownerships o
+                    where o.user_id = #{userId} and o.profile_id = #{subjectId} and o.status = 'active'
+                </when>
+                <when test="subjectType == 'event'">
+                    select r.event_id as id from cm_event_registrations r
+                    where r.user_id = #{userId} and r.event_id = #{subjectId}
+                </when>
+                <when test="subjectType == 'private_introduction_request'">
+                    select r.id from cm_private_introduction_requests r
+                    where r.requester_user_id = #{userId} and r.id = #{subjectId}
+                </when>
+                <when test="subjectType == 'membership'">
+                    select m.id from cm_user_memberships m where m.user_id = #{userId} and m.id = #{subjectId}
+                </when>
+                <otherwise>select null as id where 1 = 0</otherwise>
+            </choose>
+        ) access_subject
+    </select>
+
+    <select id="selectOpenSystemThread" resultType="string">
+        select id from cm_inbox_threads
+        where user_id = #{userId} and category = 'system' and status = 'open'
+          and ((#{subjectType} is null and subject_type is null and subject_id is null)
+            or (subject_type = #{subjectType} and subject_id = #{subjectId}))
+        order by updated_at desc limit 1 for update
+    </select>
+
+    <insert id="insertThread">
+        insert into cm_inbox_threads (id, user_id, category, subject_type, subject_id, status)
+        values (#{id}, #{userId}, 'system', #{subjectType}, #{subjectId}, 'open')
+    </insert>
+
+    <insert id="insertNotification">
+        insert into cm_inbox_messages (
+            id, thread_id, sender_type, sender_user_id, message_type, body,
+            template_code, template_locale, action_type, action_payload, dedupe_key
+        ) values (
+            #{id}, #{threadId}, #{senderType}, #{senderUserId}, #{messageType}, #{body},
+            #{templateCode}, #{templateLocale}, #{actionType}, null, #{dedupeKey}
+        )
+    </insert>
+
+    <update id="touchThread">update cm_inbox_threads set updated_at = current_timestamp where id = #{threadId}</update>
+</mapper>

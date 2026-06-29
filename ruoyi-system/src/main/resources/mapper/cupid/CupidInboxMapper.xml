@@ -44,7 +44,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 
     <select id="selectMessages" resultType="map">
         select m.id, m.sender_type as senderType,
-               m.message_type as messageType, m.body,
+               m.message_type as messageType, m.body, m.action_type as actionType,
                m.created_at as createdAt
         from cm_inbox_messages m
         where m.thread_id = #{threadId}

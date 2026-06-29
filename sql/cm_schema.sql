@@ -26,6 +26,8 @@ drop table if exists cm_staff_members;
 drop table if exists cm_inbox_reads;
 drop table if exists cm_inbox_messages;
 drop table if exists cm_inbox_threads;
+drop table if exists cm_inbox_template_localized_fields;
+drop table if exists cm_inbox_templates;
 drop table if exists cm_private_introduction_requests;
 drop table if exists cm_favorite_profiles;
 drop table if exists cm_event_registrations;
@@ -1203,6 +1205,32 @@ create table cm_private_introduction_requests (
 -- 收件箱
 -- ----------------------------
 
+create table cm_inbox_templates (
+  id                 varchar(36) not null comment '通知模板ID',
+  template_code      varchar(80) not null comment '稳定模板代码，创建后不可修改',
+  message_type       varchar(30) not null comment '消息类型；可选值：text, system_notice, status_update, action_prompt',
+  subject_type       varchar(40) default null comment '限定业务对象类型',
+  action_type        varchar(80) default null comment '模板定义的操作类型',
+  status             varchar(20) not null default 'enabled' comment '模板状态；可选值：enabled, disabled',
+  created_at         datetime    not null default current_timestamp comment '创建时间',
+  updated_at         datetime    not null default current_timestamp on update current_timestamp comment '更新时间',
+  primary key (id),
+  unique key uk_cm_inbox_template_code (template_code),
+  key idx_cm_inbox_template_status (status)
+) engine=innodb comment='收件箱通知模板';
+
+create table cm_inbox_template_localized_fields (
+  id                 varchar(36) not null comment '通知模板多语言字段ID',
+  template_id        varchar(36) not null comment '通知模板ID，关联 cm_inbox_templates.id',
+  locale             varchar(8)  not null comment '语言；可选值：zh, fr, en',
+  name               varchar(120) not null comment '后台展示名称',
+  body               text        not null comment '纯文本模板正文',
+  created_at         datetime    not null default current_timestamp comment '创建时间',
+  updated_at         datetime    not null default current_timestamp on update current_timestamp comment '更新时间',
+  primary key (id),
+  unique key uk_cm_inbox_template_locale (template_id, locale)
+) engine=innodb comment='收件箱通知模板多语言字段';
+
 create table cm_inbox_threads (
   id                 varchar(36) not null comment '收件箱会话ID',
   user_id            varchar(36) not null comment '用户ID，关联 cm_users.id',
@@ -1210,9 +1238,16 @@ create table cm_inbox_threads (
   subject_type       varchar(40) default null comment '业务对象类型；可选值：profile, event, private_introduction_request, membership, legal_document',
   subject_id         varchar(36) default null comment '业务对象ID',
   status             varchar(20) not null comment '收件箱会话状态；可选值：open, closed, archived',
+  open_thread_key    varchar(140) generated always as (
+    case when status = 'open'
+      then concat(category, ':', coalesce(subject_type, ''), ':', coalesce(subject_id, ''))
+      else null
+    end
+  ) stored comment '打开会话唯一键',
   created_at         datetime    not null default current_timestamp comment '创建时间',
   updated_at         datetime    not null default current_timestamp on update current_timestamp comment '更新时间',
   primary key (id),
+  unique key uk_cm_inbox_threads_open (user_id, open_thread_key),
   key idx_cm_inbox_threads_user_status (user_id, status),
   key idx_cm_inbox_threads_subject (subject_type, subject_id)
 ) engine=innodb comment='收件箱会话';
@@ -1228,9 +1263,11 @@ create table cm_inbox_messages (
   template_locale    varchar(8)   default null comment '模板语言；可选值：zh, fr, en',
   action_type        varchar(80)  default null comment '操作类型',
   action_payload     json         default null comment '消息操作参数',
+  dedupe_key         varchar(160) default null comment '自动通知或群发幂等键',
   created_at         datetime     not null default current_timestamp comment '创建时间',
   updated_at         datetime     not null default current_timestamp on update current_timestamp comment '更新时间',
   primary key (id),
+  unique key uk_cm_inbox_messages_dedupe (dedupe_key),
   key idx_cm_inbox_messages_thread_created (thread_id, created_at)
 ) engine=innodb comment='收件箱消息';
 

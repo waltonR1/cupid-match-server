@@ -6,6 +6,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import com.alibaba.fastjson2.JSON;
@@ -14,6 +15,7 @@ import com.ruoyi.common.utils.uuid.IdUtils;
 import com.ruoyi.cupid.domain.CupidEvent;
 import com.ruoyi.cupid.domain.CupidEventRegistration;
 import com.ruoyi.cupid.domain.CupidUserMembership;
+import com.ruoyi.cupid.event.CupidInboxNotificationEvent;
 import com.ruoyi.cupid.mapper.CupidAuthMapper;
 import com.ruoyi.cupid.mapper.CupidEventMapper;
 import com.ruoyi.cupid.mapper.CupidProfileMapper;
@@ -43,6 +45,9 @@ public class CupidAdminEventServiceImpl implements ICupidAdminEventService
 
     @Autowired
     private CupidAuthMapper authMapper;
+
+    @Autowired
+    private ApplicationEventPublisher eventPublisher;
 
     @Autowired
     private CupidProfileMapper profileMapper;
@@ -310,6 +315,11 @@ public class CupidAdminEventServiceImpl implements ICupidAdminEventService
         insertAudit("event_registration", id,
                 "cupid.eventRegistration.changeStatus", reviewerUserId,
                 registrationToMap(registration), after, reason);
+        eventPublisher.publishEvent(new CupidInboxNotificationEvent(
+                registration.getUserId(), "event_registration_status_changed",
+                Map.of("eventTitle", String.valueOf(after.getOrDefault("eventTitle", "活动")),
+                        "status", targetStatus, "reason", reason == null ? "-" : reason),
+                eventId, "event-registration:" + id + ":" + targetStatus + ":" + after.get("updatedAt")));
     }
 
     private boolean occupiesSeat(String status)

@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.cupid.mapper.CupidInboxTemplateMapper">
+    <sql id="templateColumns">
+        t.id, t.template_code as templateCode, t.message_type as messageType,
+        t.subject_type as subjectType, t.action_type as actionType,
+        t.status, t.created_at as createdAt, t.updated_at as updatedAt
+    </sql>
+
+    <select id="selectTemplates" resultType="map">
+        select <include refid="templateColumns"/>,
+               (select count(*) from cm_inbox_template_localized_fields l where l.template_id = t.id) as localeCount
+        from cm_inbox_templates t
+        <where>
+            <if test="templateCode != null and templateCode != ''">and t.template_code like concat('%', #{templateCode}, '%')</if>
+            <if test="messageType != null and messageType != ''">and t.message_type = #{messageType}</if>
+            <if test="status != null and status != ''">and t.status = #{status}</if>
+        </where>
+        order by t.updated_at desc, t.template_code
+    </select>
+
+    <select id="selectTemplateById" resultType="map">
+        select <include refid="templateColumns"/> from cm_inbox_templates t where t.id = #{id} limit 1
+    </select>
+
+    <select id="selectTemplateByCode" resultType="map">
+        select <include refid="templateColumns"/> from cm_inbox_templates t where t.template_code = #{templateCode} limit 1
+    </select>
+
+    <select id="selectLocalizedFields" resultType="map">
+        select id, template_id as templateId, locale, name, body, updated_at as updatedAt
+        from cm_inbox_template_localized_fields where template_id = #{templateId} order by field(locale, 'zh', 'fr', 'en')
+    </select>
+
+    <select id="selectLocalizedField" resultType="map">
+        select id, template_id as templateId, locale, name, body
+        from cm_inbox_template_localized_fields where template_id = #{templateId} and locale = #{locale} limit 1
+    </select>
+
+    <insert id="insertTemplate">
+        insert into cm_inbox_templates (id, template_code, message_type, subject_type, action_type, status)
+        values (#{id}, #{templateCode}, #{messageType}, #{subjectType}, #{actionType}, #{status})
+    </insert>
+
+    <update id="updateTemplate">
+        update cm_inbox_templates set message_type = #{messageType}, subject_type = #{subjectType},
+            action_type = #{actionType}, updated_at = current_timestamp where id = #{id}
+    </update>
+
+    <update id="updateTemplateStatus">
+        update cm_inbox_templates set status = #{status}, updated_at = current_timestamp where id = #{id}
+    </update>
+
+    <insert id="upsertLocalizedField">
+        insert into cm_inbox_template_localized_fields (id, template_id, locale, name, body)
+        values (#{id}, #{templateId}, #{locale}, #{name}, #{body})
+        on duplicate key update name = values(name), body = values(body), updated_at = current_timestamp
+    </insert>
+</mapper>

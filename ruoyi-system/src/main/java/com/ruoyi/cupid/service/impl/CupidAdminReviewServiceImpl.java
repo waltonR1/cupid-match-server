@@ -12,8 +12,10 @@ import com.ruoyi.cupid.domain.CupidProfileVerificationMaterial;
 import com.ruoyi.cupid.mapper.CupidProfileMapper;
 import com.ruoyi.cupid.service.ICupidAdminReviewService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import com.ruoyi.cupid.event.CupidInboxNotificationEvent;
 
 /**
  * Cupid Match 后台审核服务实现
@@ -29,6 +31,9 @@ public class CupidAdminReviewServiceImpl implements ICupidAdminReviewService
 
     @Autowired
     private CupidProfileMapper profileMapper;
+
+    @Autowired
+    private ApplicationEventPublisher eventPublisher;
 
     @Override
     public List<Map<String, Object>> selectProfileList(Map<String, Object> params)
@@ -65,6 +70,8 @@ public class CupidAdminReviewServiceImpl implements ICupidAdminReviewService
         profileMapper.updateAdminProfileReviewStatus(profileId, targetStatus);
         Map<String, Object> after = profileMapper.selectAdminProfileDetail(profileId);
         insertAudit("profile", profileId, "cupid.profile.review", reviewerUserId, before, after, reason);
+        publishNotification(after, "approved".equals(status) ? "profile_review_approved" : "profile_review_rejected",
+                profileId, status, reason, "profile-review:" + profileId + ":" + status + ":" + after.get("updatedAt"));
     }
 
     @Override
@@ -89,6 +96,9 @@ public class CupidAdminReviewServiceImpl implements ICupidAdminReviewService
         profileMapper.updateAdminPhotoReviewStatus(photoId, status);
         Map<String, Object> after = profileMapper.selectAdminPhotoDetail(photoId);
         insertAudit("profile_photo", photoId, "cupid.photo.review", reviewerUserId, before, after, reason);
+        publishNotification(after, "approved".equals(status) ? "photo_review_approved" : "photo_review_rejected",
+                String.valueOf(after.get("profileId")), status, reason,
+                "photo-review:" + photoId + ":" + status + ":" + after.get("updatedAt"));
     }
 
     @Override
@@ -123,6 +133,9 @@ public class CupidAdminReviewServiceImpl implements ICupidAdminReviewService
         Map<String, Object> after = profileMapper.selectAdminVerificationDetail(materialId);
         insertAudit("profile_verification_material", materialId,
                 "cupid.verification.review", reviewerUserId, before, after, reason);
+        publishNotification(after, "approved".equals(status) ? "verification_approved" : "verification_rejected",
+                profileId, status, reason,
+                "verification-review:" + materialId + ":" + status + ":" + after.get("updatedAt"));
     }
 
     @Override
@@ -244,6 +257,7 @@ public class CupidAdminReviewServiceImpl implements ICupidAdminReviewService
         Map<String, Object> after = profileMapper.selectAdminIntroductionDetail(requestId);
         insertAudit("private_introduction_request", requestId,
                 "cupid.introduction.accept", reviewerUserId, before, after, reason);
+        publishIntroductionNotification(after, requestId, "accepted", reason);
     }
 
     @Override
@@ -269,6 +283,7 @@ public class CupidAdminReviewServiceImpl implements ICupidAdminReviewService
         Map<String, Object> after = profileMapper.selectAdminIntroductionDetail(requestId);
         insertAudit("private_introduction_request", requestId,
                 "cupid.introduction.decline", reviewerUserId, before, after, reason);
+        publishIntroductionNotification(after, requestId, "declined", reason);
     }
 
     @Override
@@ -291,6 +306,48 @@ public class CupidAdminReviewServiceImpl implements ICupidAdminReviewService
         {
             throw new ServiceException("审核状态不正确");
         }
+    }
+
+    private void publishNotification(Map<String, Object> row, String templateCode, String subjectId,
+            String status, String reason, String dedupeKey)
+    {
+        String userId = value(row.get("ownerUserId"));
+        if (!hasText(userId))
+        {
+            return;
+        }
+        Map<String, Object> variables = new java.util.HashMap<>();
+        variables.put("profileName", fallback(row.get("profileName"), "资料"));
+        variables.put("verificationType", fallback(row.get("materialType"), "verification"));
+        variables.put("status", status);
+        variables.put("reason", fallback(reason, "-"));
+        eventPublisher.publishEvent(new CupidInboxNotificationEvent(
+                userId, templateCode, variables, subjectId, dedupeKey));
+    }
+
+    private void publishIntroductionNotification(Map<String, Object> row, String requestId,
+            String status, String reason)
+    {
+        String userId = value(row.get("requesterUserId"));
+        if (!hasText(userId))
+        {
+            return;
+        }
+        eventPublisher.publishEvent(new CupidInboxNotificationEvent(userId,
+                "private_introduction_status_changed",
+                Map.of("status", status, "reason", fallback(reason, "-")), requestId,
+                "introduction:" + requestId + ":" + status));
+    }
+
+    private static String value(Object value)
+    {
+        return value == null || "null".equals(String.valueOf(value)) ? null : String.valueOf(value);
+    }
+
+    private static String fallback(Object value, String fallback)
+    {
+        String text = value == null ? null : String.valueOf(value).trim();
+        return text != null && !text.isEmpty() ? text : fallback;
     }
 
     private Map<String, Object> requirePendingIntroduction(String requestId)
