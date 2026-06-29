@@ -1269,6 +1269,10 @@ Registration：
 
 **当前状态：代码实现完成，构建通过；在当前数据库完成结构同步并重启后进行真实数据验收。**
 
+8.5 后续“后台群发记录”补充方案详见 [cm-phase-8-5-6-inbox-broadcast-history.md](D:/uniapp/cupid-match/cupid-match-server/doc/cm-phase-8-5-6-inbox-broadcast-history.md)。
+
+8.5 后续“后台单发记录”补充方案详见 [cm-phase-8-5-7-inbox-single-send-history.md](D:/uniapp/cupid-match/cupid-match-server/doc/cm-phase-8-5-7-inbox-single-send-history.md)。
+
 #### 终态定义
 
 Phase 8.5 将 Cupid Inbox 的“站内通知”能力推进到终态，不宣告未来受控沟通能力完成：
