@@ -615,8 +615,8 @@ insert into sys_role (role_name, role_key, role_sort, data_scope, menu_check_str
 select 'Cupid 审计员', 'cupid_auditor', 14, '1', 1, 1, '0', '0', 'admin', sysdate(), 'Cupid 业务审计只读'
 where not exists (select 1 from sys_role where role_key = 'cupid_auditor' and del_flag = '0');
 
-delete from sys_role_menu where menu_id between 2000 and 2099;
-delete from sys_menu where menu_id between 2000 and 2099;
+delete from sys_role_menu where menu_id between 2000 and 2109;
+delete from sys_menu where menu_id between 2000 and 2109;
 
 insert into sys_menu values
 ('2000', '审核中心', '0', '10', 'cupid', null, '', 'Cupid', 1, 0, 'M', '0', '0', '', 'clipboard', 'admin', sysdate(), '', null, 'Cupid 审核中心目录'),
@@ -685,9 +685,16 @@ insert into sys_menu values('2095', '会员管理', '2080', '4', 'membership', '
 insert into sys_menu values('2096', '会员查询', '2095', '1', '', '', '', '', 1, 0, 'F', '0', '0', 'cupid:membership:query', '#', 'admin', sysdate(), '', null, '');
 insert into sys_menu values('2097', '会员状态变更', '2095', '2', '', '', '', '', 1, 0, 'F', '0', '0', 'cupid:membership:status', '#', 'admin', sysdate(), '', null, '');
 insert into sys_menu values('2098', '会员资料编辑', '2095', '3', '', '', '', '', 1, 0, 'F', '0', '0', 'cupid:membership:edit', '#', 'admin', sysdate(), '', null, '');
+insert into sys_menu values('2099', '运营协作', '0', '16', 'cupid-operation', null, '', 'CupidOperationRoot', 1, 0, 'M', '0', '0', '', 'clipboard', 'admin', sysdate(), '', null, 'Cupid 运营协作目录');
+insert into sys_menu values('2100', '跟进事项', '2099', '1', 'task', 'cupid/staff-task/index', '', 'CupidStaffTask', 1, 0, 'C', '0', '0', 'cupid:staffTask:list', 'list', 'admin', sysdate(), '', null, 'Cupid 跟进事项');
+insert into sys_menu values('2101', '任务查询', '2100', '1', '', '', '', '', 1, 0, 'F', '0', '0', 'cupid:staffTask:query', '#', 'admin', sysdate(), '', null, '');
+insert into sys_menu values('2102', '任务新增', '2100', '2', '', '', '', '', 1, 0, 'F', '0', '0', 'cupid:staffTask:add', '#', 'admin', sysdate(), '', null, '');
+insert into sys_menu values('2103', '任务编辑', '2100', '3', '', '', '', '', 1, 0, 'F', '0', '0', 'cupid:staffTask:edit', '#', 'admin', sysdate(), '', null, '');
+insert into sys_menu values('2104', '业务审计', '2099', '2', 'audit', 'cupid/audit/index', '', 'CupidAudit', 1, 0, 'C', '0', '0', 'cupid:audit:list', 'eye', 'admin', sysdate(), '', null, 'Cupid 业务审计');
+insert into sys_menu values('2105', '审计查询', '2104', '1', '', '', '', '', 1, 0, 'F', '0', '0', 'cupid:audit:query', '#', 'admin', sysdate(), '', null, '');
 
 insert into sys_role_menu (role_id, menu_id)
-select r.role_id, m.menu_id from sys_role r join sys_menu m on m.menu_id between 2000 and 2099
+select r.role_id, m.menu_id from sys_role r join sys_menu m on m.menu_id between 2000 and 2109
 where r.role_key = 'cupid_admin' and r.del_flag = '0';
 
 insert into sys_role_menu (role_id, menu_id)
@@ -696,6 +703,10 @@ where r.role_key = 'cupid_reviewer' and r.del_flag = '0';
 
 insert into sys_role_menu (role_id, menu_id)
 select r.role_id, m.menu_id from sys_role r join sys_menu m on m.menu_id in (2000, 2010, 2011, 2020, 2021, 2030, 2031, 2032, 2033, 2034, 2035, 2036, 2060, 2061, 2062)
+where r.role_key = 'cupid_auditor' and r.del_flag = '0';
+
+insert into sys_role_menu (role_id, menu_id)
+select r.role_id, m.menu_id from sys_role r join sys_menu m on m.menu_id in (2099, 2104, 2105)
 where r.role_key = 'cupid_auditor' and r.del_flag = '0';
 
 insert into sys_role_menu (role_id, menu_id)
@@ -708,6 +719,10 @@ where r.role_key = 'cupid_support' and r.del_flag = '0';
 
 insert into sys_role_menu (role_id, menu_id)
 select r.role_id, m.menu_id from sys_role r join sys_menu m on m.menu_id in (2089, 2090, 2092)
+where r.role_key = 'cupid_support' and r.del_flag = '0';
+
+insert into sys_role_menu (role_id, menu_id)
+select r.role_id, m.menu_id from sys_role r join sys_menu m on m.menu_id in (2099, 2100, 2101, 2103)
 where r.role_key = 'cupid_support' and r.del_flag = '0';
 
 insert into sys_role_menu (role_id, menu_id)

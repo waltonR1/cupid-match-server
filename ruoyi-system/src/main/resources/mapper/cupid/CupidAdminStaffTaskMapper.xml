@@ -1,0 +1,125 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.cupid.mapper.CupidAdminStaffTaskMapper">
+
+    <select id="selectAdminStaffTasks" resultType="map">
+        select
+            t.id,
+            t.assignee_sys_user_id as assigneeSysUserId,
+            t.subject_type as subjectType,
+            t.subject_id as subjectId,
+            t.status,
+            t.priority,
+            t.due_at as dueAt,
+            t.completed_at as completedAt,
+            t.created_at as createdAt,
+            t.updated_at as updatedAt,
+            su.user_name as assigneeUserName,
+            su.nick_name as assigneeNickName,
+            nz.value as noteZh
+        from cm_staff_tasks t
+        left join sys_user su on su.user_id = t.assignee_sys_user_id
+        left join cm_staff_task_localized_fields nz
+            on nz.staff_task_id = t.id
+           and nz.field_name = 'note'
+           and nz.locale = 'zh'
+        where 1 = 1
+        <if test="keyword != null and keyword != ''">
+            and (
+                t.subject_id like concat('%', #{keyword}, '%')
+                or nz.value like concat('%', #{keyword}, '%')
+                or su.user_name like concat('%', #{keyword}, '%')
+                or su.nick_name like concat('%', #{keyword}, '%')
+            )
+        </if>
+        <if test="subjectType != null and subjectType != ''">
+            and t.subject_type = #{subjectType}
+        </if>
+        <if test="status != null and status != ''">
+            and t.status = #{status}
+        </if>
+        <if test="priority != null and priority != ''">
+            and t.priority = #{priority}
+        </if>
+        <if test="assigneeSysUserId != null and assigneeSysUserId != ''">
+            and t.assignee_sys_user_id = #{assigneeSysUserId}
+        </if>
+        order by case when t.status = 'done' then 1 else 0 end, t.updated_at desc, t.id desc
+    </select>
+
+    <select id="selectAdminStaffTaskById" resultType="map">
+        select
+            t.id,
+            t.assignee_sys_user_id as assigneeSysUserId,
+            t.subject_type as subjectType,
+            t.subject_id as subjectId,
+            t.status,
+            t.priority,
+            t.due_at as dueAt,
+            t.completed_at as completedAt,
+            t.created_at as createdAt,
+            t.updated_at as updatedAt,
+            su.user_name as assigneeUserName,
+            su.nick_name as assigneeNickName,
+            nz.value as noteZh,
+            nf.value as noteFr,
+            ne.value as noteEn
+        from cm_staff_tasks t
+        left join sys_user su on su.user_id = t.assignee_sys_user_id
+        left join cm_staff_task_localized_fields nz
+            on nz.staff_task_id = t.id and nz.field_name = 'note' and nz.locale = 'zh'
+        left join cm_staff_task_localized_fields nf
+            on nf.staff_task_id = t.id and nf.field_name = 'note' and nf.locale = 'fr'
+        left join cm_staff_task_localized_fields ne
+            on ne.staff_task_id = t.id and ne.field_name = 'note' and ne.locale = 'en'
+        where t.id = #{id}
+        limit 1
+    </select>
+
+    <select id="selectAvailableAssignees" resultType="map">
+        select
+            user_id as userId,
+            user_name as userName,
+            nick_name as nickName
+        from sys_user
+        where del_flag = '0'
+          and status = '0'
+        order by user_name
+    </select>
+
+    <insert id="insertAdminStaffTask">
+        insert into cm_staff_tasks (
+            id, assignee_sys_user_id, subject_type, subject_id, status, priority, due_at, completed_at, created_at, updated_at
+        ) values (
+            #{id}, #{assigneeSysUserId}, #{subjectType}, #{subjectId}, #{status}, #{priority},
+            #{dueAt}, #{completedAt}, current_timestamp, current_timestamp
+        )
+    </insert>
+
+    <update id="updateAdminStaffTask">
+        update cm_staff_tasks
+        set assignee_sys_user_id = #{assigneeSysUserId},
+            status = #{status},
+            priority = #{priority},
+            due_at = #{dueAt},
+            completed_at = #{completedAt},
+            updated_at = current_timestamp
+        where id = #{id}
+    </update>
+
+    <insert id="upsertTaskLocalizedField">
+        insert into cm_staff_task_localized_fields (
+            id, staff_task_id, field_name, locale, value, source, provider, status, created_at, updated_at
+        ) values (
+            #{id}, #{staffTaskId}, 'note', #{locale}, #{value}, 'manual', 'human', 'ready', current_timestamp, current_timestamp
+        )
+        on duplicate key update
+            value = values(value),
+            source = 'manual',
+            provider = 'human',
+            status = 'ready',
+            updated_at = current_timestamp
+    </insert>
+</mapper>

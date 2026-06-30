@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.cupid.mapper.CupidAdminAuditMapper">
+
+    <select id="selectAdminAuditLogs" resultType="map">
+        select
+            al.id,
+            al.actor_type as actorType,
+            al.actor_user_id as actorUserId,
+            al.subject_type as subjectType,
+            al.subject_id as subjectId,
+            al.action,
+            al.reason,
+            al.created_at as createdAt,
+            su.user_name as actorUserName,
+            su.nick_name as actorNickName,
+            case
+                when al.actor_type = 'staff' then coalesce(su.nick_name, su.user_name, al.actor_user_id)
+                when al.actor_type = 'system' then 'system'
+                else al.actor_user_id
+            end as actorDisplayName
+        from cm_audit_logs al
+        left join sys_user su
+            on al.actor_type = 'staff'
+           and cast(al.actor_user_id as unsigned) = su.user_id
+        where 1 = 1
+        <if test="action != null and action != ''">
+            and al.action = #{action}
+        </if>
+        <if test="subjectType != null and subjectType != ''">
+            and al.subject_type = #{subjectType}
+        </if>
+        <if test="subjectId != null and subjectId != ''">
+            and al.subject_id = #{subjectId}
+        </if>
+        <if test="operatorKeyword != null and operatorKeyword != ''">
+            and (
+                al.actor_user_id = #{operatorKeyword}
+                or su.user_name like concat('%', #{operatorKeyword}, '%')
+                or su.nick_name like concat('%', #{operatorKeyword}, '%')
+            )
+        </if>
+        <if test="dateFrom != null and dateFrom != ''">
+            and al.created_at &gt;= #{dateFrom}
+        </if>
+        <if test="dateTo != null and dateTo != ''">
+            and al.created_at &lt;= #{dateTo}
+        </if>
+        order by al.created_at desc, al.id desc
+    </select>
+
+    <select id="selectAdminAuditLogById" resultType="map">
+        select
+            al.id,
+            al.actor_type as actorType,
+            al.actor_user_id as actorUserId,
+            al.subject_type as subjectType,
+            al.subject_id as subjectId,
+            al.action,
+            cast(al.before_data as char) as beforeData,
+            cast(al.after_data as char) as afterData,
+            al.reason,
+            al.created_at as createdAt,
+            su.user_name as actorUserName,
+            su.nick_name as actorNickName,
+            case
+                when al.actor_type = 'staff' then coalesce(su.nick_name, su.user_name, al.actor_user_id)
+                when al.actor_type = 'system' then 'system'
+                else al.actor_user_id
+            end as actorDisplayName
+        from cm_audit_logs al
+        left join sys_user su
+            on al.actor_type = 'staff'
+           and cast(al.actor_user_id as unsigned) = su.user_id
+        where al.id = #{id}
+        limit 1
+    </select>
+</mapper>
