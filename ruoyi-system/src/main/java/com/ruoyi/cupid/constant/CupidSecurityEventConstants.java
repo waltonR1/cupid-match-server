@@ -14,6 +14,7 @@ public final class CupidSecurityEventConstants
     public static final String RESULT_SUCCESS = "success";
     public static final String RESULT_FAILED = "failed";
     public static final String RESULT_BLOCKED = "blocked";
+    public static final String RESULT_DETECTED = "detected";
 
     private CupidSecurityEventConstants()
     {

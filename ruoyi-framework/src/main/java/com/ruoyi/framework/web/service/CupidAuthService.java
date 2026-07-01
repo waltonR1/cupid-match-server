@@ -2,15 +2,21 @@ package com.ruoyi.framework.web.service;
 
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.TimeUnit;
 import java.util.regex.Pattern;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import com.ruoyi.common.constant.HttpStatus;
+import com.ruoyi.common.core.domain.model.CupidLoginUser;
+import com.ruoyi.common.core.redis.RedisCache;
 import com.ruoyi.common.exception.cupid.CupidApiException;
+import com.ruoyi.common.utils.ServletUtils;
 import com.ruoyi.cupid.constant.CupidSecurityEventConstants;
 import com.ruoyi.cupid.domain.CupidAuthIdentity;
 import com.ruoyi.cupid.domain.CupidUser;
@@ -21,7 +27,9 @@ import com.ruoyi.cupid.service.ICupidSecurityEventService;
 import com.ruoyi.cupid.service.ICupidUserService;
 import com.ruoyi.common.utils.SecurityUtils;
 import com.ruoyi.common.utils.StringUtils;
+import com.ruoyi.common.utils.ip.IpUtils;
 import com.ruoyi.common.utils.uuid.IdUtils;
+import jakarta.servlet.http.HttpServletRequest;
 
 /**
  * Cupid Match 用户认证服务
@@ -33,6 +41,11 @@ public class CupidAuthService
     private static final Pattern PHONE_PATTERN = Pattern.compile("^\\+?[1-9]\\d{6,14}$");
     private static final java.util.Set<String> SENSITIVE_ACTIONS = java.util.Set.of(
             "change_password", "deactivate_account", "export_data", "unbind_identity");
+    private static final String LOGIN_FAIL_KEY_PREFIX = "cupid:risk:login-fail:";
+    private static final String KNOWN_LOGIN_ENV_KEY_PREFIX = "cupid:risk:known-env:";
+    private static final int LOGIN_FAIL_WINDOW_MINUTES = 10;
+    private static final int LOGIN_FAIL_THRESHOLD = 5;
+    private static final int KNOWN_LOGIN_ENV_DAYS = 90;
 
     @Autowired
     private ICupidUserService userService;
@@ -52,6 +65,9 @@ public class CupidAuthService
     @Autowired
     private ICupidSecurityEventService securityEventService;
 
+    @Autowired
+    private RedisCache redisCache;
+
     @Transactional
     public Map<String, Object> login(String identifier, String password)
     {
@@ -67,14 +83,30 @@ public class CupidAuthService
         CupidAuthIdentity identity = userService.selectIdentityByProviderAndIdentifier(provider, normalizedIdentifier);
         if (identity == null || !SecurityUtils.matchesPassword(password, identity.getPasswordHash()))
         {
-            securityEventService.recordEvent(null, identity == null ? null : identity.getId(),
+            int failCount = increaseLoginFailCount(provider, normalizedIdentifier, resolveIp());
+            securityEventService.recordEvent(identity == null ? null : identity.getUserId(),
+                    identity == null ? null : identity.getId(),
                     CupidSecurityEventConstants.EVENT_LOGIN_FAILED,
                     CupidSecurityEventConstants.RESULT_FAILED, null, null,
                     Map.of("provider", provider,
                             "maskedIdentifier", maskIdentifier(provider, normalizedIdentifier),
-                            "reason", "invalid_credentials"));
+                            "reason", "invalid_credentials",
+                            "failCountInWindow", failCount));
+            if (failCount == LOGIN_FAIL_THRESHOLD)
+            {
+                securityEventService.recordEvent(identity == null ? null : identity.getUserId(),
+                        identity == null ? null : identity.getId(),
+                        CupidSecurityEventConstants.EVENT_RISK_DETECTED,
+                        CupidSecurityEventConstants.RESULT_DETECTED, "high", resolveDeviceId(),
+                        Map.of("rule", "login_failed_burst",
+                                "provider", provider,
+                                "maskedIdentifier", maskIdentifier(provider, normalizedIdentifier),
+                                "failCountInWindow", failCount,
+                                "windowMinutes", LOGIN_FAIL_WINDOW_MINUTES));
+            }
             throw new CupidApiException(HttpStatus.UNAUTHORIZED, "invalid_credentials");
         }
+        clearLoginFailCount(provider, normalizedIdentifier, resolveIp());
 
         CupidUser user;
         try
@@ -103,9 +135,11 @@ public class CupidAuthService
         legalService.acceptActiveDocuments(user.getId());
 
         Map<String, Object> response = new LinkedHashMap<>();
+        List<CupidLoginUser> existingSessions = tokenService.selectUserSessions(user.getId());
         response.put("token", tokenService.createToken(identity.getId(), user.getId()));
         response.put("user", toUserDto(user));
         response.put("membership", toMembershipDto(userService.selectActiveMembershipByUserId(user.getId())));
+        recordLoginRiskIfNeeded(user.getId(), identity.getId(), provider, normalizedIdentifier, existingSessions);
         securityEventService.recordEvent(user.getId(), identity.getId(),
                 CupidSecurityEventConstants.EVENT_LOGIN_SUCCESS,
                 CupidSecurityEventConstants.RESULT_SUCCESS, null, null,
@@ -550,6 +584,87 @@ public class CupidAuthService
         return result;
     }
 
+    private void recordLoginRiskIfNeeded(String userId, String identityId, String provider, String normalizedIdentifier,
+            List<CupidLoginUser> existingSessions)
+    {
+        String currentDeviceId = resolveDeviceId();
+        String currentUserAgent = resolveUserAgent();
+        String currentIp = resolveIp();
+        String currentFingerprint = buildSessionFingerprint(currentDeviceId, currentUserAgent, currentIp);
+        Set<String> activeFingerprints = new HashSet<>();
+        for (CupidLoginUser session : existingSessions)
+        {
+            activeFingerprints.add(buildSessionFingerprint(session.getDeviceId(), session.getUserAgent(), session.getIp()));
+        }
+
+        String knownEnvironmentKey = KNOWN_LOGIN_ENV_KEY_PREFIX + userId;
+        Set<String> knownFingerprints = redisCache.getCacheSet(knownEnvironmentKey);
+        boolean hasKnownEnvironment = knownFingerprints != null && !knownFingerprints.isEmpty();
+        boolean newEnvironment = hasKnownEnvironment && !knownFingerprints.contains(currentFingerprint);
+        long otherEnvironmentCount = activeFingerprints.stream()
+                .filter(item -> !item.equals(currentFingerprint))
+                .count();
+        boolean multipleActiveEnvironments = otherEnvironmentCount > 0;
+
+        redisCache.setCacheSet(knownEnvironmentKey, Set.of(currentFingerprint));
+        redisCache.expire(knownEnvironmentKey, KNOWN_LOGIN_ENV_DAYS, TimeUnit.DAYS);
+
+        if (!newEnvironment && !multipleActiveEnvironments)
+        {
+            return;
+        }
+
+        Map<String, Object> detail = new LinkedHashMap<>();
+        detail.put("rule", newEnvironment ? "new_login_environment" : "multi_active_login_environment");
+        detail.put("provider", provider);
+        detail.put("maskedIdentifier", maskIdentifier(provider, normalizedIdentifier));
+        detail.put("activeSessionCount", existingSessions.size() + 1);
+        detail.put("otherEnvironmentCount", otherEnvironmentCount);
+        detail.put("newEnvironment", newEnvironment);
+        detail.put("multipleActiveEnvironments", multipleActiveEnvironments);
+        detail.put("currentIp", currentIp);
+        detail.put("currentDeviceId", currentDeviceId);
+        detail.put("currentUserAgent", currentUserAgent);
+        securityEventService.recordEvent(userId, identityId,
+                CupidSecurityEventConstants.EVENT_RISK_DETECTED,
+                CupidSecurityEventConstants.RESULT_DETECTED,
+                newEnvironment ? "medium" : "low",
+                currentDeviceId, detail);
+    }
+
+    private int increaseLoginFailCount(String provider, String identifier, String ip)
+    {
+        String key = buildLoginFailKey(provider, identifier, ip);
+        Integer current = redisCache.getCacheObject(key);
+        int next = current == null ? 1 : current + 1;
+        redisCache.setCacheObject(key, next, LOGIN_FAIL_WINDOW_MINUTES, TimeUnit.MINUTES);
+        return next;
+    }
+
+    private void clearLoginFailCount(String provider, String identifier, String ip)
+    {
+        redisCache.deleteObject(buildLoginFailKey(provider, identifier, ip));
+    }
+
+    private String buildLoginFailKey(String provider, String identifier, String ip)
+    {
+        String safeIp = StringUtils.hasText(ip) ? ip : "unknown";
+        return LOGIN_FAIL_KEY_PREFIX + provider + ":" + identifier + ":" + safeIp;
+    }
+
+    private String buildSessionFingerprint(String deviceId, String userAgent, String ip)
+    {
+        if (StringUtils.hasText(deviceId))
+        {
+            return "device:" + deviceId.trim();
+        }
+        if (StringUtils.hasText(userAgent))
+        {
+            return "ua:" + userAgent.trim();
+        }
+        return "ip:" + (StringUtils.hasText(ip) ? ip.trim() : "unknown");
+    }
+
     private Map<String, Object> toIdentityDto(CupidAuthIdentity identity)
     {
         Map<String, Object> dto = new LinkedHashMap<>();
@@ -604,6 +719,44 @@ public class CupidAuthService
         if (value instanceof Number) return ((Number) value).intValue() != 0;
         if (value instanceof String) return "true".equalsIgnoreCase((String) value) || "1".equals(value);
         return false;
+    }
+
+    private String resolveIp()
+    {
+        try
+        {
+            return IpUtils.getIpAddr();
+        }
+        catch (Exception e)
+        {
+            return null;
+        }
+    }
+
+    private String resolveUserAgent()
+    {
+        HttpServletRequest request = ServletUtils.getRequest();
+        if (request == null)
+        {
+            return null;
+        }
+        String userAgent = request.getHeader("User-Agent");
+        return StringUtils.hasText(userAgent) ? userAgent.trim() : null;
+    }
+
+    private String resolveDeviceId()
+    {
+        HttpServletRequest request = ServletUtils.getRequest();
+        if (request == null)
+        {
+            return null;
+        }
+        String deviceId = request.getHeader("X-Device-Id");
+        if (!StringUtils.hasText(deviceId))
+        {
+            deviceId = request.getHeader("X-Device-ID");
+        }
+        return StringUtils.hasText(deviceId) ? deviceId.trim() : null;
     }
 
     /**

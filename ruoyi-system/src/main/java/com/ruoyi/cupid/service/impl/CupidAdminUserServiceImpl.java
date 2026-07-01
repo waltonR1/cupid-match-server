@@ -235,7 +235,11 @@ public class CupidAdminUserServiceImpl implements ICupidAdminUserService
             row.put("maskedIdentifier", identity == null ? null : maskIdentifier(identity.getProvider(),
                     identity.getIdentifier()));
             row.put("createdAt", session.getCreatedAt());
+            row.put("lastActiveAt", session.getLastActiveAt());
             row.put("expiresAt", session.getExpiresAt());
+            row.put("ip", session.getIp());
+            row.put("deviceId", session.getDeviceId());
+            row.put("userAgent", session.getUserAgent());
             return row;
         }).toList();
     }

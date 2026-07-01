@@ -1,5 +1,6 @@
 package com.ruoyi.framework.web.service;
 
+import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
@@ -14,7 +15,9 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 import com.ruoyi.common.constant.Constants;
 import com.ruoyi.common.core.domain.model.CupidLoginUser;
 import com.ruoyi.common.core.redis.RedisCache;
+import com.ruoyi.common.utils.ServletUtils;
 import com.ruoyi.common.utils.StringUtils;
+import com.ruoyi.common.utils.ip.IpUtils;
 import com.ruoyi.common.utils.uuid.IdUtils;
 import com.ruoyi.cupid.service.ICupidTokenService;
 import io.jsonwebtoken.Claims;
@@ -22,9 +25,6 @@ import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.SignatureAlgorithm;
 import jakarta.servlet.http.HttpServletRequest;
 
-/**
- * Cupid Match 用户令牌服务
- */
 @Service
 public class CupidTokenService implements ICupidTokenService
 {
@@ -36,6 +36,8 @@ public class CupidTokenService implements ICupidTokenService
     private static final String TOKEN_TYPE = "cupid";
     private static final long MILLIS_MINUTE = 60 * 1000L;
     private static final long MILLIS_MINUTE_TWENTY = 20 * MILLIS_MINUTE;
+    private static final String HEADER_DEVICE_ID = "X-Device-Id";
+    private static final String HEADER_DEVICE_ID_ALT = "X-Device-ID";
 
     @Autowired
     private RedisCache redisCache;
@@ -49,9 +51,6 @@ public class CupidTokenService implements ICupidTokenService
     @Value("${token.expireTime}")
     private int expireTime;
 
-    /**
-     * 创建前台用户会话和 JWT
-     */
     public String createToken(String identityId, String userId)
     {
         CupidLoginUser session = createSession(identityId, userId);
@@ -64,12 +63,6 @@ public class CupidTokenService implements ICupidTokenService
                 .compact();
     }
 
-    /**
-     * 从 JWT 和 Redis 会话中恢复已认证用户身份
-     *
-     * @param request HTTP请求
-     * @return 用户身份，令牌或会话无效时返回 null
-     */
     public CupidLoginUser getUserPrincipal(HttpServletRequest request)
     {
         String token = getToken(request);
@@ -95,23 +88,17 @@ public class CupidTokenService implements ICupidTokenService
         return session;
     }
 
-    /**
-     * 会话剩余时间不足20分钟时自动续期
-     *
-     * @param principal 已认证用户身份
-     */
     public void verifyToken(CupidLoginUser principal)
     {
-        if (principal.getExpiresAt() - System.currentTimeMillis() <= MILLIS_MINUTE_TWENTY)
+        long now = System.currentTimeMillis();
+        principal.setLastActiveAt(now);
+        if (principal.getExpiresAt() - now <= MILLIS_MINUTE_TWENTY)
         {
-            principal.setExpiresAt(System.currentTimeMillis() + expireTime * MILLIS_MINUTE);
-            storeSession(principal);
+            principal.setExpiresAt(now + expireTime * MILLIS_MINUTE);
         }
+        storeSession(principal);
     }
 
-    /**
-     * 注销单个令牌对应的会话
-     */
     public void deleteToken(String sessionId)
     {
         if (sessionId == null)
@@ -126,9 +113,6 @@ public class CupidTokenService implements ICupidTokenService
         }
     }
 
-    /**
-     * 注销用户的全部令牌会话
-     */
     @Override
     public void deleteUserTokens(String userId)
     {
@@ -174,7 +158,7 @@ public class CupidTokenService implements ICupidTokenService
     public Set<String> selectOnlineUserIds()
     {
         Set<String> empty = Collections.emptySet();
-        java.util.Collection<String> keys = redisCache.keys(USER_SESSION_KEY_PREFIX + "*");
+        Collection<String> keys = redisCache.keys(USER_SESSION_KEY_PREFIX + "*");
         if (keys == null || keys.isEmpty())
         {
             return empty;
@@ -200,12 +184,17 @@ public class CupidTokenService implements ICupidTokenService
     private CupidLoginUser createSession(String identityId, String userId)
     {
         long now = System.currentTimeMillis();
+        HttpServletRequest request = ServletUtils.getRequest();
         CupidLoginUser session = new CupidLoginUser();
         session.setId(IdUtils.fastUUID());
         session.setIdentityId(identityId);
         session.setUserId(userId);
         session.setCreatedAt(now);
+        session.setLastActiveAt(now);
         session.setExpiresAt(now + expireTime * MILLIS_MINUTE);
+        session.setIp(resolveIp());
+        session.setUserAgent(resolveUserAgent(request));
+        session.setDeviceId(resolveDeviceId(request));
         afterCommit(() -> storeSession(session));
         return session;
     }
@@ -217,7 +206,6 @@ public class CupidTokenService implements ICupidTokenService
 
     private void storeSession(CupidLoginUser session)
     {
-        // 会话详情用于 JWT 认证，用户会话集合用于批量注销该用户的全部登录设备。
         redisCache.setCacheObject(getSessionKey(session.getId()), session, expireTime, TimeUnit.MINUTES);
         String userSessionKey = getUserSessionKey(session.getUserId());
         redisCache.setCacheSet(userSessionKey, Collections.singleton(session.getId()));
@@ -267,7 +255,6 @@ public class CupidTokenService implements ICupidTokenService
 
     private void afterCommit(Runnable operation)
     {
-        // 避免数据库事务回滚后 Redis 中仍然保留无效会话。
         if (!TransactionSynchronizationManager.isSynchronizationActive())
         {
             operation.run();
@@ -291,5 +278,41 @@ public class CupidTokenService implements ICupidTokenService
     private String getUserSessionKey(String userId)
     {
         return USER_SESSION_KEY_PREFIX + userId;
+    }
+
+    private String resolveIp()
+    {
+        try
+        {
+            return IpUtils.getIpAddr();
+        }
+        catch (Exception e)
+        {
+            return null;
+        }
+    }
+
+    private String resolveUserAgent(HttpServletRequest request)
+    {
+        if (request == null)
+        {
+            return null;
+        }
+        String userAgent = request.getHeader("User-Agent");
+        return StringUtils.hasText(userAgent) ? userAgent.trim() : null;
+    }
+
+    private String resolveDeviceId(HttpServletRequest request)
+    {
+        if (request == null)
+        {
+            return null;
+        }
+        String deviceId = request.getHeader(HEADER_DEVICE_ID);
+        if (!StringUtils.hasText(deviceId))
+        {
+            deviceId = request.getHeader(HEADER_DEVICE_ID_ALT);
+        }
+        return StringUtils.hasText(deviceId) ? deviceId.trim() : null;
     }
 }

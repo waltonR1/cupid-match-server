@@ -66,6 +66,7 @@ drop table if exists cm_user_agreement_acceptances;
 drop table if exists cm_legal_document_contents;
 drop table if exists cm_legal_documents;
 drop table if exists cm_user_preferences;
+drop table if exists cm_security_events;
 drop table if exists cm_user_security_challenges;
 drop table if exists cm_user_security_settings;
 drop table if exists cm_auth_identities;
@@ -618,6 +619,25 @@ create table cm_user_security_challenges (
   key idx_cm_security_challenge_token (challenge_token),
   key idx_cm_security_challenge_expires (expires_at)
 ) engine=innodb comment='用户安全挑战';
+
+create table cm_security_events (
+  id             varchar(64)  not null comment '安全事件ID',
+  user_id        varchar(64)  default null comment 'Cupid 用户ID',
+  identity_id    varchar(64)  default null comment 'Cupid 登录身份ID',
+  event_type     varchar(64)  not null comment '事件类型代码',
+  event_result   varchar(32)  not null comment '事件结果：success, failed, blocked, detected',
+  risk_level     varchar(32)  default null comment '风险等级代码',
+  ip             varchar(64)  default null comment '客户端IP',
+  user_agent     varchar(512) default null comment '客户端 User-Agent',
+  device_id      varchar(128) default null comment '客户端设备ID',
+  detail_json    text         comment '结构化事件详情',
+  created_at     datetime     not null default current_timestamp comment '创建时间',
+  primary key (id),
+  key idx_cm_security_events_user_time (user_id, created_at),
+  key idx_cm_security_events_type_time (event_type, created_at),
+  key idx_cm_security_events_result_time (event_result, created_at),
+  key idx_cm_security_events_created_at (created_at)
+) engine=innodb default charset=utf8mb4 collate=utf8mb4_general_ci comment='Cupid C端安全事件';
 
 create table cm_user_preferences (
   id                               varchar(36)  not null comment '用户偏好ID',

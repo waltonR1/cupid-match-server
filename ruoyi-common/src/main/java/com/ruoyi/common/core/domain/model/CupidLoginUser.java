@@ -36,6 +36,14 @@ public class CupidLoginUser implements Serializable
      */
     private long expiresAt;
 
+    private String ip;
+
+    private String userAgent;
+
+    private String deviceId;
+
+    private long lastActiveAt;
+
     public String getId()
     {
         return id;
@@ -84,6 +92,46 @@ public class CupidLoginUser implements Serializable
     public void setExpiresAt(long expiresAt)
     {
         this.expiresAt = expiresAt;
+    }
+
+    public String getIp()
+    {
+        return ip;
+    }
+
+    public void setIp(String ip)
+    {
+        this.ip = ip;
+    }
+
+    public String getUserAgent()
+    {
+        return userAgent;
+    }
+
+    public void setUserAgent(String userAgent)
+    {
+        this.userAgent = userAgent;
+    }
+
+    public String getDeviceId()
+    {
+        return deviceId;
+    }
+
+    public void setDeviceId(String deviceId)
+    {
+        this.deviceId = deviceId;
+    }
+
+    public long getLastActiveAt()
+    {
+        return lastActiveAt;
+    }
+
+    public void setLastActiveAt(long lastActiveAt)
+    {
+        this.lastActiveAt = lastActiveAt;
     }
 
     /**
