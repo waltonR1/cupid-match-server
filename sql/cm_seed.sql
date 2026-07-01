@@ -692,6 +692,9 @@ insert into sys_menu values('2102', '任务新增', '2100', '2', '', '', '', '',
 insert into sys_menu values('2103', '任务编辑', '2100', '3', '', '', '', '', 1, 0, 'F', '0', '0', 'cupid:staffTask:edit', '#', 'admin', sysdate(), '', null, '');
 insert into sys_menu values('2104', '业务审计', '2099', '2', 'audit', 'cupid/audit/index', '', 'CupidAudit', 1, 0, 'C', '0', '0', 'cupid:audit:list', 'eye', 'admin', sysdate(), '', null, 'Cupid 业务审计');
 insert into sys_menu values('2105', '审计查询', '2104', '1', '', '', '', '', 1, 0, 'F', '0', '0', 'cupid:audit:query', '#', 'admin', sysdate(), '', null, '');
+insert into sys_menu values('2106', '安全事件', '2099', '3', 'security-event', 'cupid/security-event/index', '', 'CupidSecurityEvent', 1, 0, 'C', '0', '0', 'cupid:security:event:list', 'warning', 'admin', sysdate(), '', null, 'Cupid C端安全事件中心');
+insert into sys_menu values('2107', '安全事件查询', '2106', '1', '', '', '', '', 1, 0, 'F', '0', '0', 'cupid:security:event:query', '#', 'admin', sysdate(), '', null, '');
+insert into sys_menu values('2108', '安全事件导出', '2106', '2', '', '', '', '', 1, 0, 'F', '0', '0', 'cupid:security:event:export', '#', 'admin', sysdate(), '', null, '');
 
 insert into sys_role_menu (role_id, menu_id)
 select r.role_id, m.menu_id from sys_role r join sys_menu m on m.menu_id between 2000 and 2109
@@ -706,7 +709,7 @@ select r.role_id, m.menu_id from sys_role r join sys_menu m on m.menu_id in (200
 where r.role_key = 'cupid_auditor' and r.del_flag = '0';
 
 insert into sys_role_menu (role_id, menu_id)
-select r.role_id, m.menu_id from sys_role r join sys_menu m on m.menu_id in (2099, 2104, 2105)
+select r.role_id, m.menu_id from sys_role r join sys_menu m on m.menu_id in (2099, 2104, 2105, 2106, 2107)
 where r.role_key = 'cupid_auditor' and r.del_flag = '0';
 
 insert into sys_role_menu (role_id, menu_id)

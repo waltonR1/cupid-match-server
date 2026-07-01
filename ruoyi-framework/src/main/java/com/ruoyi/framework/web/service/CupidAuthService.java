@@ -11,11 +11,13 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import com.ruoyi.common.constant.HttpStatus;
 import com.ruoyi.common.exception.cupid.CupidApiException;
+import com.ruoyi.cupid.constant.CupidSecurityEventConstants;
 import com.ruoyi.cupid.domain.CupidAuthIdentity;
 import com.ruoyi.cupid.domain.CupidUser;
 import com.ruoyi.cupid.domain.CupidUserMembership;
 import com.ruoyi.cupid.mapper.CupidAuthMapper;
 import com.ruoyi.cupid.service.ICupidLegalService;
+import com.ruoyi.cupid.service.ICupidSecurityEventService;
 import com.ruoyi.cupid.service.ICupidUserService;
 import com.ruoyi.common.utils.SecurityUtils;
 import com.ruoyi.common.utils.StringUtils;
@@ -47,6 +49,9 @@ public class CupidAuthService
     @Autowired
     private CupidAuthMapper authMapper;
 
+    @Autowired
+    private ICupidSecurityEventService securityEventService;
+
     @Transactional
     public Map<String, Object> login(String identifier, String password)
     {
@@ -62,10 +67,33 @@ public class CupidAuthService
         CupidAuthIdentity identity = userService.selectIdentityByProviderAndIdentifier(provider, normalizedIdentifier);
         if (identity == null || !SecurityUtils.matchesPassword(password, identity.getPasswordHash()))
         {
+            securityEventService.recordEvent(null, identity == null ? null : identity.getId(),
+                    CupidSecurityEventConstants.EVENT_LOGIN_FAILED,
+                    CupidSecurityEventConstants.RESULT_FAILED, null, null,
+                    Map.of("provider", provider,
+                            "maskedIdentifier", maskIdentifier(provider, normalizedIdentifier),
+                            "reason", "invalid_credentials"));
             throw new CupidApiException(HttpStatus.UNAUTHORIZED, "invalid_credentials");
         }
 
-        CupidUser user = requireActiveUser(identity.getUserId());
+        CupidUser user;
+        try
+        {
+            user = requireActiveUser(identity.getUserId());
+        }
+        catch (CupidApiException e)
+        {
+            if (e.getCode() == HttpStatus.FORBIDDEN)
+            {
+                securityEventService.recordEvent(identity.getUserId(), identity.getId(),
+                        CupidSecurityEventConstants.EVENT_LOGIN_FAILED,
+                        CupidSecurityEventConstants.RESULT_BLOCKED, null, null,
+                        Map.of("provider", provider,
+                                "maskedIdentifier", maskIdentifier(provider, normalizedIdentifier),
+                                "reason", e.getMessage()));
+            }
+            throw e;
+        }
         if ("deactivated".equals(user.getStatus()))
         {
             userService.reactivateUser(user.getId());
@@ -78,6 +106,11 @@ public class CupidAuthService
         response.put("token", tokenService.createToken(identity.getId(), user.getId()));
         response.put("user", toUserDto(user));
         response.put("membership", toMembershipDto(userService.selectActiveMembershipByUserId(user.getId())));
+        securityEventService.recordEvent(user.getId(), identity.getId(),
+                CupidSecurityEventConstants.EVENT_LOGIN_SUCCESS,
+                CupidSecurityEventConstants.RESULT_SUCCESS, null, null,
+                Map.of("provider", provider,
+                        "maskedIdentifier", maskIdentifier(provider, normalizedIdentifier)));
         return response;
     }
 
@@ -179,6 +212,11 @@ public class CupidAuthService
 
         userService.updatePassword(identity.getId(), SecurityUtils.encryptPassword(newPassword));
         tokenService.deleteUserTokens(identity.getUserId());
+        securityEventService.recordEvent(identity.getUserId(), identity.getId(),
+                CupidSecurityEventConstants.EVENT_PASSWORD_RESET,
+                CupidSecurityEventConstants.RESULT_SUCCESS, null, null,
+                Map.of("provider", provider,
+                        "maskedIdentifier", maskIdentifier(provider, identifier)));
 
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("success", true);
@@ -354,6 +392,12 @@ public class CupidAuthService
         validatePassword(newPassword);
         userService.updatePassword(loginIdentity.getId(), SecurityUtils.encryptPassword(newPassword));
         tokenService.deleteUserTokens(userId);
+        securityEventService.recordEvent(userId, loginIdentity.getId(),
+                CupidSecurityEventConstants.EVENT_PASSWORD_CHANGED,
+                CupidSecurityEventConstants.RESULT_SUCCESS, null, null,
+                Map.of("provider", loginIdentity.getProvider(),
+                        "maskedIdentifier", maskIdentifier(loginIdentity.getProvider(), loginIdentity.getIdentifier()),
+                        "challengeVerified", StringUtils.hasText(challengeToken)));
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("passwordUpdatedAt", Instant.now().toString());
         return result;
@@ -589,6 +633,32 @@ public class CupidAuthService
     /**
      * 安全去空白
      */
+    private String maskIdentifier(String provider, String value)
+    {
+        if (!StringUtils.hasText(value))
+        {
+            return null;
+        }
+        if ("email".equals(provider))
+        {
+            int atIndex = value.indexOf("@");
+            if (atIndex <= 2)
+            {
+                return "***" + (atIndex > 0 ? value.substring(atIndex) : "");
+            }
+            return value.substring(0, 2) + "***" + value.substring(atIndex);
+        }
+        if ("phone".equals(provider))
+        {
+            if (value.length() <= 7)
+            {
+                return value.substring(0, Math.min(2, value.length())) + "***";
+            }
+            return value.substring(0, 3) + "****" + value.substring(value.length() - 4);
+        }
+        return value.length() <= 2 ? "**" : value.substring(0, 2) + "***";
+    }
+
     private String trimmed(String value)
     {
         return value == null ? "" : value.trim();

@@ -1,0 +1,81 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.cupid.mapper.CupidSecurityEventMapper">
+
+    <insert id="insertSecurityEvent" parameterType="com.ruoyi.cupid.domain.CupidSecurityEvent">
+        insert into cm_security_events (
+            id, user_id, identity_id, event_type, event_result, risk_level,
+            ip, user_agent, device_id, detail_json, created_at
+        ) values (
+            #{id}, #{userId}, #{identityId}, #{eventType}, #{eventResult}, #{riskLevel},
+            #{ip}, #{userAgent}, #{deviceId}, #{detailJson}, current_timestamp
+        )
+    </insert>
+
+    <select id="selectAdminSecurityEvents" resultType="map">
+        select
+            se.id,
+            se.user_id as userId,
+            se.identity_id as identityId,
+            se.event_type as eventType,
+            se.event_result as eventResult,
+            se.risk_level as riskLevel,
+            se.ip,
+            se.user_agent as userAgent,
+            se.device_id as deviceId,
+            se.created_at as createdAt,
+            u.account_name as accountName,
+            ai.provider
+        from cm_security_events se
+        left join cm_users u on u.id = se.user_id
+        left join cm_auth_identities ai on ai.id = se.identity_id
+        where 1 = 1
+        <if test="userId != null and userId != ''">
+            and se.user_id = #{userId}
+        </if>
+        <if test="eventType != null and eventType != ''">
+            and se.event_type = #{eventType}
+        </if>
+        <if test="eventResult != null and eventResult != ''">
+            and se.event_result = #{eventResult}
+        </if>
+        <if test="dateFrom != null and dateFrom != ''">
+            and se.created_at &gt;= #{dateFrom}
+        </if>
+        <if test="dateTo != null and dateTo != ''">
+            and se.created_at &lt;= #{dateTo}
+        </if>
+        <if test="keyword != null and keyword != ''">
+            and (
+                se.user_id = #{keyword}
+                or u.account_name like concat('%', #{keyword}, '%')
+                or se.ip like concat('%', #{keyword}, '%')
+            )
+        </if>
+        order by se.created_at desc, se.id desc
+    </select>
+
+    <select id="selectAdminSecurityEventById" resultType="map">
+        select
+            se.id,
+            se.user_id as userId,
+            se.identity_id as identityId,
+            se.event_type as eventType,
+            se.event_result as eventResult,
+            se.risk_level as riskLevel,
+            se.ip,
+            se.user_agent as userAgent,
+            se.device_id as deviceId,
+            cast(se.detail_json as char) as detailJson,
+            se.created_at as createdAt,
+            u.account_name as accountName,
+            ai.provider
+        from cm_security_events se
+        left join cm_users u on u.id = se.user_id
+        left join cm_auth_identities ai on ai.id = se.identity_id
+        where se.id = #{id}
+        limit 1
+    </select>
+</mapper>

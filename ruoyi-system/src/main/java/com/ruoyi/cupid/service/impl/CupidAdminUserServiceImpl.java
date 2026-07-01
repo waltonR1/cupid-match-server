@@ -13,12 +13,14 @@ import com.alibaba.fastjson2.JSON;
 import com.ruoyi.common.core.domain.model.CupidLoginUser;
 import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.utils.uuid.IdUtils;
+import com.ruoyi.cupid.constant.CupidSecurityEventConstants;
 import com.ruoyi.cupid.domain.CupidAuthIdentity;
 import com.ruoyi.cupid.domain.CupidUser;
 import com.ruoyi.cupid.mapper.CupidAdminUserMapper;
 import com.ruoyi.cupid.mapper.CupidAuthMapper;
 import com.ruoyi.cupid.mapper.CupidCommonOptionMapper;
 import com.ruoyi.cupid.service.ICupidAdminUserService;
+import com.ruoyi.cupid.service.ICupidSecurityEventService;
 import com.ruoyi.cupid.service.ICupidTokenService;
 
 @Service
@@ -35,6 +37,9 @@ public class CupidAdminUserServiceImpl implements ICupidAdminUserService
 
     @Autowired
     private ICupidTokenService cupidTokenService;
+
+    @Autowired
+    private ICupidSecurityEventService securityEventService;
 
     @Override
     public List<Map<String, Object>> selectAdminUsers(Map<String, Object> params)
@@ -118,6 +123,14 @@ public class CupidAdminUserServiceImpl implements ICupidAdminUserService
         commonOptionMapper.insertAdminAuditLog(IdUtils.fastUUID(), "staff", operatorUserId,
                 "user", userId, "cupid.user.kickSession", null,
                 JSON.toJSONString(Map.of("sessionId", sessionId)), emptyToNull(reason));
+        Map<String, Object> detail = new LinkedHashMap<>();
+        detail.put("sessionId", sessionId);
+        detail.put("operatorUserId", operatorUserId);
+        detail.put("reason", emptyToNull(reason));
+        detail.put("allSessions", false);
+        securityEventService.recordEvent(userId, null,
+                CupidSecurityEventConstants.EVENT_SESSION_KICKED,
+                CupidSecurityEventConstants.RESULT_SUCCESS, null, null, detail);
     }
 
     @Override
@@ -128,6 +141,13 @@ public class CupidAdminUserServiceImpl implements ICupidAdminUserService
         commonOptionMapper.insertAdminAuditLog(IdUtils.fastUUID(), "staff", operatorUserId,
                 "user", userId, "cupid.user.kickAllSessions", null,
                 JSON.toJSONString(Map.of("allSessions", true)), emptyToNull(reason));
+        Map<String, Object> detail = new LinkedHashMap<>();
+        detail.put("operatorUserId", operatorUserId);
+        detail.put("reason", emptyToNull(reason));
+        detail.put("allSessions", true);
+        securityEventService.recordEvent(userId, null,
+                CupidSecurityEventConstants.EVENT_SESSION_KICKED,
+                CupidSecurityEventConstants.RESULT_SUCCESS, null, null, detail);
     }
 
     @Override

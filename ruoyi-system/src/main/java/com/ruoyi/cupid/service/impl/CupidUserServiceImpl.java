@@ -11,10 +11,12 @@ import com.ruoyi.common.exception.cupid.CupidApiException;
 import com.ruoyi.common.utils.SecurityUtils;
 import com.ruoyi.common.utils.StringUtils;
 import com.ruoyi.common.utils.uuid.IdUtils;
+import com.ruoyi.cupid.constant.CupidSecurityEventConstants;
 import com.ruoyi.cupid.domain.CupidAuthIdentity;
 import com.ruoyi.cupid.domain.CupidUser;
 import com.ruoyi.cupid.domain.CupidUserMembership;
 import com.ruoyi.cupid.mapper.CupidAuthMapper;
+import com.ruoyi.cupid.service.ICupidSecurityEventService;
 import com.ruoyi.cupid.service.ICupidUserService;
 
 /**
@@ -28,6 +30,9 @@ public class CupidUserServiceImpl implements ICupidUserService
 
     @Autowired
     private CupidAuthMapper authMapper;
+
+    @Autowired
+    private ICupidSecurityEventService securityEventService;
 
     @Override
     public CupidAuthIdentity selectIdentityByProviderAndIdentifier(String provider, String identifier)
@@ -137,7 +142,14 @@ public class CupidUserServiceImpl implements ICupidUserService
         String passwordHash = findReusablePasswordHash(userId);
         String identityId = IdUtils.fastUUID();
         authMapper.insertIdentity(identityId, userId, provider, normalized, passwordHash);
-        return authMapper.selectIdentityById(identityId);
+        CupidAuthIdentity identity = authMapper.selectIdentityById(identityId);
+        securityEventService.recordEvent(userId, identityId,
+                CupidSecurityEventConstants.EVENT_IDENTITY_BOUND,
+                CupidSecurityEventConstants.RESULT_SUCCESS, null, null,
+                Map.of("provider", provider,
+                        "identityId", identityId,
+                        "maskedIdentifier", maskIdentifier(normalized)));
+        return identity;
     }
 
     @Override
@@ -158,7 +170,15 @@ public class CupidUserServiceImpl implements ICupidUserService
         {
             throw new CupidApiException(HttpStatus.BAD_REQUEST, "mfa_identity");
         }
+        String provider = target.getProvider();
+        String maskedIdentifier = maskIdentifier(target.getIdentifier());
         authMapper.deleteIdentity(identityId);
+        securityEventService.recordEvent(userId, identityId,
+                CupidSecurityEventConstants.EVENT_IDENTITY_UNBOUND,
+                CupidSecurityEventConstants.RESULT_SUCCESS, null, null,
+                Map.of("provider", provider,
+                        "identityId", identityId,
+                        "maskedIdentifier", maskedIdentifier));
     }
 
     @Override
