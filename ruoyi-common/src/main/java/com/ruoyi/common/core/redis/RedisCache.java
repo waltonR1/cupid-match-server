@@ -8,8 +8,11 @@ import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.BoundSetOperations;
+import org.springframework.data.redis.core.Cursor;
 import org.springframework.data.redis.core.HashOperations;
+import org.springframework.data.redis.core.RedisCallback;
 import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.data.redis.core.ScanOptions;
 import org.springframework.data.redis.core.ValueOperations;
 import org.springframework.stereotype.Component;
 
@@ -293,5 +296,29 @@ public class RedisCache
     public Collection<String> keys(final String pattern)
     {
         return redisTemplate.keys(pattern);
+    }
+
+    /**
+     * 使用 SCAN 分批统计匹配的键，避免 KEYS 阻塞 Redis
+     *
+     * @param pattern 键匹配表达式
+     * @return 匹配的键数量
+     */
+    public long countKeys(final String pattern)
+    {
+        Long count = (Long) redisTemplate.execute((RedisCallback<Long>) connection -> {
+            long matched = 0;
+            ScanOptions options = ScanOptions.scanOptions().match(pattern).count(500).build();
+            try (Cursor<byte[]> cursor = connection.scan(options))
+            {
+                while (cursor.hasNext())
+                {
+                    cursor.next();
+                    matched++;
+                }
+            }
+            return matched;
+        });
+        return count == null ? 0 : count;
     }
 }

@@ -162,4 +162,9 @@ public interface CupidAuthMapper
     int expireSecurityChallenge(@Param("userId") String userId,
             @Param("action") String action,
             @Param("challengeToken") String challengeToken);
+
+    /**
+     * 统计尚未过期的安全挑战令牌
+     */
+    int countActiveSecurityChallenges();
 }

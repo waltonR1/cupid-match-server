@@ -252,4 +252,12 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
           and status = 'verified'
           and expires_at &lt;= now()
     </update>
+
+    <select id="countActiveSecurityChallenges" resultType="int">
+        select count(1)
+        from cm_user_security_challenges
+        where status = 'verified'
+          and challenge_token is not null
+          and expires_at > now()
+    </select>
 </mapper>
