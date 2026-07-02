@@ -281,6 +281,10 @@ insert into sys_config values(6, '用户登录-黑名单列表',           'sys.
 insert into sys_config values(7, '用户管理-初始密码修改策略',     'sys.account.initPasswordModify',   '1',             'Y', 'admin', sysdate(), '', null, '0：初始密码修改策略关闭，没有任何提示，1：提醒用户，如果未修改初始密码，则在登录时就会提醒修改密码对话框');
 insert into sys_config values(8, '用户管理-账号密码更新周期',     'sys.account.passwordValidateDays', '0',             'Y', 'admin', sysdate(), '', null, '密码更新周期（填写数字，数据初始化值为0不限制，若修改必须为大于0小于365的正整数），如果超过这个周期登录系统时，则在登录时就会提醒修改密码对话框');
 insert into sys_config values(9, '用户管理-密码字符范围',         'sys.account.chrtype',              '0',             'Y', 'admin', sysdate(), '', null, '默认任意字符范围，0任意（密码可以输入任意字符），1数字（密码只能为0-9数字），2英文字母（密码只能为a-z和A-Z字母），3字母和数字（密码必须包含字母，数字）,4字母数字和特殊字符（目前支持的特殊字符包括：~!@#$%^&*()-=_+）');
+insert into sys_config values(10, 'Cupid-验证码有效期（分钟）',    'cupid.auth.verification.codeTtlMinutes',       '5',  'Y', 'admin', sysdate(), '', null, '允许范围1-15，非法值自动回退为5');
+insert into sys_config values(11, 'Cupid-验证码重发间隔（秒）',    'cupid.auth.verification.resendIntervalSeconds', '60', 'Y', 'admin', sysdate(), '', null, '允许范围30-300，非法值自动回退为60');
+insert into sys_config values(12, 'Cupid-私人介绍有效期（天）',    'cupid.introduction.expiryDays',                  '7',  'Y', 'admin', sysdate(), '', null, '允许范围1-30，仅影响新申请，非法值自动回退为7');
+insert into sys_config values(13, 'Cupid-私人介绍冷却期（天）',    'cupid.introduction.cooldownDays',                '90', 'Y', 'admin', sysdate(), '', null, '允许范围7-365，仅影响新冷却记录，非法值自动回退为90');
 
 -- Cupid common options (dynamic groups)
 insert into cm_option_groups (id, group_key, group_name, group_scope, manage_status, sort_order, status) values

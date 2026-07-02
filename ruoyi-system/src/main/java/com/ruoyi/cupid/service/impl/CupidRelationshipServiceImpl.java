@@ -31,6 +31,7 @@ import com.ruoyi.cupid.mapper.CupidAuthMapper;
 import com.ruoyi.cupid.mapper.CupidProfileMapper;
 import com.ruoyi.cupid.service.ICupidCommonOptionService;
 import com.ruoyi.cupid.service.ICupidRelationshipService;
+import com.ruoyi.cupid.service.ICupidRuntimeConfigService;
 
 /**
  * Cupid Match 收藏与私人介绍服务实现。
@@ -39,8 +40,6 @@ import com.ruoyi.cupid.service.ICupidRelationshipService;
 public class CupidRelationshipServiceImpl implements ICupidRelationshipService
 {
     private static final String INTRODUCTION_ENTITLEMENT = "private_introduction";
-    private static final int INTRODUCTION_EXPIRY_DAYS = 7;
-    private static final int INTRODUCTION_COOLDOWN_DAYS = 90;
     private static final List<String> SUMMARY_FIELDS =
             List.of("profile_name", "summary");
 
@@ -52,6 +51,9 @@ public class CupidRelationshipServiceImpl implements ICupidRelationshipService
 
     @Autowired
     private CupidAuthMapper authMapper;
+
+    @Autowired
+    private ICupidRuntimeConfigService runtimeConfigService;
 
     @Override
     public Map<String, Object> addFavorite(String userId, String profileId)
@@ -186,7 +188,8 @@ public class CupidRelationshipServiceImpl implements ICupidRelationshipService
 
         profileMapper.insertIntroductionRequest(
                 IdUtils.fastUUID(), userId, profileId, "requested",
-                Date.from(now.toInstant().plus(INTRODUCTION_EXPIRY_DAYS, ChronoUnit.DAYS)),
+                Date.from(now.toInstant().plus(
+                        runtimeConfigService.getIntroductionExpiryDays(), ChronoUnit.DAYS)),
                 balance.getId());
         balance.setQuotaUsed(balance.getQuotaUsed() + 1);
         balance.setQuotaRemaining(balance.getQuotaRemaining() - 1);
@@ -324,7 +327,8 @@ public class CupidRelationshipServiceImpl implements ICupidRelationshipService
         Date base = request.getRespondedAt() != null
                 ? request.getRespondedAt() : request.getRequestedAt();
         return base == null ? null
-                : Date.from(base.toInstant().plus(INTRODUCTION_COOLDOWN_DAYS, ChronoUnit.DAYS));
+                : Date.from(base.toInstant().plus(
+                        runtimeConfigService.getIntroductionCooldownDays(), ChronoUnit.DAYS));
     }
 
     private String effectiveStatus(CupidPrivateIntroductionRequest request, Date now)

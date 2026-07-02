@@ -42,6 +42,7 @@ import com.ruoyi.cupid.mapper.CupidMembershipMapper;
 import com.ruoyi.cupid.mapper.CupidProfileMapper;
 import com.ruoyi.cupid.service.ICupidCommonOptionService;
 import com.ruoyi.cupid.service.ICupidProfileService;
+import com.ruoyi.cupid.service.ICupidRuntimeConfigService;
 import com.ruoyi.cupid.service.ICupidTranslationService;
 import com.ruoyi.cupid.service.ICupidUserService;
 
@@ -93,7 +94,6 @@ public class CupidProfileServiceImpl implements ICupidProfileService
     private static final int MAX_PAGE_SIZE = 100;
     private static final int DEFAULT_FEATURED_SIZE = 3;
     private static final int MAX_FEATURED_SIZE = 12;
-    private static final int INTRODUCTION_COOLDOWN_DAYS = 90;
 
     @Autowired
     private CupidProfileMapper profileMapper;
@@ -109,6 +109,9 @@ public class CupidProfileServiceImpl implements ICupidProfileService
 
     @Autowired
     private CupidMembershipMapper membershipMapper;
+
+    @Autowired
+    private ICupidRuntimeConfigService runtimeConfigService;
 
     @Override
     public Map<String, Object> getSelfProfileDirectory(Map<String, String> params, String userId)
@@ -1154,7 +1157,8 @@ public class CupidProfileServiceImpl implements ICupidProfileService
         {
             return null;
         }
-        return Date.from(base.toInstant().plus(INTRODUCTION_COOLDOWN_DAYS, ChronoUnit.DAYS));
+        return Date.from(base.toInstant().plus(
+                runtimeConfigService.getIntroductionCooldownDays(), ChronoUnit.DAYS));
     }
 
     /**

@@ -11,6 +11,7 @@ import com.ruoyi.cupid.domain.CupidProfileVerification;
 import com.ruoyi.cupid.domain.CupidProfileVerificationMaterial;
 import com.ruoyi.cupid.mapper.CupidProfileMapper;
 import com.ruoyi.cupid.service.ICupidAdminReviewService;
+import com.ruoyi.cupid.service.ICupidRuntimeConfigService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
@@ -27,10 +28,11 @@ public class CupidAdminReviewServiceImpl implements ICupidAdminReviewService
 
     private static final Set<String> MATERIAL_TYPES = Set.of("identity", "education", "income", "marital");
 
-    private static final int INTRODUCTION_COOLDOWN_DAYS = 90;
-
     @Autowired
     private CupidProfileMapper profileMapper;
+
+    @Autowired
+    private ICupidRuntimeConfigService runtimeConfigService;
 
     @Autowired
     private ApplicationEventPublisher eventPublisher;
@@ -270,7 +272,8 @@ public class CupidAdminReviewServiceImpl implements ICupidAdminReviewService
         }
         Map<String, Object> before = requirePendingIntroduction(requestId);
         java.util.Date cooldownUntil = java.util.Date.from(
-                java.time.Instant.now().plus(INTRODUCTION_COOLDOWN_DAYS, ChronoUnit.DAYS));
+                java.time.Instant.now().plus(
+                        runtimeConfigService.getIntroductionCooldownDays(), ChronoUnit.DAYS));
         if (profileMapper.updateAdminIntroductionDeclined(requestId, cooldownUntil) != 1)
         {
             throw new ServiceException("该申请已处理，不能重复操作");

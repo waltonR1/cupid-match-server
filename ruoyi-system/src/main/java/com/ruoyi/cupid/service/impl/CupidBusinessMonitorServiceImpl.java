@@ -26,6 +26,8 @@ public class CupidBusinessMonitorServiceImpl implements ICupidBusinessMonitorSer
             new MetricDefinition("sessions", "用户会话", "cupid:session:*"),
             new MetricDefinition("sessionIndexes", "用户会话索引", "cupid:user-sessions:*"),
             new MetricDefinition("verificationCodes", "验证码", "cupid:verification-code:*"),
+            new MetricDefinition("verificationCooldowns", "验证码发送冷却", "cupid:verification-cooldown:*"),
+            new MetricDefinition("verificationReservations", "验证码事务占用", "cupid:verification-reservation:*"),
             new MetricDefinition("loginFailureCounters", "登录失败计数", "cupid:risk:login-fail:*"),
             new MetricDefinition("knownEnvironments", "已知登录环境", "cupid:risk:known-env:*"));
 

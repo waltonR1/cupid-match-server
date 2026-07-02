@@ -12,9 +12,12 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
+import com.ruoyi.common.constant.HttpStatus;
 import com.ruoyi.common.core.redis.RedisCache;
+import com.ruoyi.common.exception.cupid.CupidApiException;
 import com.ruoyi.common.utils.SecurityUtils;
 import com.ruoyi.common.utils.uuid.IdUtils;
+import com.ruoyi.cupid.service.ICupidRuntimeConfigService;
 import com.ruoyi.framework.web.domain.CupidVerificationCode;
 
 /**
@@ -28,13 +31,16 @@ public class CupidVerificationCodeService
 
     private static final Logger log = LoggerFactory.getLogger(CupidVerificationCodeService.class);
     private static final String KEY_PREFIX = "cupid:verification-code:";
-    private static final String RESERVATION_SUFFIX = ":reservation";
-    private static final int CODE_TTL_MINUTES = 5;
+    private static final String COOLDOWN_KEY_PREFIX = "cupid:verification-cooldown:";
+    private static final String RESERVATION_KEY_PREFIX = "cupid:verification-reservation:";
     private static final int RESERVATION_TTL_MINUTES = 10;
     private static final SecureRandom RANDOM = new SecureRandom();
 
     @Autowired
     private RedisCache redisCache;
+
+    @Autowired
+    private ICupidRuntimeConfigService runtimeConfigService;
 
     @Value("${cupid.auth.verification-code-log-enabled:false}")
     private boolean verificationCodeLogEnabled;
@@ -49,8 +55,18 @@ public class CupidVerificationCodeService
      */
     public Map<String, Object> create(String purpose, String provider, String identifier)
     {
+        int codeTtlMinutes = runtimeConfigService.getVerificationCodeTtlMinutes();
+        int resendIntervalSeconds = runtimeConfigService.getVerificationResendIntervalSeconds();
+        String key = getKey(purpose, provider, identifier);
+        String cooldownKey = getCooldownKey(purpose, provider, identifier);
+        if (!redisCache.setCacheObjectIfAbsent(cooldownKey, "1",
+                resendIntervalSeconds, TimeUnit.SECONDS))
+        {
+            throw new CupidApiException(HttpStatus.TOO_MANY_REQUESTS, "verification_code_too_frequent");
+        }
+
         String code = String.format("%06d", RANDOM.nextInt(1_000_000));
-        long expiresAt = System.currentTimeMillis() + TimeUnit.MINUTES.toMillis(CODE_TTL_MINUTES);
+        long expiresAt = System.currentTimeMillis() + TimeUnit.MINUTES.toMillis(codeTtlMinutes);
 
         CupidVerificationCode entry = new CupidVerificationCode();
         entry.setId(IdUtils.fastUUID());
@@ -60,8 +76,15 @@ public class CupidVerificationCodeService
         entry.setCodeHash(SecurityUtils.encryptPassword(code));
         entry.setExpiresAt(expiresAt);
 
-        redisCache.setCacheObject(getKey(purpose, provider, identifier), entry,
-                CODE_TTL_MINUTES, TimeUnit.MINUTES);
+        try
+        {
+            redisCache.setCacheObject(key, entry, codeTtlMinutes, TimeUnit.MINUTES);
+        }
+        catch (RuntimeException e)
+        {
+            redisCache.deleteObject(cooldownKey);
+            throw e;
+        }
 
         // Phase-one delivery adapter: never returned by the product API and explicitly disabled in production.
         if (verificationCodeLogEnabled)
@@ -73,6 +96,9 @@ public class CupidVerificationCodeService
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("id", entry.getId());
         result.put("expiresAt", Instant.ofEpochMilli(expiresAt).toString());
+        result.put("resendAvailableAt",
+                Instant.ofEpochMilli(System.currentTimeMillis()
+                        + TimeUnit.SECONDS.toMillis(resendIntervalSeconds)).toString());
         return result;
     }
 
@@ -95,7 +121,7 @@ public class CupidVerificationCodeService
             return false;
         }
 
-        String reservationKey = key + RESERVATION_SUFFIX;
+        String reservationKey = getReservationKey(purpose, provider, identifier);
         if (!redisCache.setCacheObjectIfAbsent(reservationKey, entry.getId(),
                 RESERVATION_TTL_MINUTES, TimeUnit.MINUTES))
         {
@@ -126,5 +152,15 @@ public class CupidVerificationCodeService
     private String getKey(String purpose, String provider, String identifier)
     {
         return KEY_PREFIX + purpose + ":" + provider + ":" + identifier;
+    }
+
+    private String getCooldownKey(String purpose, String provider, String identifier)
+    {
+        return COOLDOWN_KEY_PREFIX + purpose + ":" + provider + ":" + identifier;
+    }
+
+    private String getReservationKey(String purpose, String provider, String identifier)
+    {
+        return RESERVATION_KEY_PREFIX + purpose + ":" + provider + ":" + identifier;
     }
 }

@@ -22,6 +22,7 @@ import com.ruoyi.cupid.domain.CupidAuthIdentity;
 import com.ruoyi.cupid.domain.CupidUser;
 import com.ruoyi.cupid.domain.CupidUserMembership;
 import com.ruoyi.cupid.mapper.CupidAuthMapper;
+import com.ruoyi.cupid.service.ICupidRuntimeConfigService;
 import com.ruoyi.cupid.service.ICupidLegalService;
 import com.ruoyi.cupid.service.ICupidSecurityEventService;
 import com.ruoyi.cupid.service.ICupidUserService;
@@ -58,6 +59,9 @@ public class CupidAuthService
 
     @Autowired
     private CupidVerificationCodeService verificationCodeService;
+
+    @Autowired
+    private ICupidRuntimeConfigService runtimeConfigService;
 
     @Autowired
     private CupidAuthMapper authMapper;
@@ -470,8 +474,10 @@ public class CupidAuthService
         Map<String, Object> result = verificationCodeService.create(
                 "challenge_" + action, target.getProvider(), target.getIdentifier());
         result.put("maskedIdentifier", resolveMaskedIdentifier(mfa, target.getId()));
+        int codeTtlMinutes = runtimeConfigService.getVerificationCodeTtlMinutes();
         authMapper.insertSecurityChallenge(IdUtils.fastUUID(), userId, action, target.getProvider(),
-                target.getId(), new java.util.Date(System.currentTimeMillis() + 5 * 60 * 1000L));
+                target.getId(), new java.util.Date(System.currentTimeMillis()
+                        + TimeUnit.MINUTES.toMillis(codeTtlMinutes)));
         return result;
     }
 
