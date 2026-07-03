@@ -17,8 +17,10 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import com.ruoyi.common.annotation.Log;
 import com.ruoyi.common.constant.CacheConstants;
 import com.ruoyi.common.core.domain.AjaxResult;
+import com.ruoyi.common.enums.BusinessType;
 import com.ruoyi.common.utils.StringUtils;
 import com.ruoyi.system.domain.SysCache;
 
@@ -94,7 +96,8 @@ public class CacheController
         return AjaxResult.success(sysCache);
     }
 
-    @PreAuthorize("@ss.hasPermi('monitor:cache:list')")
+    @PreAuthorize("@ss.hasPermi('monitor:cache:clear')")
+    @Log(title = "缓存管理", businessType = BusinessType.CLEAN)
     @DeleteMapping("/clearCacheName/{cacheName}")
     public AjaxResult clearCacheName(@PathVariable String cacheName)
     {
@@ -103,7 +106,8 @@ public class CacheController
         return AjaxResult.success();
     }
 
-    @PreAuthorize("@ss.hasPermi('monitor:cache:list')")
+    @PreAuthorize("@ss.hasPermi('monitor:cache:clear')")
+    @Log(title = "缓存管理", businessType = BusinessType.CLEAN)
     @DeleteMapping("/clearCacheKey/{cacheKey}")
     public AjaxResult clearCacheKey(@PathVariable String cacheKey)
     {
@@ -111,7 +115,8 @@ public class CacheController
         return AjaxResult.success();
     }
 
-    @PreAuthorize("@ss.hasPermi('monitor:cache:list')")
+    @PreAuthorize("@ss.hasPermi('monitor:cache:clear')")
+    @Log(title = "缓存管理", businessType = BusinessType.CLEAN)
     @DeleteMapping("/clearCacheAll")
     public AjaxResult clearCacheAll()
     {
