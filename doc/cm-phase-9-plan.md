@@ -257,7 +257,8 @@ Phase 9A 拆为七项：
 
 - 私人介绍过期补偿：将自然过期的申请标记为 `expired`，并返还已消耗权益
 - 安全挑战过期清理：将过期的 `pending`、`verified` 挑战标记为 `expired`
-- 两项任务共用 `cupid.scheduler.batchSize` 热配置，允许范围为 50–2000
+- 会员到期状态同步：将超过有效期但状态仍为 `active` 的会员标记为 `expired`
+- 三项任务共用 `cupid.scheduler.batchSize` 热配置，允许范围为 50–2000
 
 消息失败重试和活动提醒暂不接入；待幂等机制、提醒时间和模板规则明确后再实施。
 

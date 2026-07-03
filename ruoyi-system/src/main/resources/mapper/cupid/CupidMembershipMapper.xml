@@ -86,4 +86,15 @@
                  case lf.locale when #{locale} then 0 when 'zh' then 1 when 'en' then 2 else 3 end
     </select>
 
+    <update id="expireMemberships">
+        update cm_user_memberships
+        set status = 'expired',
+            updated_at = now()
+        where status = 'active'
+          and expires_at is not null
+          and expires_at &lt;= now()
+        order by expires_at, id
+        limit #{batchSize}
+    </update>
+
 </mapper>

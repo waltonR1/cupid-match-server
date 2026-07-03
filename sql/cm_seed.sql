@@ -576,6 +576,7 @@ insert into sys_job values(2, '系统默认（有参）', 'DEFAULT', 'ryTask.ryP
 insert into sys_job values(3, '系统默认（多参）', 'DEFAULT', 'ryTask.ryMultipleParams(\'ry\', true, 2000L, 316.50D, 100)',  '0/20 * * * * ?', '3', '1', '1', 'admin', sysdate(), '', null, '');
 insert into sys_job values(4, '私人介绍过期补偿', 'CUPID', 'cupidTask.expireIntroductionRequests', '0 */10 * * * ?', '3', '1', '0', 'admin', sysdate(), '', null, '处理过期私人介绍申请并返还权益');
 insert into sys_job values(5, '安全挑战过期清理', 'CUPID', 'cupidTask.expireSecurityChallenges', '30 */10 * * * ?', '3', '1', '0', 'admin', sysdate(), '', null, '标记已过期的安全挑战');
+insert into sys_job values(6, '会员到期状态同步', 'CUPID', 'cupidTask.expireMemberships', '0 5 * * * ?', '3', '1', '0', 'admin', sysdate(), '', null, '将超过有效期的有效会员同步为已过期');
 
 -- 17
 insert into sys_notice values('1', '温馨提醒：2018-07-01 若依新版本发布啦', '2', '新版本内容', '0', 'admin', sysdate(), '', null, '管理员');

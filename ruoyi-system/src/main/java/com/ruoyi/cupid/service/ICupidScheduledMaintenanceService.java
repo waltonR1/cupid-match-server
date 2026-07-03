@@ -18,4 +18,11 @@ public interface ICupidScheduledMaintenanceService
      * @return 本次处理数量
      */
     int expireSecurityChallenges();
+
+    /**
+     * 同步已超过有效期的会员状态。
+     *
+     * @return 本次处理数量
+     */
+    int expireMemberships();
 }

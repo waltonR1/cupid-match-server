@@ -19,6 +19,20 @@ set @cm_sql = if(
   exists (
     select 1 from information_schema.statistics
     where table_schema = database()
+      and table_name = 'cm_user_memberships'
+      and index_name = 'idx_cm_user_memberships_status_expires'
+  ),
+  'select 1',
+  'alter table cm_user_memberships add key idx_cm_user_memberships_status_expires (status, expires_at)'
+);
+prepare cm_stmt from @cm_sql;
+execute cm_stmt;
+deallocate prepare cm_stmt;
+
+set @cm_sql = if(
+  exists (
+    select 1 from information_schema.statistics
+    where table_schema = database()
       and table_name = 'cm_user_security_challenges'
       and index_name = 'idx_cm_security_challenge_status_expires'
   ),
@@ -79,4 +93,18 @@ where not exists (
   select 1 from sys_job
   where job_group = 'CUPID'
     and invoke_target = 'cupidTask.expireSecurityChallenges'
+);
+
+insert into sys_job (
+  job_name, job_group, invoke_target, cron_expression,
+  misfire_policy, concurrent, status, create_by, create_time, remark
+)
+select
+  '会员到期状态同步', 'CUPID', 'cupidTask.expireMemberships',
+  '0 5 * * * ?', '3', '1', '0', 'admin', sysdate(),
+  '将超过有效期的有效会员同步为已过期'
+where not exists (
+  select 1 from sys_job
+  where job_group = 'CUPID'
+    and invoke_target = 'cupidTask.expireMemberships'
 );

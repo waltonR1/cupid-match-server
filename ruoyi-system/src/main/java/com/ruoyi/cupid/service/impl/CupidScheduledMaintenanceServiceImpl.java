@@ -8,6 +8,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import com.ruoyi.cupid.mapper.CupidAuthMapper;
+import com.ruoyi.cupid.mapper.CupidMembershipMapper;
 import com.ruoyi.cupid.mapper.CupidProfileMapper;
 import com.ruoyi.cupid.service.ICupidRuntimeConfigService;
 import com.ruoyi.cupid.service.ICupidScheduledMaintenanceService;
@@ -27,6 +28,9 @@ public class CupidScheduledMaintenanceServiceImpl
 
     @Autowired
     private CupidAuthMapper authMapper;
+
+    @Autowired
+    private CupidMembershipMapper membershipMapper;
 
     @Autowired
     private ICupidRuntimeConfigService runtimeConfigService;
@@ -64,6 +68,16 @@ public class CupidScheduledMaintenanceServiceImpl
         int processed = authMapper.expireSecurityChallenges(
                 runtimeConfigService.getScheduledMaintenanceBatchSize());
         log.info("Cupid 安全挑战过期维护完成，本次处理 {} 条", processed);
+        return processed;
+    }
+
+    @Override
+    @Transactional
+    public int expireMemberships()
+    {
+        int processed = membershipMapper.expireMemberships(
+                runtimeConfigService.getScheduledMaintenanceBatchSize());
+        log.info("Cupid 会员到期状态同步完成，本次处理 {} 条", processed);
         return processed;
     }
 }

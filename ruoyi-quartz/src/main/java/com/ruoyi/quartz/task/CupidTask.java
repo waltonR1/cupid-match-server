@@ -22,4 +22,9 @@ public class CupidTask
     {
         scheduledMaintenanceService.expireSecurityChallenges();
     }
+
+    public void expireMemberships()
+    {
+        scheduledMaintenanceService.expireMemberships();
+    }
 }

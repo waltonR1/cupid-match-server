@@ -38,4 +38,9 @@ public interface CupidMembershipMapper
      */
     List<Map<String, Object>> selectPlanLocalizedNames(@Param("locale") String locale);
 
+    /**
+     * 批量同步已到期的有效会员状态
+     */
+    int expireMemberships(@Param("batchSize") int batchSize);
+
 }

@@ -1034,7 +1034,8 @@ create table cm_user_memberships (
   updated_at         datetime    not null default current_timestamp on update current_timestamp comment '更新时间',
   primary key (id),
   key idx_cm_user_memberships_user_status (user_id, status),
-  key idx_cm_user_memberships_plan (plan_id)
+  key idx_cm_user_memberships_plan (plan_id),
+  key idx_cm_user_memberships_status_expires (status, expires_at)
 ) engine=innodb comment='用户会员';
 
 create table cm_user_entitlement_balances (
