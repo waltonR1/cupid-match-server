@@ -20,7 +20,10 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     <!-- 查询未读数量：正常状态公告 减去 当前用户已读数 -->
     <select id="selectUnreadCount" resultType="int">
         select count(*) from sys_notice n
-        where n.status = '0' and not exists (select 1 from sys_notice_read r where r.notice_id = n.notice_id and r.user_id = #{userId})
+        where n.status = '0'
+          and (n.remark is null or n.remark not like 'recipient:%'
+               or n.remark like concat('recipient:', #{userId}, ':%'))
+          and not exists (select 1 from sys_notice_read r where r.notice_id = n.notice_id and r.user_id = #{userId})
     </select>
 
     <!-- 查询是否已读 -->
@@ -42,6 +45,8 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         left join sys_notice_read r
             on r.notice_id = n.notice_id and r.user_id = #{userId}
         where n.status = '0'
+          and (n.remark is null or n.remark not like 'recipient:%'
+               or n.remark like concat('recipient:', #{userId}, ':%'))
         order by n.notice_id desc
         limit #{limit}
     </select>

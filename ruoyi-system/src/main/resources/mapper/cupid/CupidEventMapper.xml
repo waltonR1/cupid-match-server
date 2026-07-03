@@ -678,4 +678,30 @@
         where id = #{id}
     </update>
 
+    <select id="selectUpcomingEventReminderTargets" resultType="map">
+        select r.user_id as userId,
+               e.id as eventId,
+               timestamp(e.event_date, e.start_time) as startsAt,
+               coalesce(
+                   (select lf.value from cm_event_localized_fields lf
+                    where lf.event_id = e.id and lf.field_name = 'title'
+                      and lf.locale = u.preferred_locale and lf.status = 'ready' limit 1),
+                   (select lf.value from cm_event_localized_fields lf
+                    where lf.event_id = e.id and lf.field_name = 'title'
+                      and lf.locale = 'zh' and lf.status = 'ready' limit 1),
+                   e.id
+               ) as eventTitle
+        from cm_event_registrations r
+        join cm_events e on e.id = r.event_id
+        join cm_users u on u.id = r.user_id and u.status = 'active'
+        left join cm_user_preferences p on p.user_id = r.user_id
+        where r.status = 'confirmed'
+          and e.status not in ('draft', 'hidden', 'completed')
+          and coalesce(p.event_reminders_enabled, 1) = 1
+          and timestamp(e.event_date, e.start_time) &gt; now()
+          and timestamp(e.event_date, e.start_time) &lt;= date_add(now(), interval 24 hour)
+        order by e.event_date, e.start_time, r.id
+        limit #{batchSize}
+    </select>
+
 </mapper>

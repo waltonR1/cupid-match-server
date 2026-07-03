@@ -16,6 +16,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             t.completed_at as completedAt,
             t.created_at as createdAt,
             t.updated_at as updatedAt,
+            case when t.status != 'done' and t.due_at &lt; now() then 1 else 0 end as overdue,
             su.user_name as assigneeUserName,
             su.nick_name as assigneeNickName,
             nz.value as noteZh
@@ -46,7 +47,9 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <if test="assigneeSysUserId != null and assigneeSysUserId != ''">
             and t.assignee_sys_user_id = #{assigneeSysUserId}
         </if>
-        order by case when t.status = 'done' then 1 else 0 end, t.updated_at desc, t.id desc
+        order by case when t.status != 'done' and t.due_at &lt; now() then 0
+                      when t.status = 'done' then 2 else 1 end,
+                 t.due_at, t.updated_at desc, t.id desc
     </select>
 
     <select id="selectAdminStaffTaskById" resultType="map">
@@ -61,6 +64,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             t.completed_at as completedAt,
             t.created_at as createdAt,
             t.updated_at as updatedAt,
+            case when t.status != 'done' and t.due_at &lt; now() then 1 else 0 end as overdue,
             su.user_name as assigneeUserName,
             su.nick_name as assigneeNickName,
             nz.value as noteZh,
@@ -76,6 +80,29 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             on ne.staff_task_id = t.id and ne.field_name = 'note' and ne.locale = 'en'
         where t.id = #{id}
         limit 1
+    </select>
+
+    <select id="selectOverdueStaffTaskReminderTargets" resultType="map">
+        select t.id as taskId,
+               t.assignee_sys_user_id as assigneeSysUserId,
+               t.subject_type as subjectType,
+               t.subject_id as subjectId,
+               t.due_at as dueAt,
+               coalesce(nz.value, t.id) as note
+        from cm_staff_tasks t
+        left join cm_staff_task_localized_fields nz
+          on nz.staff_task_id = t.id
+         and nz.field_name = 'note'
+         and nz.locale = 'zh'
+        join sys_user u
+          on u.user_id = t.assignee_sys_user_id
+         and u.status = '0'
+         and u.del_flag = '0'
+        where t.status != 'done'
+          and t.due_at is not null
+          and t.due_at &lt; now()
+        order by t.due_at, t.id
+        limit #{batchSize}
     </select>
 
     <select id="selectAvailableAssignees" resultType="map">

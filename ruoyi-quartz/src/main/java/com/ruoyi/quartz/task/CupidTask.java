@@ -27,4 +27,14 @@ public class CupidTask
     {
         scheduledMaintenanceService.expireMemberships();
     }
+
+    public void sendEventReminders()
+    {
+        scheduledMaintenanceService.sendEventReminders();
+    }
+
+    public void sendOverdueStaffTaskReminders()
+    {
+        scheduledMaintenanceService.sendOverdueStaffTaskReminders();
+    }
 }

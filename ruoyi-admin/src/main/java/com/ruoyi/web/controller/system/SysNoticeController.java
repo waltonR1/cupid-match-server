@@ -19,6 +19,7 @@ import com.ruoyi.common.core.domain.AjaxResult;
 import com.ruoyi.common.core.page.TableDataInfo;
 import com.ruoyi.common.core.text.Convert;
 import com.ruoyi.common.enums.BusinessType;
+import com.ruoyi.common.utils.SecurityUtils;
 import com.ruoyi.system.domain.SysNotice;
 import com.ruoyi.system.service.ISysNoticeReadService;
 import com.ruoyi.system.service.ISysNoticeService;
@@ -56,7 +57,15 @@ public class SysNoticeController extends BaseController
     @GetMapping(value = "/{noticeId}")
     public AjaxResult getInfo(@PathVariable Long noticeId)
     {
-        return success(noticeService.selectNoticeById(noticeId));
+        SysNotice notice = noticeService.selectNoticeById(noticeId);
+        if (notice != null && notice.getRemark() != null
+                && notice.getRemark().startsWith("recipient:")
+                && !notice.getRemark().startsWith("recipient:" + getUserId() + ":")
+                && !SecurityUtils.isAdmin(getUserId()))
+        {
+            return error("无权查看该通知");
+        }
+        return success(notice);
     }
 
     /**

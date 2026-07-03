@@ -209,4 +209,7 @@ public interface CupidEventMapper
             @Param("entitlementBalanceId") String entitlementBalanceId,
             @Param("consumeQuota") boolean consumeQuota,
             @Param("releaseQuota") boolean releaseQuota);
+
+    List<Map<String, Object>> selectUpcomingEventReminderTargets(
+            @Param("batchSize") int batchSize);
 }

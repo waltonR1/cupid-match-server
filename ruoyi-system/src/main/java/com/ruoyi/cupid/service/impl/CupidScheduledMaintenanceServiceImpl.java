@@ -8,10 +8,15 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import com.ruoyi.cupid.mapper.CupidAuthMapper;
+import com.ruoyi.cupid.mapper.CupidAdminStaffTaskMapper;
+import com.ruoyi.cupid.mapper.CupidEventMapper;
 import com.ruoyi.cupid.mapper.CupidMembershipMapper;
 import com.ruoyi.cupid.mapper.CupidProfileMapper;
 import com.ruoyi.cupid.service.ICupidRuntimeConfigService;
 import com.ruoyi.cupid.service.ICupidScheduledMaintenanceService;
+import com.ruoyi.cupid.service.ICupidInboxNotificationService;
+import com.ruoyi.system.domain.SysNotice;
+import com.ruoyi.system.mapper.SysNoticeMapper;
 
 /**
  * Cupid 定时维护服务实现。
@@ -31,6 +36,18 @@ public class CupidScheduledMaintenanceServiceImpl
 
     @Autowired
     private CupidMembershipMapper membershipMapper;
+
+    @Autowired
+    private CupidEventMapper eventMapper;
+
+    @Autowired
+    private CupidAdminStaffTaskMapper staffTaskMapper;
+
+    @Autowired
+    private ICupidInboxNotificationService inboxNotificationService;
+
+    @Autowired
+    private SysNoticeMapper noticeMapper;
 
     @Autowired
     private ICupidRuntimeConfigService runtimeConfigService;
@@ -79,5 +96,55 @@ public class CupidScheduledMaintenanceServiceImpl
                 runtimeConfigService.getScheduledMaintenanceBatchSize());
         log.info("Cupid 会员到期状态同步完成，本次处理 {} 条", processed);
         return processed;
+    }
+
+    @Override
+    public int sendEventReminders()
+    {
+        List<Map<String, Object>> targets = eventMapper.selectUpcomingEventReminderTargets(
+                runtimeConfigService.getScheduledMaintenanceBatchSize());
+        int sent = 0;
+        for (Map<String, Object> target : targets)
+        {
+            String userId = String.valueOf(target.get("userId"));
+            String eventId = String.valueOf(target.get("eventId"));
+            String messageId = inboxNotificationService.sendSystemNotification(
+                    userId, "event_reminder_24h", null,
+                    Map.of("eventTitle", String.valueOf(target.get("eventTitle")),
+                            "startsAt", String.valueOf(target.get("startsAt"))),
+                    eventId, "event-reminder-24h:" + eventId + ":" + userId);
+            if (messageId != null)
+            {
+                sent++;
+            }
+        }
+        log.info("Cupid 活动站内提醒完成，本次发送 {} 条", sent);
+        return sent;
+    }
+
+    @Override
+    public int sendOverdueStaffTaskReminders()
+    {
+        List<Map<String, Object>> targets = staffTaskMapper.selectOverdueStaffTaskReminderTargets(
+                runtimeConfigService.getScheduledMaintenanceBatchSize());
+        int sent = 0;
+        for (Map<String, Object> target : targets)
+        {
+            SysNotice notice = new SysNotice();
+            notice.setNoticeTitle("跟进事项已逾期");
+            notice.setNoticeType("1");
+            notice.setNoticeContent("跟进事项“" + target.get("note") + "”已超过截止时间，请及时处理。");
+            notice.setStatus("0");
+            notice.setCreateBy("system");
+            String remark = "recipient:" + target.get("assigneeSysUserId")
+                    + ":staff-task-overdue:" + target.get("taskId");
+            notice.setRemark(remark);
+            if (noticeMapper.countNoticeByRemark(remark) == 0)
+            {
+                sent += noticeMapper.insertNotice(notice);
+            }
+        }
+        log.info("Cupid 跟进事项逾期提醒完成，本次发送 {} 条", sent);
+        return sent;
     }
 }

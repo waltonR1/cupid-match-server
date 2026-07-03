@@ -13,6 +13,9 @@ public interface CupidAdminStaffTaskMapper
 
     List<Map<String, Object>> selectAvailableAssignees();
 
+    List<Map<String, Object>> selectOverdueStaffTaskReminderTargets(
+            @Param("batchSize") int batchSize);
+
     int insertAdminStaffTask(@Param("id") String id,
             @Param("assigneeSysUserId") Long assigneeSysUserId,
             @Param("subjectType") String subjectType,

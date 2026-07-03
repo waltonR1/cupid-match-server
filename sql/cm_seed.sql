@@ -589,6 +589,8 @@ insert into sys_job values(3, '系统默认（多参）', 'DEFAULT', 'ryTask.ryM
 insert into sys_job values(4, '私人介绍过期补偿', 'CUPID', 'cupidTask.expireIntroductionRequests', '0 */10 * * * ?', '3', '1', '0', 'admin', sysdate(), '', null, '处理过期私人介绍申请并返还权益');
 insert into sys_job values(5, '安全挑战过期清理', 'CUPID', 'cupidTask.expireSecurityChallenges', '30 */10 * * * ?', '3', '1', '0', 'admin', sysdate(), '', null, '标记已过期的安全挑战');
 insert into sys_job values(6, '会员到期状态同步', 'CUPID', 'cupidTask.expireMemberships', '0 5 * * * ?', '3', '1', '0', 'admin', sysdate(), '', null, '将超过有效期的有效会员同步为已过期');
+insert into sys_job values(7, '活动站内提醒', 'CUPID', 'cupidTask.sendEventReminders', '0 */10 * * * ?', '3', '1', '0', 'admin', sysdate(), '', null, '向24小时内开始的活动确认用户发送站内提醒');
+insert into sys_job values(8, '跟进事项逾期提醒', 'CUPID', 'cupidTask.sendOverdueStaffTaskReminders', '30 */10 * * * ?', '3', '1', '0', 'admin', sysdate(), '', null, '向逾期跟进事项负责人发送后台通知');
 
 -- 17
 insert into sys_notice values('1', '温馨提醒：2018-07-01 若依新版本发布啦', '2', '新版本内容', '0', 'admin', sysdate(), '', null, '管理员');
@@ -1436,7 +1438,8 @@ insert into cm_inbox_templates (id, template_code, message_type, subject_type, a
   ('10000000-0000-5000-8000-000000000006', 'verification_approved', 'status_update', 'profile', null, 'enabled'),
   ('10000000-0000-5000-8000-000000000007', 'verification_rejected', 'status_update', 'profile', null, 'enabled'),
   ('10000000-0000-5000-8000-000000000008', 'event_registration_status_changed', 'status_update', 'event', null, 'enabled'),
-  ('10000000-0000-5000-8000-000000000009', 'private_introduction_status_changed', 'status_update', 'private_introduction_request', null, 'enabled');
+  ('10000000-0000-5000-8000-000000000009', 'private_introduction_status_changed', 'status_update', 'private_introduction_request', null, 'enabled'),
+  ('10000000-0000-5000-8000-000000000010', 'event_reminder_24h', 'action_prompt', 'event', 'view_event', 'enabled');
 
 insert into cm_inbox_template_localized_fields (id, template_id, locale, name, body) values
   ('11000000-0000-5000-8000-000000000001', '10000000-0000-5000-8000-000000000001', 'zh', '欢迎通知', '欢迎使用 Cupid Match。'),
@@ -1465,7 +1468,10 @@ insert into cm_inbox_template_localized_fields (id, template_id, locale, name, b
   ('11000000-0000-5000-8000-000000000024', '10000000-0000-5000-8000-000000000008', 'en', 'Event registration updated', 'Your registration for {{eventTitle}} is now {{status}}.'),
   ('11000000-0000-5000-8000-000000000025', '10000000-0000-5000-8000-000000000009', 'zh', '私人介绍状态更新', '你的私人介绍申请状态已更新为 {{status}}。'),
   ('11000000-0000-5000-8000-000000000026', '10000000-0000-5000-8000-000000000009', 'fr', 'Statut introduction privee', 'Votre demande introduction privee est maintenant {{status}}.'),
-  ('11000000-0000-5000-8000-000000000027', '10000000-0000-5000-8000-000000000009', 'en', 'Private introduction updated', 'Your private introduction request is now {{status}}.');
+  ('11000000-0000-5000-8000-000000000027', '10000000-0000-5000-8000-000000000009', 'en', 'Private introduction updated', 'Your private introduction request is now {{status}}.'),
+  ('11000000-0000-5000-8000-000000000028', '10000000-0000-5000-8000-000000000010', 'zh', '活动开始提醒', '活动《{{eventTitle}}》将在 {{startsAt}} 开始，请提前做好准备。'),
+  ('11000000-0000-5000-8000-000000000029', '10000000-0000-5000-8000-000000000010', 'fr', 'Rappel evenement', 'L evenement {{eventTitle}} commencera le {{startsAt}}. Merci de vous preparer a l avance.'),
+  ('11000000-0000-5000-8000-000000000030', '10000000-0000-5000-8000-000000000010', 'en', 'Event reminder', 'The event {{eventTitle}} starts at {{startsAt}}. Please prepare in advance.');
 
 -- 3A.32 cm_inbox_threads
 insert into cm_inbox_threads (id, user_id, category, subject_type, subject_id, status, created_at, updated_at) values

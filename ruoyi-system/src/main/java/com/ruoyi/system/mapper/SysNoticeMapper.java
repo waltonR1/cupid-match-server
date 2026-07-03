@@ -1,6 +1,7 @@
 package com.ruoyi.system.mapper;
 
 import java.util.List;
+import org.apache.ibatis.annotations.Param;
 import com.ruoyi.system.domain.SysNotice;
 
 /**
@@ -33,6 +34,8 @@ public interface SysNoticeMapper
      * @return 结果
      */
     public int insertNotice(SysNotice notice);
+
+    public int countNoticeByRemark(@Param("remark") String remark);
 
     /**
      * 修改公告

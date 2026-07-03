@@ -25,4 +25,8 @@ public interface ICupidScheduledMaintenanceService
      * @return 本次处理数量
      */
     int expireMemberships();
+
+    int sendEventReminders();
+
+    int sendOverdueStaffTaskReminders();
 }

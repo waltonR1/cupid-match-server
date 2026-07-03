@@ -18,7 +18,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     </resultMap>
     
     <sql id="selectNoticeVo">
-        select notice_id, notice_title, notice_type, cast(notice_content as char) as notice_content, status, create_by, create_time, update_by, update_time, remark 
+        select notice_id, notice_title, notice_type, cast(notice_content as char) as notice_content, status, create_by, create_time, update_by, update_time, remark
 		from sys_notice
     </sql>
     
@@ -62,6 +62,10 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
  			sysdate()
 		)
     </insert>
+
+    <select id="countNoticeByRemark" parameterType="String" resultType="int">
+        select count(1) from sys_notice where remark = #{remark}
+    </select>
 	 
     <update id="updateNotice" parameterType="SysNotice">
         update sys_notice 
