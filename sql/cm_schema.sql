@@ -617,7 +617,8 @@ create table cm_user_security_challenges (
   primary key (id),
   key idx_cm_security_challenge_user (user_id),
   key idx_cm_security_challenge_token (challenge_token),
-  key idx_cm_security_challenge_expires (expires_at)
+  key idx_cm_security_challenge_expires (expires_at),
+  key idx_cm_security_challenge_status_expires (status, expires_at)
 ) engine=innodb comment='用户安全挑战';
 
 create table cm_security_events (
@@ -1207,7 +1208,7 @@ create table cm_private_introduction_requests (
   requester_user_id        varchar(36)  not null comment '申请人用户ID，关联 cm_users.id',
   requester_profile_id     varchar(36)  default null comment '申请人资料ID，关联 cm_profiles.id',
   target_profile_id        varchar(36)  not null comment '目标资料ID，关联 cm_profiles.id',
-  status                   varchar(20)  not null comment '私人介绍申请状态；可选值：requested, accepted, declined, cancelled',
+  status                   varchar(20)  not null comment '私人介绍申请状态；可选值：requested, accepted, declined, cancelled, expired',
   active_target_id         varchar(36) generated always as (case when status in ('requested', 'accepted') then target_profile_id else null end) stored comment '有效目标资料ID，用于限制进行中的重复申请',
   message                  varchar(1000) default null comment '申请留言',
   requested_at             datetime     not null comment '申请时间',
@@ -1221,7 +1222,8 @@ create table cm_private_introduction_requests (
   unique key uk_cm_intro_active_pair (requester_user_id, active_target_id),
   key idx_cm_intro_requester_status (requester_user_id, status),
   key idx_cm_intro_target_status (target_profile_id, status),
-  key idx_cm_intro_entitlement (entitlement_balance_id)
+  key idx_cm_intro_entitlement (entitlement_balance_id),
+  key idx_cm_intro_status_expires (status, expires_at)
 ) engine=innodb comment='私人介绍申请';
 
 -- ----------------------------

@@ -164,6 +164,11 @@ public interface CupidAuthMapper
             @Param("challengeToken") String challengeToken);
 
     /**
+     * 批量标记已超过有效期的安全挑战
+     */
+    int expireSecurityChallenges(@Param("batchSize") int batchSize);
+
+    /**
      * 统计尚未过期的安全挑战令牌
      */
     int countActiveSecurityChallenges();

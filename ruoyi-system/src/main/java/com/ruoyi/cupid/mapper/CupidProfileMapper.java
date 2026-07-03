@@ -87,6 +87,11 @@ public interface CupidProfileMapper
 
     int restoreIntroductionEntitlement(@Param("balanceId") String balanceId);
 
+    List<Map<String, Object>> selectExpiredIntroductionRequestsForUpdate(
+            @Param("batchSize") int batchSize);
+
+    int updateIntroductionRequestExpired(@Param("requestId") String requestId);
+
     List<Map<String, Object>> selectAdminProfileManageList(Map<String, Object> params);
 
     Map<String, Object> selectAdminProfileManageDetail(@Param("profileId") String profileId);

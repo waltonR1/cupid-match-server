@@ -172,7 +172,12 @@ public class CupidRelationshipServiceImpl implements ICupidRelationshipService
             }
             if ("requested".equals(latest.getStatus()))
             {
-                profileMapper.expireIntroductionRequest(latest.getId());
+                if (profileMapper.expireIntroductionRequest(latest.getId()) == 1
+                        && latest.getEntitlementBalanceId() != null)
+                {
+                    profileMapper.restoreIntroductionEntitlement(
+                            latest.getEntitlementBalanceId());
+                }
             }
         }
 

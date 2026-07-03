@@ -26,6 +26,8 @@ public class CupidRuntimeConfigServiceImpl implements ICupidRuntimeConfigService
             "cupid.introduction.expiryDays";
     private static final String KEY_INTRODUCTION_COOLDOWN_DAYS =
             "cupid.introduction.cooldownDays";
+    private static final String KEY_SCHEDULED_MAINTENANCE_BATCH_SIZE =
+            "cupid.scheduler.batchSize";
 
     private static final int DEFAULT_CODE_TTL_MINUTES = 5;
     private static final int MIN_CODE_TTL_MINUTES = 1;
@@ -42,6 +44,10 @@ public class CupidRuntimeConfigServiceImpl implements ICupidRuntimeConfigService
     private static final int DEFAULT_INTRODUCTION_COOLDOWN_DAYS = 90;
     private static final int MIN_INTRODUCTION_COOLDOWN_DAYS = 7;
     private static final int MAX_INTRODUCTION_COOLDOWN_DAYS = 365;
+
+    private static final int DEFAULT_SCHEDULED_MAINTENANCE_BATCH_SIZE = 500;
+    private static final int MIN_SCHEDULED_MAINTENANCE_BATCH_SIZE = 50;
+    private static final int MAX_SCHEDULED_MAINTENANCE_BATCH_SIZE = 2000;
 
     @Autowired
     private ISysConfigService configService;
@@ -72,6 +78,15 @@ public class CupidRuntimeConfigServiceImpl implements ICupidRuntimeConfigService
     {
         return readBoundedInt(KEY_INTRODUCTION_COOLDOWN_DAYS, DEFAULT_INTRODUCTION_COOLDOWN_DAYS,
                 MIN_INTRODUCTION_COOLDOWN_DAYS, MAX_INTRODUCTION_COOLDOWN_DAYS);
+    }
+
+    @Override
+    public int getScheduledMaintenanceBatchSize()
+    {
+        return readBoundedInt(KEY_SCHEDULED_MAINTENANCE_BATCH_SIZE,
+                DEFAULT_SCHEDULED_MAINTENANCE_BATCH_SIZE,
+                MIN_SCHEDULED_MAINTENANCE_BATCH_SIZE,
+                MAX_SCHEDULED_MAINTENANCE_BATCH_SIZE);
     }
 
     private int readBoundedInt(String key, int defaultValue, int minValue, int maxValue)

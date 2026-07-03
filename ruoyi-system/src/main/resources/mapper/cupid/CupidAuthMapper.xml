@@ -253,6 +253,16 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
           and expires_at &lt;= now()
     </update>
 
+    <update id="expireSecurityChallenges">
+        update cm_user_security_challenges
+        set status = 'expired',
+            updated_at = now()
+        where status in ('pending', 'verified')
+          and expires_at &lt;= now()
+        order by expires_at, id
+        limit #{batchSize}
+    </update>
+
     <select id="countActiveSecurityChallenges" resultType="int">
         select count(1)
         from cm_user_security_challenges

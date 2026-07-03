@@ -29,6 +29,12 @@
             <artifactId>ruoyi-common</artifactId>
         </dependency>
 
+        <!-- Cupid 业务定时维护服务 -->
+        <dependency>
+            <groupId>com.ruoyi</groupId>
+            <artifactId>ruoyi-system</artifactId>
+        </dependency>
+
     </dependencies>
 
 </project>

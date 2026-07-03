@@ -270,6 +270,7 @@ insert into sys_dict_data values(26, 8,  '生成代码', '8',       'sys_oper_ty
 insert into sys_dict_data values(27, 9,  '清空数据', '9',       'sys_oper_type',       '',   'danger',  'N', '0', 'admin', sysdate(), '', null, '清空操作');
 insert into sys_dict_data values(28, 1,  '成功',     '0',       'sys_common_status',   '',   'primary', 'N', '0', 'admin', sysdate(), '', null, '正常状态');
 insert into sys_dict_data values(29, 2,  '失败',     '1',       'sys_common_status',   '',   'danger',  'N', '0', 'admin', sysdate(), '', null, '停用状态');
+insert into sys_dict_data values(30, 3,  'Cupid业务', 'CUPID',   'sys_job_group',       '',   'primary', 'N', '0', 'admin', sysdate(), '', null, 'Cupid业务任务分组');
 
 -- 13
 insert into sys_config values(1, '主框架页-默认皮肤样式名称',     'sys.index.skinName',               'skin-blue',     'Y', 'admin', sysdate(), '', null, '蓝色 skin-blue、绿色 skin-green、紫色 skin-purple、红色 skin-red、黄色 skin-yellow' );
@@ -285,6 +286,7 @@ insert into sys_config values(10, 'Cupid-验证码有效期（分钟）',    'cu
 insert into sys_config values(11, 'Cupid-验证码重发间隔（秒）',    'cupid.auth.verification.resendIntervalSeconds', '60', 'Y', 'admin', sysdate(), '', null, '允许范围30-300，非法值自动回退为60');
 insert into sys_config values(12, 'Cupid-私人介绍有效期（天）',    'cupid.introduction.expiryDays',                  '7',  'Y', 'admin', sysdate(), '', null, '允许范围1-30，仅影响新申请，非法值自动回退为7');
 insert into sys_config values(13, 'Cupid-私人介绍冷却期（天）',    'cupid.introduction.cooldownDays',                '90', 'Y', 'admin', sysdate(), '', null, '允许范围7-365，仅影响新冷却记录，非法值自动回退为90');
+insert into sys_config values(14, 'Cupid-定时维护批量大小',        'cupid.scheduler.batchSize',                      '500', 'Y', 'admin', sysdate(), '', null, '允许范围50-2000，非法值自动回退为500');
 
 -- Cupid common options (dynamic groups)
 insert into cm_option_groups (id, group_key, group_name, group_scope, manage_status, sort_order, status) values
@@ -572,6 +574,8 @@ insert into cm_option_values (id, group_id, option_value, label_zh, label_fr, la
 insert into sys_job values(1, '系统默认（无参）', 'DEFAULT', 'ryTask.ryNoParams',        '0/10 * * * * ?', '3', '1', '1', 'admin', sysdate(), '', null, '');
 insert into sys_job values(2, '系统默认（有参）', 'DEFAULT', 'ryTask.ryParams(\'ry\')',  '0/15 * * * * ?', '3', '1', '1', 'admin', sysdate(), '', null, '');
 insert into sys_job values(3, '系统默认（多参）', 'DEFAULT', 'ryTask.ryMultipleParams(\'ry\', true, 2000L, 316.50D, 100)',  '0/20 * * * * ?', '3', '1', '1', 'admin', sysdate(), '', null, '');
+insert into sys_job values(4, '私人介绍过期补偿', 'CUPID', 'cupidTask.expireIntroductionRequests', '0 */10 * * * ?', '3', '1', '0', 'admin', sysdate(), '', null, '处理过期私人介绍申请并返还权益');
+insert into sys_job values(5, '安全挑战过期清理', 'CUPID', 'cupidTask.expireSecurityChallenges', '30 */10 * * * ?', '3', '1', '0', 'admin', sysdate(), '', null, '标记已过期的安全挑战');
 
 -- 17
 insert into sys_notice values('1', '温馨提醒：2018-07-01 若依新版本发布啦', '2', '新版本内容', '0', 'admin', sysdate(), '', null, '管理员');

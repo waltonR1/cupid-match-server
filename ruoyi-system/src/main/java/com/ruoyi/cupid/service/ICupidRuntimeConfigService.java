@@ -12,4 +12,6 @@ public interface ICupidRuntimeConfigService
     int getIntroductionExpiryDays();
 
     int getIntroductionCooldownDays();
+
+    int getScheduledMaintenanceBatchSize();
 }

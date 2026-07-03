@@ -831,6 +831,27 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         where id = #{balanceId}
     </update>
 
+    <select id="selectExpiredIntroductionRequestsForUpdate" resultType="map">
+        select id as requestId, entitlement_balance_id as entitlementBalanceId
+        from cm_private_introduction_requests
+        where status = 'requested'
+          and expires_at is not null
+          and expires_at &lt;= now()
+        order by expires_at, id
+        limit #{batchSize}
+        for update
+    </select>
+
+    <update id="updateIntroductionRequestExpired">
+        update cm_private_introduction_requests
+        set status = 'expired',
+            updated_at = now()
+        where id = #{requestId}
+          and status = 'requested'
+          and expires_at is not null
+          and expires_at &lt;= now()
+    </update>
+
     <sql id="selfProfileWhere">
         p.profile_status in ('open', 'review')
         and p.archived_at is null
@@ -1408,7 +1429,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 
     <update id="expireIntroductionRequest">
         update cm_private_introduction_requests
-        set status = 'cancelled', updated_at = now()
+        set status = 'expired', updated_at = now()
         where id = #{id} and status = 'requested' and expires_at &lt;= now()
     </update>
 
