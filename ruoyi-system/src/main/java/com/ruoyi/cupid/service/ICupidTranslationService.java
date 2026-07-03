@@ -45,4 +45,6 @@ public interface ICupidTranslationService
      * @param fieldNames       本次保存的字段名列表（snake_case）
      */
     void requestInternalTranslations(String internalRecordId, String sourceLocale, List<String> fieldNames);
+
+    int retryFailedTranslations();
 }

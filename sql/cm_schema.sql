@@ -1448,3 +1448,21 @@ create table cm_payments (
   key idx_cm_payments_order (order_id),
   key idx_cm_payments_provider_payment (provider, provider_payment_id)
 ) engine=innodb comment='支付记录';
+
+create table cm_translation_retries (
+  id varchar(36) not null,
+  entity_type varchar(30) not null,
+  entity_id varchar(36) not null,
+  field_name varchar(80) not null,
+  source_locale varchar(8) not null,
+  target_locale varchar(8) not null,
+  attempt_count int not null default 1,
+  next_retry_at datetime not null,
+  last_error varchar(1000) default null,
+  status varchar(20) not null default 'pending',
+  created_at datetime not null default current_timestamp,
+  updated_at datetime not null default current_timestamp on update current_timestamp,
+  primary key (id),
+  unique key uk_cm_translation_retry_target (entity_type, entity_id, field_name, target_locale),
+  key idx_cm_translation_retry_due (status, next_retry_at)
+) engine=innodb comment='机器翻译失败重试记录';

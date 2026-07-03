@@ -3,6 +3,7 @@ package com.ruoyi.cupid.service.impl;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import com.ruoyi.common.utils.StringUtils;
 import com.ruoyi.cupid.service.ICupidRuntimeConfigService;
@@ -28,6 +29,7 @@ public class CupidRuntimeConfigServiceImpl implements ICupidRuntimeConfigService
             "cupid.introduction.cooldownDays";
     private static final String KEY_SCHEDULED_MAINTENANCE_BATCH_SIZE =
             "cupid.scheduler.batchSize";
+    private static final String KEY_TRANSLATION_ENABLED = "cupid.translation.enabled";
 
     private static final int DEFAULT_CODE_TTL_MINUTES = 5;
     private static final int MIN_CODE_TTL_MINUTES = 1;
@@ -51,6 +53,27 @@ public class CupidRuntimeConfigServiceImpl implements ICupidRuntimeConfigService
 
     @Autowired
     private ISysConfigService configService;
+
+    @Value("${cupid.translation.enabled:false}")
+    private boolean defaultTranslationEnabled;
+
+    @Value("${cupid.translation.api-url:http://localhost:5000}")
+    private String defaultTranslationApiUrl;
+
+    @Value("${cupid.translation.connect-timeout-seconds:3}")
+    private int defaultTranslationConnectTimeoutSeconds;
+
+    @Value("${cupid.translation.read-timeout-seconds:10}")
+    private int defaultTranslationReadTimeoutSeconds;
+
+    @Value("${cupid.translation.retry.max-attempts:5}")
+    private int defaultTranslationRetryMaxAttempts;
+
+    @Value("${cupid.translation.retry.batch-size:100}")
+    private int defaultTranslationRetryBatchSize;
+
+    @Value("${cupid.translation.retry.base-delay-minutes:5}")
+    private int defaultTranslationRetryBaseDelayMinutes;
 
     @Override
     public int getVerificationCodeTtlMinutes()
@@ -87,6 +110,51 @@ public class CupidRuntimeConfigServiceImpl implements ICupidRuntimeConfigService
                 DEFAULT_SCHEDULED_MAINTENANCE_BATCH_SIZE,
                 MIN_SCHEDULED_MAINTENANCE_BATCH_SIZE,
                 MAX_SCHEDULED_MAINTENANCE_BATCH_SIZE);
+    }
+
+    @Override
+    public boolean isTranslationEnabled()
+    {
+        String value = configService.selectConfigByKey(KEY_TRANSLATION_ENABLED);
+        return StringUtils.hasText(value)
+                ? Boolean.parseBoolean(value.trim())
+                : defaultTranslationEnabled;
+    }
+
+    @Override
+    public String getTranslationApiUrl()
+    {
+        return defaultTranslationApiUrl;
+    }
+
+    @Override
+    public int getTranslationConnectTimeoutSeconds()
+    {
+        return defaultTranslationConnectTimeoutSeconds;
+    }
+
+    @Override
+    public int getTranslationReadTimeoutSeconds()
+    {
+        return defaultTranslationReadTimeoutSeconds;
+    }
+
+    @Override
+    public int getTranslationRetryMaxAttempts()
+    {
+        return defaultTranslationRetryMaxAttempts;
+    }
+
+    @Override
+    public int getTranslationRetryBatchSize()
+    {
+        return defaultTranslationRetryBatchSize;
+    }
+
+    @Override
+    public int getTranslationRetryBaseDelayMinutes()
+    {
+        return defaultTranslationRetryBaseDelayMinutes;
     }
 
     private int readBoundedInt(String key, int defaultValue, int minValue, int maxValue)

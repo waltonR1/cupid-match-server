@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.cupid.mapper.CupidTranslationRetryMapper">
+
+    <insert id="recordFailure">
+        insert into cm_translation_retries (
+            id, entity_type, entity_id, field_name, source_locale, target_locale,
+            attempt_count, next_retry_at, last_error, status, created_at, updated_at
+        ) values (
+            #{id}, #{entityType}, #{entityId}, #{fieldName}, #{sourceLocale}, #{targetLocale},
+            1, date_add(now(), interval #{baseDelayMinutes} minute),
+            left(#{errorMessage}, 1000),
+            if(#{maxAttempts} &lt;= 1, 'exhausted', 'pending'), now(), now()
+        )
+        on duplicate key update
+            source_locale = values(source_locale),
+            attempt_count = attempt_count + 1,
+            next_retry_at = date_add(now(), interval
+                (#{baseDelayMinutes} * pow(2, least(attempt_count - 1, 10))) minute),
+            last_error = values(last_error),
+            status = if(attempt_count &gt;= #{maxAttempts}, 'exhausted', 'pending'),
+            updated_at = now()
+    </insert>
+
+    <select id="selectDueRetries" resultType="map">
+        select entity_type as entityType,
+               entity_id as entityId,
+               field_name as fieldName,
+               source_locale as sourceLocale,
+               target_locale as targetLocale,
+               attempt_count as attemptCount
+        from cm_translation_retries
+        where status = 'pending'
+          and attempt_count &lt; #{maxAttempts}
+          and next_retry_at &lt;= now()
+        order by next_retry_at, id
+        limit #{batchSize}
+    </select>
+
+    <delete id="deleteRetry">
+        delete from cm_translation_retries
+        where entity_type = #{entityType}
+          and entity_id = #{entityId}
+          and field_name = #{fieldName}
+          and target_locale = #{targetLocale}
+    </delete>
+</mapper>

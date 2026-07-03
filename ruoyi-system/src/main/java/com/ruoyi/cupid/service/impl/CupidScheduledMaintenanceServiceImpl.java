@@ -15,6 +15,7 @@ import com.ruoyi.cupid.mapper.CupidProfileMapper;
 import com.ruoyi.cupid.service.ICupidRuntimeConfigService;
 import com.ruoyi.cupid.service.ICupidScheduledMaintenanceService;
 import com.ruoyi.cupid.service.ICupidInboxNotificationService;
+import com.ruoyi.cupid.service.ICupidTranslationService;
 import com.ruoyi.system.domain.SysNotice;
 import com.ruoyi.system.mapper.SysNoticeMapper;
 
@@ -51,6 +52,9 @@ public class CupidScheduledMaintenanceServiceImpl
 
     @Autowired
     private ICupidRuntimeConfigService runtimeConfigService;
+
+    @Autowired
+    private ICupidTranslationService translationService;
 
     @Override
     @Transactional
@@ -146,5 +150,13 @@ public class CupidScheduledMaintenanceServiceImpl
         }
         log.info("Cupid 跟进事项逾期提醒完成，本次发送 {} 条", sent);
         return sent;
+    }
+
+    @Override
+    public int retryFailedTranslations()
+    {
+        int completed = translationService.retryFailedTranslations();
+        log.info("Cupid translation retry completed, succeeded={}", completed);
+        return completed;
     }
 }

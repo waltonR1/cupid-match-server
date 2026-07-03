@@ -37,4 +37,9 @@ public class CupidTask
     {
         scheduledMaintenanceService.sendOverdueStaffTaskReminders();
     }
+
+    public void retryFailedTranslations()
+    {
+        scheduledMaintenanceService.retryFailedTranslations();
+    }
 }

@@ -299,6 +299,7 @@ insert into sys_config values(11, 'Cupid-验证码重发间隔（秒）',    'cu
 insert into sys_config values(12, 'Cupid-私人介绍有效期（天）',    'cupid.introduction.expiryDays',                  '7',  'Y', 'admin', sysdate(), '', null, '允许范围1-30，仅影响新申请，非法值自动回退为7');
 insert into sys_config values(13, 'Cupid-私人介绍冷却期（天）',    'cupid.introduction.cooldownDays',                '90', 'Y', 'admin', sysdate(), '', null, '允许范围7-365，仅影响新冷却记录，非法值自动回退为90');
 insert into sys_config values(14, 'Cupid-定时维护批量大小',        'cupid.scheduler.batchSize',                      '500', 'Y', 'admin', sysdate(), '', null, '允许范围50-2000，非法值自动回退为500');
+insert into sys_config values(15, 'Cupid-机器翻译开关', 'cupid.translation.enabled', 'false', 'Y', 'admin', sysdate(), '', null, '修改后立即生效');
 
 -- Cupid common options (dynamic groups)
 insert into cm_option_groups (id, group_key, group_name, group_scope, manage_status, sort_order, status) values
@@ -591,6 +592,7 @@ insert into sys_job values(5, '安全挑战过期清理', 'CUPID', 'cupidTask.ex
 insert into sys_job values(6, '会员到期状态同步', 'CUPID', 'cupidTask.expireMemberships', '0 5 * * * ?', '3', '1', '0', 'admin', sysdate(), '', null, '将超过有效期的有效会员同步为已过期');
 insert into sys_job values(7, '活动站内提醒', 'CUPID', 'cupidTask.sendEventReminders', '0 */10 * * * ?', '3', '1', '0', 'admin', sysdate(), '', null, '向24小时内开始的活动确认用户发送站内提醒');
 insert into sys_job values(8, '跟进事项逾期提醒', 'CUPID', 'cupidTask.sendOverdueStaffTaskReminders', '30 */10 * * * ?', '3', '1', '0', 'admin', sysdate(), '', null, '向逾期跟进事项负责人发送后台通知');
+insert into sys_job values(9, '翻译失败重试', 'CUPID', 'cupidTask.retryFailedTranslations', '0 */5 * * * ?', '3', '1', '0', 'admin', sysdate(), '', null, '按指数退避重试机器翻译失败任务');
 
 -- 17
 insert into sys_notice values('1', '温馨提醒：2018-07-01 若依新版本发布啦', '2', '新版本内容', '0', 'admin', sysdate(), '', null, '管理员');

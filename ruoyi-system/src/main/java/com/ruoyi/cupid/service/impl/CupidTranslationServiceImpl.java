@@ -10,7 +10,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.beans.factory.InitializingBean;
+import org.springframework.boot.context.event.ApplicationReadyEvent;
+import org.springframework.context.event.EventListener;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
@@ -19,13 +20,15 @@ import com.ruoyi.common.utils.StringUtils;
 import com.ruoyi.common.utils.uuid.IdUtils;
 import com.ruoyi.cupid.domain.CupidProfileLocalizedField;
 import com.ruoyi.cupid.mapper.CupidProfileMapper;
+import com.ruoyi.cupid.mapper.CupidTranslationRetryMapper;
+import com.ruoyi.cupid.service.ICupidRuntimeConfigService;
 import com.ruoyi.cupid.service.ICupidTranslationService;
 
 /**
  * Cupid Match 翻译服务 — LibreTranslate 实现
  */
 @Service
-public class CupidTranslationServiceImpl implements ICupidTranslationService, InitializingBean
+public class CupidTranslationServiceImpl implements ICupidTranslationService
 {
     private static final Logger log = LoggerFactory.getLogger(CupidTranslationServiceImpl.class);
     private static final List<String> ALL_LOCALES = Arrays.asList("zh", "fr", "en");
@@ -33,28 +36,19 @@ public class CupidTranslationServiceImpl implements ICupidTranslationService, In
     @Autowired
     private CupidProfileMapper profileMapper;
 
-    @Value("${cupid.translation.api-url:http://localhost:5000}")
-    private String apiUrl;
-
-    @Value("${cupid.translation.enabled:true}")
-    private boolean enabled;
-
     @Value("${cupid.translation.fail-fast:false}")
     private boolean failFast;
 
-    @Value("${cupid.translation.connect-timeout:3s}")
-    private Duration connectTimeout;
+    @Autowired
+    private CupidTranslationRetryMapper retryMapper;
 
-    @Value("${cupid.translation.read-timeout:10s}")
-    private Duration readTimeout;
+    @Autowired
+    private ICupidRuntimeConfigService runtimeConfigService;
 
-    private RestTemplate restTemplate;
-
-    @Override
-    public void afterPropertiesSet()
+    @EventListener(ApplicationReadyEvent.class)
+    public void checkTranslatorAfterStartup()
     {
-        this.restTemplate = createRestTemplate();
-        if (enabled && failFast)
+        if (failFast && runtimeConfigService.isTranslationEnabled())
         {
             checkTranslatorAvailable();
         }
@@ -63,7 +57,7 @@ public class CupidTranslationServiceImpl implements ICupidTranslationService, In
     @Override
     public void prepareTranslations(String profileId, String sourceLocale, List<String> fieldNames)
     {
-        if (!enabled || fieldNames == null || fieldNames.isEmpty())
+        if (!runtimeConfigService.isTranslationEnabled() || fieldNames == null || fieldNames.isEmpty())
         {
             return;
         }
@@ -92,7 +86,7 @@ public class CupidTranslationServiceImpl implements ICupidTranslationService, In
     @Async("threadPoolTaskExecutor")
     public void requestTranslations(String profileId, String sourceLocale, List<String> fieldNames)
     {
-        if (!enabled || fieldNames == null || fieldNames.isEmpty())
+        if (!runtimeConfigService.isTranslationEnabled() || fieldNames == null || fieldNames.isEmpty())
         {
             return;
         }
@@ -121,6 +115,7 @@ public class CupidTranslationServiceImpl implements ICupidTranslationService, In
                 if (translated == null)
                 {
                     profileMapper.updatePendingLocalizedFieldStatus(profileId, fieldName, targetLocale, "failed");
+                    recordFailure("profile", profileId, fieldName, sourceLocale, targetLocale);
                     continue;
                 }
 
@@ -134,6 +129,7 @@ public class CupidTranslationServiceImpl implements ICupidTranslationService, In
                 field.setProvider("libretranslate");
                 field.setStatus("ready");
                 profileMapper.upsertLocalizedField(field);
+                retryMapper.deleteRetry("profile", profileId, fieldName, targetLocale);
             }
         }
     }
@@ -141,7 +137,7 @@ public class CupidTranslationServiceImpl implements ICupidTranslationService, In
     @Override
     public void prepareInternalTranslations(String internalRecordId, String sourceLocale, List<String> fieldNames)
     {
-        if (!enabled || fieldNames == null || fieldNames.isEmpty())
+        if (!runtimeConfigService.isTranslationEnabled() || fieldNames == null || fieldNames.isEmpty())
         {
             return;
         }
@@ -171,7 +167,7 @@ public class CupidTranslationServiceImpl implements ICupidTranslationService, In
     @Async("threadPoolTaskExecutor")
     public void requestInternalTranslations(String internalRecordId, String sourceLocale, List<String> fieldNames)
     {
-        if (!enabled || fieldNames == null || fieldNames.isEmpty())
+        if (!runtimeConfigService.isTranslationEnabled() || fieldNames == null || fieldNames.isEmpty())
         {
             return;
         }
@@ -201,21 +197,91 @@ public class CupidTranslationServiceImpl implements ICupidTranslationService, In
                 {
                     profileMapper.updatePendingAdminInternalLocalizedFieldStatus(
                             internalRecordId, fieldName, targetLocale, "failed");
+                    recordFailure("profile_internal", internalRecordId,
+                            fieldName, sourceLocale, targetLocale);
                     continue;
                 }
 
                 profileMapper.upsertAdminInternalLocalizedFieldWithMeta(
                         IdUtils.fastUUID(), internalRecordId, fieldName, targetLocale,
                         translated, "machine", "libretranslate", "ready");
+                retryMapper.deleteRetry("profile_internal", internalRecordId, fieldName, targetLocale);
             }
         }
+    }
+
+    @Override
+    public int retryFailedTranslations()
+    {
+        if (!runtimeConfigService.isTranslationEnabled())
+        {
+            return 0;
+        }
+        List<Map<String, Object>> retries = retryMapper.selectDueRetries(
+                runtimeConfigService.getTranslationRetryBatchSize(),
+                runtimeConfigService.getTranslationRetryMaxAttempts());
+        int completed = 0;
+        for (Map<String, Object> retry : retries)
+        {
+            String entityType = String.valueOf(retry.get("entityType"));
+            String entityId = String.valueOf(retry.get("entityId"));
+            String fieldName = String.valueOf(retry.get("fieldName"));
+            String sourceLocale = String.valueOf(retry.get("sourceLocale"));
+            String targetLocale = String.valueOf(retry.get("targetLocale"));
+            String existingTarget = "profile_internal".equals(entityType)
+                    ? findInternalLocalizedFieldValue(entityId, fieldName, targetLocale)
+                    : findLocalizedFieldValue(entityId, fieldName, targetLocale);
+            if (StringUtils.hasText(existingTarget))
+            {
+                retryMapper.deleteRetry(entityType, entityId, fieldName, targetLocale);
+                continue;
+            }
+            String sourceText = "profile_internal".equals(entityType)
+                    ? findInternalLocalizedFieldValue(entityId, fieldName, sourceLocale)
+                    : findLocalizedFieldValue(entityId, fieldName, sourceLocale);
+            if (!StringUtils.hasText(sourceText))
+            {
+                recordFailure(entityType, entityId, fieldName, sourceLocale, targetLocale);
+                continue;
+            }
+            String translated = callLibreTranslate(sourceText, sourceLocale, targetLocale);
+            if (translated == null)
+            {
+                recordFailure(entityType, entityId, fieldName, sourceLocale, targetLocale);
+                continue;
+            }
+            if ("profile_internal".equals(entityType))
+            {
+                profileMapper.upsertAdminInternalLocalizedFieldWithMeta(
+                        IdUtils.fastUUID(), entityId, fieldName, targetLocale,
+                        translated, "machine", "libretranslate", "ready");
+            }
+            else
+            {
+                CupidProfileLocalizedField field = new CupidProfileLocalizedField();
+                field.setId(IdUtils.fastUUID());
+                field.setProfileId(entityId);
+                field.setFieldName(fieldName);
+                field.setLocale(targetLocale);
+                field.setValue(translated);
+                field.setSource("machine");
+                field.setProvider("libretranslate");
+                field.setStatus("ready");
+                profileMapper.upsertLocalizedField(field);
+            }
+            retryMapper.deleteRetry(entityType, entityId, fieldName, targetLocale);
+            completed++;
+        }
+        return completed;
     }
 
     private RestTemplate createRestTemplate()
     {
         SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
-        factory.setConnectTimeout(connectTimeout);
-        factory.setReadTimeout(readTimeout);
+        factory.setConnectTimeout(Duration.ofSeconds(
+                runtimeConfigService.getTranslationConnectTimeoutSeconds()));
+        factory.setReadTimeout(Duration.ofSeconds(
+                runtimeConfigService.getTranslationReadTimeoutSeconds()));
         return new RestTemplate(factory);
     }
 
@@ -223,7 +289,7 @@ public class CupidTranslationServiceImpl implements ICupidTranslationService, In
     {
         try
         {
-            restTemplate.getForObject(normalizedApiUrl() + "/languages", Object.class);
+            createRestTemplate().getForObject(normalizedApiUrl() + "/languages", Object.class);
         }
         catch (Exception e)
         {
@@ -288,7 +354,7 @@ public class CupidTranslationServiceImpl implements ICupidTranslationService, In
             body.put("source", toLtCode(sourceLang));
             body.put("target", toLtCode(targetLang));
 
-            Map<String, Object> response = restTemplate.postForObject(
+            Map<String, Object> response = createRestTemplate().postForObject(
                     normalizedApiUrl() + "/translate", body, Map.class);
 
             if (response != null && response.get("translatedText") != null)
@@ -305,11 +371,21 @@ public class CupidTranslationServiceImpl implements ICupidTranslationService, In
 
     private String normalizedApiUrl()
     {
+        String apiUrl = runtimeConfigService.getTranslationApiUrl();
         if (apiUrl != null && apiUrl.endsWith("/"))
         {
             return apiUrl.substring(0, apiUrl.length() - 1);
         }
         return apiUrl;
+    }
+
+    private void recordFailure(String entityType, String entityId, String fieldName,
+            String sourceLocale, String targetLocale)
+    {
+        retryMapper.recordFailure(IdUtils.fastUUID(), entityType, entityId, fieldName,
+                sourceLocale, targetLocale, "LibreTranslate request failed",
+                runtimeConfigService.getTranslationRetryMaxAttempts(),
+                runtimeConfigService.getTranslationRetryBaseDelayMinutes());
     }
 
     private static String toLtCode(String internal)

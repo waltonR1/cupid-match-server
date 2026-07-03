@@ -14,4 +14,18 @@ public interface ICupidRuntimeConfigService
     int getIntroductionCooldownDays();
 
     int getScheduledMaintenanceBatchSize();
+
+    boolean isTranslationEnabled();
+
+    String getTranslationApiUrl();
+
+    int getTranslationConnectTimeoutSeconds();
+
+    int getTranslationReadTimeoutSeconds();
+
+    int getTranslationRetryMaxAttempts();
+
+    int getTranslationRetryBatchSize();
+
+    int getTranslationRetryBaseDelayMinutes();
 }
