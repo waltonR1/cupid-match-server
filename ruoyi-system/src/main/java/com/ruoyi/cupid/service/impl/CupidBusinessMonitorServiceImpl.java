@@ -11,6 +11,7 @@ import org.springframework.stereotype.Service;
 import com.ruoyi.common.core.redis.RedisCache;
 import com.ruoyi.cupid.mapper.CupidAuthMapper;
 import com.ruoyi.cupid.service.ICupidBusinessMonitorService;
+import com.ruoyi.cupid.service.ICupidOperationsService;
 
 /**
  * Cupid 业务专项监控服务实现
@@ -36,6 +37,9 @@ public class CupidBusinessMonitorServiceImpl implements ICupidBusinessMonitorSer
 
     @Autowired
     private CupidAuthMapper authMapper;
+
+    @Autowired
+    private ICupidOperationsService operationsService;
 
     @Override
     public Map<String, Object> getOverview()
@@ -79,6 +83,7 @@ public class CupidBusinessMonitorServiceImpl implements ICupidBusinessMonitorSer
         }
 
         result.put("activeChallengeTokens", authMapper.countActiveSecurityChallenges());
+        result.put("operations", operationsService.getOperationalStatistics());
         return result;
     }
 

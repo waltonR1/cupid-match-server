@@ -26,6 +26,7 @@ drop table if exists cm_staff_members;
 drop table if exists cm_inbox_broadcast_targets;
 drop table if exists cm_inbox_broadcasts;
 drop table if exists cm_inbox_single_dispatches;
+drop table if exists cm_inbox_system_failures;
 drop table if exists cm_inbox_reads;
 drop table if exists cm_inbox_messages;
 drop table if exists cm_inbox_threads;
@@ -1338,12 +1339,15 @@ create table cm_inbox_broadcast_targets (
   broadcast_id       varchar(36)  not null comment '群发记录ID，对应 cm_inbox_broadcasts.id',
   user_id            varchar(36)  not null comment '目标用户ID，对应 cm_users.id',
   message_id         varchar(36)  default null comment '实际创建的消息ID，对应 cm_inbox_messages.id',
-  status             varchar(20)  not null comment '发送状态：success, failure',
+  status             varchar(20)  not null comment '发送状态：success, failure, retrying, exhausted',
   error_message      varchar(500) default null comment '失败原因',
+  retry_count        int not null default 0 comment '重试次数',
+  next_retry_at      datetime default null comment '下次重试时间',
   created_at         datetime     not null default current_timestamp comment '创建时间',
   primary key (id),
   key idx_cm_inbox_broadcast_targets_broadcast (broadcast_id, created_at),
-  key idx_cm_inbox_broadcast_targets_user_status (user_id, status)
+  key idx_cm_inbox_broadcast_targets_user_status (user_id, status),
+  key idx_cm_inbox_broadcast_targets_retry (status, next_retry_at)
 ) engine=innodb comment='后台站内信群发明细';
 
 create table cm_inbox_single_dispatches (
@@ -1357,15 +1361,36 @@ create table cm_inbox_single_dispatches (
   subject_type       varchar(40)  default null comment '业务对象类型',
   subject_id         varchar(36)  default null comment '业务对象ID',
   payload_json       json         not null comment '原始请求快照',
-  status             varchar(20)  not null comment '发送状态：pending, success, failure',
+  status             varchar(20)  not null comment '发送状态：pending, success, failure, retrying, exhausted',
   error_message      varchar(500) default null comment '失败原因',
+  retry_count        int not null default 0 comment '重试次数',
+  next_retry_at      datetime default null comment '下次重试时间',
   created_at         datetime     not null default current_timestamp comment '创建时间',
   updated_at         datetime     not null default current_timestamp on update current_timestamp comment '更新时间',
   primary key (id),
   key idx_cm_inbox_single_dispatches_staff_created (staff_user_id, created_at),
   key idx_cm_inbox_single_dispatches_user_created (user_id, created_at),
-  key idx_cm_inbox_single_dispatches_status_created (status, created_at)
+  key idx_cm_inbox_single_dispatches_status_created (status, created_at),
+  key idx_cm_inbox_single_dispatches_retry (status, next_retry_at)
 ) engine=innodb comment='后台站内信单发记录';
+
+create table cm_inbox_system_failures (
+  id varchar(36) not null,
+  user_id varchar(36) not null,
+  template_code varchar(80) not null,
+  variables_json json not null,
+  subject_id varchar(36) default null,
+  dedupe_key varchar(191) default null,
+  status varchar(20) not null default 'pending',
+  retry_count int not null default 0,
+  next_retry_at datetime default null,
+  error_message varchar(500) default null,
+  created_at datetime not null default current_timestamp,
+  updated_at datetime not null default current_timestamp on update current_timestamp,
+  primary key (id),
+  unique key uk_cm_inbox_system_failure_dedupe (dedupe_key),
+  key idx_cm_inbox_system_failure_due (status, next_retry_at)
+) engine=innodb comment='系统自动通知失败记录';
 
 create table cm_staff_tasks (
   id                    varchar(36) not null comment '后台任务ID',

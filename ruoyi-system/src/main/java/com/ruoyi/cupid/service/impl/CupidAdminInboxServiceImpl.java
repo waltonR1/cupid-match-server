@@ -83,12 +83,14 @@ public class CupidAdminInboxServiceImpl implements ICupidAdminInboxService
         dispatchMapper.insertSingleDispatch(record);
         try
         {
-            String messageId = notificationService.sendStaffNotification(body, staffUserId, null);
+            String messageId = notificationService.sendStaffNotification(
+                    body, staffUserId, "single-dispatch:" + dispatchId);
             dispatchMapper.updateSingleDispatchSuccess(dispatchId, messageId);
         }
         catch (RuntimeException ex)
         {
-            dispatchMapper.updateSingleDispatchFailure(dispatchId, safeMessage(ex));
+            dispatchMapper.updateSingleDispatchFailure(
+                    dispatchId, safeMessage(ex), CupidMessageRetryPolicy.isRetryable(ex));
             throw ex;
         }
     }
@@ -150,8 +152,9 @@ public class CupidAdminInboxServiceImpl implements ICupidAdminInboxService
             catch (RuntimeException ex)
             {
                 String errorMessage = safeMessage(ex);
+                String status = CupidMessageRetryPolicy.isRetryable(ex) ? "retrying" : "failure";
                 dispatchMapper.insertBroadcastTarget(buildBroadcastTargetRecord(broadcastId, userId, null,
-                        "failure", errorMessage));
+                        status, errorMessage));
                 if (failures.size() < 20)
                 {
                     failures.add(Map.of("userId", userId, "message", errorMessage));
@@ -247,6 +250,7 @@ public class CupidAdminInboxServiceImpl implements ICupidAdminInboxService
     private static String safeMessage(RuntimeException ex)
     {
         String message = ex.getMessage();
-        return StringUtils.hasText(message) ? message : "发送失败";
+        message = StringUtils.hasText(message) ? message : "发送失败";
+        return message.substring(0, Math.min(message.length(), 500));
     }
 }

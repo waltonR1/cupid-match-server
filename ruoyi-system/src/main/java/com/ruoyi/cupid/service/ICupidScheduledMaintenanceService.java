@@ -31,4 +31,8 @@ public interface ICupidScheduledMaintenanceService
     int sendOverdueStaffTaskReminders();
 
     int retryFailedTranslations();
+
+    int retryFailedMessages();
+
+    int cleanupOperationalData();
 }

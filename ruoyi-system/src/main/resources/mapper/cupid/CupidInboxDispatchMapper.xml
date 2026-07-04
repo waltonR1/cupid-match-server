@@ -13,9 +13,10 @@
 
     <insert id="insertBroadcastTarget">
         insert into cm_inbox_broadcast_targets (
-            id, broadcast_id, user_id, message_id, status, error_message
+            id, broadcast_id, user_id, message_id, status, error_message, next_retry_at
         ) values (
-            #{id}, #{broadcastId}, #{userId}, #{messageId}, #{status}, #{errorMessage}
+            #{id}, #{broadcastId}, #{userId}, #{messageId}, #{status}, #{errorMessage},
+            if(#{status} = 'retrying', date_add(now(), interval 5 minute), null)
         )
     </insert>
 
@@ -65,7 +66,8 @@
 
     <select id="selectBroadcastTargets" resultType="map">
         select t.id, t.user_id as userId, t.message_id as messageId, t.status,
-               t.error_message as errorMessage, t.created_at as createdAt,
+               t.error_message as errorMessage, t.retry_count as retryCount,
+               t.next_retry_at as nextRetryAt, t.created_at as createdAt,
                u.account_name as accountName
         from cm_inbox_broadcast_targets t
         left join cm_users u on u.id = t.user_id
@@ -94,8 +96,9 @@
 
     <update id="updateSingleDispatchFailure">
         update cm_inbox_single_dispatches
-        set status = 'failure',
+        set status = if(#{retryable}, 'retrying', 'failure'),
             error_message = #{errorMessage},
+            next_retry_at = if(#{retryable}, date_add(now(), interval 5 minute), null),
             updated_at = current_timestamp
         where id = #{id}
     </update>
@@ -104,6 +107,7 @@
         select d.id, d.user_id as userId, d.message_id as messageId, d.mode,
                d.template_code as templateCode, d.locale, d.subject_type as subjectType,
                d.subject_id as subjectId, d.status, d.error_message as errorMessage,
+               d.retry_count as retryCount, d.next_retry_at as nextRetryAt,
                d.created_at as createdAt, d.updated_at as updatedAt,
                u.account_name as accountName, su.user_name as staffUserName
         from cm_inbox_single_dispatches d
@@ -131,6 +135,7 @@
                d.mode, d.template_code as templateCode, d.locale,
                d.subject_type as subjectType, d.subject_id as subjectId,
                d.payload_json as payloadJson, d.status, d.error_message as errorMessage,
+               d.retry_count as retryCount, d.next_retry_at as nextRetryAt,
                d.created_at as createdAt, d.updated_at as updatedAt,
                u.account_name as accountName, su.user_name as staffUserName,
                m.body as messageBody, m.message_type as messageType
@@ -141,4 +146,149 @@
         where d.id = #{id}
         limit 1
     </select>
+
+    <select id="selectDueSingleRetries" resultType="map">
+        select d.id, d.staff_user_id as staffUserId, d.payload_json as payloadJson
+        from cm_inbox_single_dispatches d
+        where d.status = 'retrying' and d.retry_count &lt; #{maxAttempts}
+          and d.next_retry_at &lt;= now()
+        order by d.next_retry_at limit #{batchSize}
+    </select>
+
+    <select id="selectDueBroadcastRetries" resultType="map">
+        select t.id, t.broadcast_id as broadcastId, t.user_id as userId,
+               b.staff_user_id as staffUserId, b.payload_json as payloadJson,
+               u.preferred_locale as preferredLocale
+        from cm_inbox_broadcast_targets t
+        join cm_inbox_broadcasts b on b.id = t.broadcast_id
+        join cm_users u on u.id = t.user_id
+        where t.status = 'retrying' and t.retry_count &lt; #{maxAttempts}
+          and t.next_retry_at &lt;= now()
+        order by t.next_retry_at limit #{batchSize}
+    </select>
+
+    <update id="markSingleRetryFailure">
+        update cm_inbox_single_dispatches
+        set retry_count = retry_count + 1, error_message = #{errorMessage},
+            next_retry_at = date_add(now(), interval
+              (#{baseDelayMinutes} * pow(2, least(retry_count, 10))) minute),
+            status = if(retry_count &gt;= #{maxAttempts}, 'exhausted', 'retrying')
+        where id = #{id}
+    </update>
+
+    <update id="markBroadcastRetrySuccess">
+        update cm_inbox_broadcast_targets
+        set message_id = #{messageId}, status = 'success', error_message = null,
+            next_retry_at = null
+        where id = #{id}
+    </update>
+
+    <update id="markBroadcastRetryFailure">
+        update cm_inbox_broadcast_targets
+        set retry_count = retry_count + 1, error_message = #{errorMessage},
+            next_retry_at = date_add(now(), interval
+              (#{baseDelayMinutes} * pow(2, least(retry_count, 10))) minute),
+            status = if(retry_count &gt;= #{maxAttempts}, 'exhausted', 'retrying')
+        where id = #{id}
+    </update>
+
+    <update id="markBroadcastPermanentFailure">
+        update cm_inbox_broadcast_targets
+        set status = 'failure', error_message = #{errorMessage}, next_retry_at = null
+        where id = #{id}
+    </update>
+
+    <update id="refreshBroadcastCounts">
+        update cm_inbox_broadcasts b
+        set success_count = (select count(*) from cm_inbox_broadcast_targets t
+                             where t.broadcast_id = b.id and t.status = 'success'),
+            failure_count = (select count(*) from cm_inbox_broadcast_targets t
+                             where t.broadcast_id = b.id and t.status != 'success')
+        where b.id = #{broadcastId}
+    </update>
+
+    <select id="selectMessageIdByDedupeKey" resultType="string">
+        select id from cm_inbox_messages where dedupe_key = #{dedupeKey} limit 1
+    </select>
+
+    <insert id="insertSystemFailure">
+        insert into cm_inbox_system_failures
+          (id, user_id, template_code, variables_json, subject_id, dedupe_key,
+           status, retry_count, next_retry_at, error_message)
+        values
+          (#{id}, #{userId}, #{templateCode}, #{variablesJson}, #{subjectId}, #{dedupeKey},
+           #{status}, 0, if(#{retryable}, date_add(now(), interval 5 minute), null), #{errorMessage})
+        on duplicate key update error_message = values(error_message), updated_at = now()
+    </insert>
+
+    <select id="selectDueSystemRetries" resultType="map">
+        select id, user_id as userId, template_code as templateCode,
+               variables_json as variablesJson, subject_id as subjectId, dedupe_key as dedupeKey
+        from cm_inbox_system_failures
+        where status = 'pending' and retry_count &lt; #{maxAttempts}
+          and next_retry_at &lt;= now()
+        order by next_retry_at limit #{batchSize}
+    </select>
+
+    <delete id="deleteSystemFailure">
+        delete from cm_inbox_system_failures where id = #{id}
+    </delete>
+
+    <update id="markSystemRetryFailure">
+        update cm_inbox_system_failures
+        set retry_count = retry_count + 1, error_message = #{errorMessage},
+            next_retry_at = date_add(now(), interval
+              (#{baseDelayMinutes} * pow(2, least(retry_count, 10))) minute),
+            status = if(retry_count &gt;= #{maxAttempts}, 'exhausted', 'pending')
+        where id = #{id}
+    </update>
+
+    <update id="markSystemPermanentFailure">
+        update cm_inbox_system_failures
+        set status = 'failure', error_message = #{errorMessage}, next_retry_at = null
+        where id = #{id}
+    </update>
+
+    <select id="selectDeliveryStatistics" resultType="map">
+        select
+          (select count(*) from cm_inbox_messages where sender_type in ('staff', 'system')) as messageSuccessCount,
+          (select count(*) from cm_inbox_single_dispatches where status in ('failure','retrying','exhausted')) +
+          (select count(*) from cm_inbox_broadcast_targets where status in ('failure','retrying','exhausted')) +
+          (select count(*) from cm_inbox_system_failures) as messageFailureCount,
+          (select count(*) from cm_inbox_single_dispatches where status = 'retrying') +
+          (select count(*) from cm_inbox_broadcast_targets where status = 'retrying') +
+          (select count(*) from cm_inbox_system_failures where status = 'pending') as pendingRetryCount,
+          (select count(*) from cm_inbox_single_dispatches where status = 'exhausted') +
+          (select count(*) from cm_inbox_broadcast_targets where status = 'exhausted') +
+          (select count(*) from cm_inbox_system_failures where status = 'exhausted') as exhaustedRetryCount,
+          (select count(*) from cm_users where status = 'active') as activeUserCount,
+          (select count(*) from cm_user_memberships where status = 'active') as activeMembershipCount,
+          (select count(*) from cm_event_registrations where status = 'confirmed') as confirmedEventRegistrationCount
+    </select>
+
+    <delete id="cleanupMessageRetries">
+        delete from cm_inbox_system_failures
+        where status in ('failure', 'exhausted') and updated_at &lt; #{before} limit 500
+    </delete>
+    <delete id="cleanupTranslationRetries">
+        delete from cm_translation_retries
+        where status = 'exhausted' and updated_at &lt; #{before} limit 500
+    </delete>
+    <delete id="cleanupSecurityChallenges">
+        delete from cm_user_security_challenges
+        where status = 'expired' and updated_at &lt; #{before} limit 500
+    </delete>
+    <delete id="cleanupSecurityEvents">
+        delete from cm_security_events
+        where created_at &lt; #{before} limit 500
+    </delete>
+    <delete id="cleanupLoginLogs">
+        delete from sys_logininfor where login_time &lt; #{before} limit 500
+    </delete>
+    <delete id="cleanupOperationLogs">
+        delete from sys_oper_log where oper_time &lt; #{before} limit 500
+    </delete>
+    <delete id="cleanupJobLogs">
+        delete from sys_job_log where create_time &lt; #{before} limit 500
+    </delete>
 </mapper>

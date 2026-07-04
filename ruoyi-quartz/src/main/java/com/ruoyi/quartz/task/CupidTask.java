@@ -42,4 +42,14 @@ public class CupidTask
     {
         scheduledMaintenanceService.retryFailedTranslations();
     }
+
+    public void retryFailedMessages()
+    {
+        scheduledMaintenanceService.retryFailedMessages();
+    }
+
+    public void cleanupOperationalData()
+    {
+        scheduledMaintenanceService.cleanupOperationalData();
+    }
 }

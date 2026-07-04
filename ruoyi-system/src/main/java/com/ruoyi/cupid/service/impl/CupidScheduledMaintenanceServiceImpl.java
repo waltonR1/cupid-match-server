@@ -16,6 +16,7 @@ import com.ruoyi.cupid.service.ICupidRuntimeConfigService;
 import com.ruoyi.cupid.service.ICupidScheduledMaintenanceService;
 import com.ruoyi.cupid.service.ICupidInboxNotificationService;
 import com.ruoyi.cupid.service.ICupidTranslationService;
+import com.ruoyi.cupid.service.ICupidOperationsService;
 import com.ruoyi.system.domain.SysNotice;
 import com.ruoyi.system.mapper.SysNoticeMapper;
 
@@ -55,6 +56,9 @@ public class CupidScheduledMaintenanceServiceImpl
 
     @Autowired
     private ICupidTranslationService translationService;
+
+    @Autowired
+    private ICupidOperationsService operationsService;
 
     @Override
     @Transactional
@@ -112,14 +116,24 @@ public class CupidScheduledMaintenanceServiceImpl
         {
             String userId = String.valueOf(target.get("userId"));
             String eventId = String.valueOf(target.get("eventId"));
-            String messageId = inboxNotificationService.sendSystemNotification(
-                    userId, "event_reminder_24h", null,
-                    Map.of("eventTitle", String.valueOf(target.get("eventTitle")),
-                            "startsAt", String.valueOf(target.get("startsAt"))),
-                    eventId, "event-reminder-24h:" + eventId + ":" + userId);
-            if (messageId != null)
+            Map<String, Object> variables = Map.of(
+                    "eventTitle", String.valueOf(target.get("eventTitle")),
+                    "startsAt", String.valueOf(target.get("startsAt")));
+            String dedupeKey = "event-reminder-24h:" + eventId + ":" + userId;
+            try
             {
-                sent++;
+                String messageId = inboxNotificationService.sendSystemNotification(
+                        userId, "event_reminder_24h", null, variables, eventId, dedupeKey);
+                if (messageId != null)
+                {
+                    sent++;
+                }
+            }
+            catch (RuntimeException error)
+            {
+                operationsService.recordSystemMessageFailure(
+                        userId, "event_reminder_24h", variables, eventId, dedupeKey, error);
+                log.error("Cupid event reminder failed: event={}, user={}", eventId, userId, error);
             }
         }
         log.info("Cupid 活动站内提醒完成，本次发送 {} 条", sent);
@@ -158,5 +172,21 @@ public class CupidScheduledMaintenanceServiceImpl
         int completed = translationService.retryFailedTranslations();
         log.info("Cupid translation retry completed, succeeded={}", completed);
         return completed;
+    }
+
+    @Override
+    public int retryFailedMessages()
+    {
+        int completed = operationsService.retryFailedMessages();
+        log.info("Cupid message retry completed, succeeded={}", completed);
+        return completed;
+    }
+
+    @Override
+    public int cleanupOperationalData()
+    {
+        int cleaned = operationsService.cleanupOperationalData();
+        log.info("Cupid operational data cleanup completed, deleted={}", cleaned);
+        return cleaned;
     }
 }

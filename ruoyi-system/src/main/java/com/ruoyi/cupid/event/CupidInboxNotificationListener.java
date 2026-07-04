@@ -7,6 +7,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.event.TransactionPhase;
 import org.springframework.transaction.event.TransactionalEventListener;
 import com.ruoyi.cupid.service.ICupidInboxNotificationService;
+import com.ruoyi.cupid.service.ICupidOperationsService;
 
 /** 在业务事务提交后发送站内通知；发送失败不回滚核心业务。 */
 @Component
@@ -16,6 +17,9 @@ public class CupidInboxNotificationListener
 
     @Autowired
     private ICupidInboxNotificationService notificationService;
+
+    @Autowired
+    private ICupidOperationsService operationsService;
 
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onNotification(CupidInboxNotificationEvent event)
@@ -27,8 +31,19 @@ public class CupidInboxNotificationListener
         }
         catch (RuntimeException ex)
         {
+            try
+            {
+                operationsService.recordSystemMessageFailure(event.getUserId(), event.getTemplateCode(),
+                        event.getVariables(), event.getSubjectId(), event.getDedupeKey(), ex);
+            }
+            catch (RuntimeException persistError)
+            {
+                log.error("Cupid Inbox failure record could not be persisted: template={}, subject={}",
+                        event.getTemplateCode(), event.getSubjectId(), persistError);
+            }
             log.error("Cupid Inbox automatic notification failed: template={}, subject={}",
                     event.getTemplateCode(), event.getSubjectId(), ex);
         }
     }
+
 }
