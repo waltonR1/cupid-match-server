@@ -200,22 +200,29 @@
     </select>
 
     <insert id="insertRegistration">
-        insert into cm_event_registrations (id, user_id, event_id, status, requested_at, waitlisted_at)
-        values (#{id}, #{userId}, #{eventId}, #{status}, now(),
-                case when #{status} = 'waitlist' then now() else null end)
+        insert into cm_event_registrations
+          (id, user_id, event_id, entitlement_balance_id, status,
+           requested_at, confirmed_at, waitlisted_at,
+           event_quota_consumed_at)
+        values
+          (#{id}, #{userId}, #{eventId}, #{entitlementBalanceId}, #{status},
+           now(),
+           case when #{status} = 'confirmed' then now() else null end,
+           case when #{status} = 'waitlist' then now() else null end,
+           case when #{consumeQuota} then now() else null end)
     </insert>
 
     <update id="resubmitRegistration">
         update cm_event_registrations
         set status = #{status},
             requested_at = now(),
-            confirmed_at = null,
+            confirmed_at = case when #{status} = 'confirmed' then now() else null end,
             declined_at = null,
             waitlisted_at = case when #{status} = 'waitlist' then now() else null end,
             cancelled_at = null,
             attended_at = null,
-            entitlement_balance_id = null,
-            event_quota_consumed_at = null,
+            entitlement_balance_id = #{entitlementBalanceId},
+            event_quota_consumed_at = case when #{consumeQuota} then now() else null end,
             event_quota_released_at = null,
             updated_at = now()
         where id = #{id}
@@ -703,5 +710,79 @@
         order by e.event_date, e.start_time, r.id
         limit #{batchSize}
     </select>
+
+    <select id="selectEventLifecycleCandidates" resultType="string">
+        select e.id
+        from cm_events e
+        where e.status in ('open', 'waitlist', 'closed')
+          and (
+            timestamp(e.event_date, e.end_time) &lt;= now()
+            or (
+              timestamp(e.event_date, e.end_time) &gt; now()
+              and e.status in ('open', 'waitlist')
+              and (select count(*) from cm_event_registrations occupied
+                   where occupied.event_id = e.id
+                     and occupied.status in ('confirmed', 'attended')) &lt; e.capacity
+              and exists (
+                select 1 from cm_event_registrations pending
+                where pending.event_id = e.id
+                  and pending.status in ('requested', 'waitlist')
+              )
+            )
+          )
+        order by e.event_date, e.end_time, e.id
+        limit #{batchSize}
+    </select>
+
+    <select id="selectNextPendingRegistrationForUpdate"
+            resultType="com.ruoyi.cupid.domain.CupidEventRegistration">
+        select id, user_id as userId, event_id as eventId,
+               entitlement_balance_id as entitlementBalanceId, status,
+               requested_at as requestedAt, confirmed_at as confirmedAt,
+               declined_at as declinedAt, waitlisted_at as waitlistedAt,
+               cancelled_at as cancelledAt, attended_at as attendedAt,
+               event_quota_consumed_at as eventQuotaConsumedAt,
+               event_quota_released_at as eventQuotaReleasedAt,
+               created_at as createdAt, updated_at as updatedAt
+        from cm_event_registrations r
+        join cm_events e on e.id = r.event_id
+        where r.event_id = #{eventId}
+          and r.status in ('requested', 'waitlist')
+          and (
+            e.consumes_membership_quota = 0
+            or exists (
+              select 1
+              from cm_user_memberships m
+              join cm_user_entitlement_balances b
+                on b.membership_id = m.id
+               and b.user_id = m.user_id
+               and b.entitlement_code = 'event_registration'
+               and b.period_started_at &lt;= now()
+               and b.period_ends_at &gt; now()
+               and b.quota_remaining &gt; 0
+              where m.user_id = r.user_id
+                and m.status = 'active'
+                and m.started_at &lt;= now()
+                and (m.expires_at is null or m.expires_at &gt; now())
+            )
+          )
+        order by r.requested_at, r.id
+        limit 1
+        for update
+    </select>
+
+    <update id="markConfirmedRegistrationsAttended">
+        update cm_event_registrations
+        set status = 'attended', attended_at = now(), updated_at = now()
+        where event_id = #{eventId} and status = 'confirmed'
+    </update>
+
+    <update id="markEventCompleted">
+        update cm_events
+        set status = 'completed', updated_at = now()
+        where id = #{eventId}
+          and status in ('open', 'waitlist', 'closed')
+          and timestamp(event_date, end_time) &lt;= now()
+    </update>
 
 </mapper>

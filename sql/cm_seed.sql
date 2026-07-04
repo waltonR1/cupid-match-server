@@ -595,6 +595,7 @@ insert into sys_job values(8, '跟进事项逾期提醒', 'CUPID', 'cupidTask.se
 insert into sys_job values(9, '翻译失败重试', 'CUPID', 'cupidTask.retryFailedTranslations', '0 */5 * * * ?', '3', '1', '0', 'admin', sysdate(), '', null, '按指数退避重试机器翻译失败任务');
 insert into sys_job values(10, '消息失败重试', 'CUPID', 'cupidTask.retryFailedMessages', '30 */5 * * * ?', '3', '1', '0', 'admin', sysdate(), '', null, '重试瞬时基础设施异常导致的站内消息失败');
 insert into sys_job values(11, '运营数据定期清理', 'CUPID', 'cupidTask.cleanupOperationalData', '0 20 3 * * ?', '3', '1', '0', 'admin', sysdate(), '', null, '按保留策略分批清理技术日志及过期运行数据');
+insert into sys_job values(12, '活动生命周期同步', 'CUPID', 'cupidTask.synchronizeEventLifecycle', '0 */5 * * * ?', '3', '1', '0', 'admin', sysdate(), '', null, '自动确认报名、递补候补并归档已结束活动');
 
 -- 17
 insert into sys_notice values('1', '温馨提醒：2018-07-01 若依新版本发布啦', '2', '新版本内容', '0', 'admin', sysdate(), '', null, '管理员');

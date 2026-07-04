@@ -157,15 +157,29 @@ public class CupidEventServiceImpl implements ICupidEventService
                     registrationState("event_quota_exhausted", null), userId);
         }
 
-        String registrationStatus = shouldWaitlist(event) ? "waitlist" : "requested";
+        String registrationStatus = shouldWaitlist(event) ? "waitlist" : "confirmed";
+        String entitlementBalanceId = null;
+        boolean consumeQuota = false;
+        if ("confirmed".equals(registrationStatus) && event.isConsumesMembershipQuota())
+        {
+            entitlementBalanceId = balance.getId();
+            consumeQuota = true;
+            if (eventMapper.consumeEventEntitlementById(entitlementBalanceId) != 1)
+            {
+                throw new CupidApiException(
+                        HttpStatus.CONFLICT, "event_quota_exhausted");
+            }
+        }
         if (existing == null)
         {
             registrationId = IdUtils.fastUUID();
-            eventMapper.insertRegistration(registrationId, userId, eventId, registrationStatus);
+            eventMapper.insertRegistration(registrationId, userId, eventId,
+                    registrationStatus, entitlementBalanceId, consumeQuota);
         }
         else
         {
-            eventMapper.resubmitRegistration(registrationId, registrationStatus);
+            eventMapper.resubmitRegistration(registrationId, registrationStatus,
+                    entitlementBalanceId, consumeQuota);
         }
 
         loadCounts(event);

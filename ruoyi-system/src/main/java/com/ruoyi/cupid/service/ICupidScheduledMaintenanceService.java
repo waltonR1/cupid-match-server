@@ -35,4 +35,11 @@ public interface ICupidScheduledMaintenanceService
     int retryFailedMessages();
 
     int cleanupOperationalData();
+
+    /**
+     * 自动确认待处理报名、递补候补，并归档已结束活动。
+     *
+     * @return 本次状态变更数量
+     */
+    int synchronizeEventLifecycle();
 }

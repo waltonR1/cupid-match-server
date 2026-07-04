@@ -7,16 +7,19 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import com.ruoyi.cupid.mapper.CupidAuthMapper;
+import com.ruoyi.cupid.domain.CupidEvent;
+import com.ruoyi.cupid.domain.CupidEventRegistration;
+import com.ruoyi.cupid.domain.CupidUserMembership;
 import com.ruoyi.cupid.mapper.CupidAdminStaffTaskMapper;
+import com.ruoyi.cupid.mapper.CupidAuthMapper;
 import com.ruoyi.cupid.mapper.CupidEventMapper;
 import com.ruoyi.cupid.mapper.CupidMembershipMapper;
 import com.ruoyi.cupid.mapper.CupidProfileMapper;
+import com.ruoyi.cupid.service.ICupidInboxNotificationService;
+import com.ruoyi.cupid.service.ICupidOperationsService;
 import com.ruoyi.cupid.service.ICupidRuntimeConfigService;
 import com.ruoyi.cupid.service.ICupidScheduledMaintenanceService;
-import com.ruoyi.cupid.service.ICupidInboxNotificationService;
 import com.ruoyi.cupid.service.ICupidTranslationService;
-import com.ruoyi.cupid.service.ICupidOperationsService;
 import com.ruoyi.system.domain.SysNotice;
 import com.ruoyi.system.mapper.SysNoticeMapper;
 
@@ -188,5 +191,68 @@ public class CupidScheduledMaintenanceServiceImpl
         int cleaned = operationsService.cleanupOperationalData();
         log.info("Cupid operational data cleanup completed, deleted={}", cleaned);
         return cleaned;
+    }
+
+    @Override
+    @Transactional
+    public int synchronizeEventLifecycle()
+    {
+        List<String> eventIds = eventMapper.selectEventLifecycleCandidates(
+                runtimeConfigService.getScheduledMaintenanceBatchSize());
+        int changed = 0;
+        for (String eventId : eventIds)
+        {
+            CupidEvent event = eventMapper.selectEventByIdForUpdate(eventId);
+            if (event == null)
+            {
+                continue;
+            }
+            if (eventMapper.markEventCompleted(eventId) == 1)
+            {
+                changed += eventMapper.markConfirmedRegistrationsAttended(eventId);
+                changed++;
+                continue;
+            }
+
+            int occupied = eventMapper.countEventOccupied(eventId);
+            while (occupied < event.getCapacity())
+            {
+                CupidEventRegistration registration =
+                        eventMapper.selectNextPendingRegistrationForUpdate(eventId);
+                if (registration == null)
+                {
+                    break;
+                }
+
+                String balanceId = null;
+                boolean consumeQuota = false;
+                if (event.isConsumesMembershipQuota())
+                {
+                    CupidUserMembership membership =
+                            authMapper.selectActiveMembershipByUserId(registration.getUserId());
+                    if (membership == null)
+                    {
+                        break;
+                    }
+                    balanceId = eventMapper.selectAvailableEventEntitlementBalanceForUpdate(
+                            registration.getUserId(), membership.getId());
+                    if (balanceId == null
+                            || eventMapper.consumeEventEntitlementById(balanceId) != 1)
+                    {
+                        break;
+                    }
+                    consumeQuota = true;
+                }
+
+                if (eventMapper.updateAdminRegistrationStatus(registration.getId(),
+                        "confirmed", balanceId, consumeQuota, false) == 1)
+                {
+                    occupied++;
+                    changed++;
+                }
+            }
+        }
+        log.info("Cupid 活动生命周期同步完成，本次状态变更 {} 条", changed);
+        return changed;
     }
 }

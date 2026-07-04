@@ -1076,6 +1076,7 @@ create table cm_events (
   updated_at            datetime     not null default current_timestamp on update current_timestamp comment '更新时间',
   primary key (id),
   key idx_cm_events_status_date (status, event_date),
+  key idx_cm_events_lifecycle (status, event_date, end_time),
   key idx_cm_events_city (city_code),
   key idx_cm_events_visibility (visibility)
 ) engine=innodb comment='活动';
@@ -1187,7 +1188,8 @@ create table cm_event_registrations (
   updated_at         datetime    not null default current_timestamp on update current_timestamp comment '更新时间',
   primary key (id),
   unique key uk_cm_event_registration_user_event (user_id, event_id),
-  key idx_cm_event_registration_event_status (event_id, status)
+  key idx_cm_event_registration_event_status (event_id, status),
+  key idx_cm_event_registration_lifecycle (event_id, status, requested_at)
 ) engine=innodb comment='活动报名';
 
 -- ----------------------------

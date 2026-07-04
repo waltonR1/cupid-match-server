@@ -52,4 +52,9 @@ public class CupidTask
     {
         scheduledMaintenanceService.cleanupOperationalData();
     }
+
+    public void synchronizeEventLifecycle()
+    {
+        scheduledMaintenanceService.synchronizeEventLifecycle();
+    }
 }

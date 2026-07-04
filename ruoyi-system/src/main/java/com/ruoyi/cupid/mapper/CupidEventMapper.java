@@ -79,12 +79,16 @@ public interface CupidEventMapper
      * 新增报名
      */
     int insertRegistration(@Param("id") String id, @Param("userId") String userId,
-            @Param("eventId") String eventId, @Param("status") String status);
+            @Param("eventId") String eventId, @Param("status") String status,
+            @Param("entitlementBalanceId") String entitlementBalanceId,
+            @Param("consumeQuota") boolean consumeQuota);
 
     /**
      * 将已取消或拒绝的报名重新提交
      */
-    int resubmitRegistration(@Param("id") String id, @Param("status") String status);
+    int resubmitRegistration(@Param("id") String id, @Param("status") String status,
+            @Param("entitlementBalanceId") String entitlementBalanceId,
+            @Param("consumeQuota") boolean consumeQuota);
 
     /**
      * 标记报名取消
@@ -212,4 +216,13 @@ public interface CupidEventMapper
 
     List<Map<String, Object>> selectUpcomingEventReminderTargets(
             @Param("batchSize") int batchSize);
+
+    List<String> selectEventLifecycleCandidates(@Param("batchSize") int batchSize);
+
+    CupidEventRegistration selectNextPendingRegistrationForUpdate(
+            @Param("eventId") String eventId);
+
+    int markConfirmedRegistrationsAttended(@Param("eventId") String eventId);
+
+    int markEventCompleted(@Param("eventId") String eventId);
 }
