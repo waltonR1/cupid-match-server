@@ -117,34 +117,34 @@ cupid:
     api-url: http://localhost:5000
     # 连接翻译器超时时间
     connect-timeout-seconds: 3
-      # 等待翻译响应超时时间
-      read-timeout-seconds: 10
-      # 翻译失败重试配置
-      retry:
-        # 单条翻译任务允许执行的最大重试次数
-        max-attempts: 5
-        # 每轮定时任务最多处理的翻译失败记录数量
-        batch-size: 100
-        # 首次重试的基础等待分钟数，后续按指数退避递增
-        base-delay-minutes: 5
-    # 站内消息失败重试配置
-    message-retry:
-      # 单条消息允许执行的最大重试次数
+    # 等待翻译响应超时时间
+    read-timeout-seconds: 10
+    # 翻译失败重试配置
+    retry:
+      # 单条翻译任务允许执行的最大重试次数
       max-attempts: 5
-      # 每轮定时任务最多处理的失败消息数量
+      # 每轮定时任务最多处理的翻译失败记录数量
       batch-size: 100
       # 首次重试的基础等待分钟数，后续按指数退避递增
       base-delay-minutes: 5
-    # 运营数据保留期限，单位均为天
-    retention:
-      # 若依登录日志、操作日志和定时任务日志保留天数
-      technical-log-days: 180
-      # C端安全事件保留天数
-      security-event-days: 365
-      # 消息与翻译重试耗尽记录保留天数
-      exhausted-retry-days: 90
-      # 已过期安全挑战记录保留天数
-      expired-challenge-days: 30
+  # 站内消息失败重试配置
+  message-retry:
+    # 单条消息允许执行的最大重试次数
+    max-attempts: 5
+    # 每轮定时任务最多处理的失败消息数量
+    batch-size: 100
+    # 首次重试的基础等待分钟数，后续按指数退避递增
+    base-delay-minutes: 5
+  # 运营数据保留期限，单位均为天
+  retention:
+    # 若依登录日志、操作日志和定时任务日志保留天数
+    technical-log-days: 180
+    # C端安全事件保留天数
+    security-event-days: 365
+    # 消息与翻译重试耗尽记录保留天数
+    exhausted-retry-days: 90
+    # 已过期安全挑战记录保留天数
+    expired-challenge-days: 30
 
 # MyBatis配置
 mybatis:
