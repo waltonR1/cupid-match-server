@@ -37,6 +37,34 @@ public class CupidVerificationCodeDeliveryService
     @Value("${cupid.auth.verification-delivery.email.from:}")
     private String emailFrom;
 
+    public void validate(String provider)
+    {
+        if (logEnabled)
+        {
+            return;
+        }
+        if ("email".equals(provider))
+        {
+            if (!runtimeConfigService.isVerificationEmailEnabled()
+                    || mailSenderProvider.getIfAvailable() == null
+                    || !StringUtils.hasText(emailFrom))
+            {
+                throw unavailable();
+            }
+            return;
+        }
+        if ("phone".equals(provider))
+        {
+            if (!runtimeConfigService.isVerificationSmsEnabled()
+                    || smsGatewayProvider.getIfAvailable() == null)
+            {
+                throw unavailable();
+            }
+            return;
+        }
+        throw unavailable();
+    }
+
     public void deliver(String purpose, String provider, String identifier,
             String code, int ttlMinutes)
     {

@@ -43,6 +43,24 @@ public class ThreadPoolConfig
     }
 
     /**
+     * 执行验证码 Email/SMS 投递任务。
+     */
+    @Bean(name = "verificationDeliveryTaskExecutor")
+    public ThreadPoolTaskExecutor verificationDeliveryTaskExecutor()
+    {
+        ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
+        executor.setCorePoolSize(2);
+        executor.setMaxPoolSize(8);
+        executor.setQueueCapacity(200);
+        executor.setKeepAliveSeconds(60);
+        executor.setThreadNamePrefix("verification-delivery-");
+        executor.setWaitForTasksToCompleteOnShutdown(true);
+        executor.setAwaitTerminationSeconds(10);
+        executor.setRejectedExecutionHandler(new ThreadPoolExecutor.AbortPolicy());
+        return executor;
+    }
+
+    /**
      * 执行周期性或定时任务
      */
     @Bean(name = "scheduledExecutorService")

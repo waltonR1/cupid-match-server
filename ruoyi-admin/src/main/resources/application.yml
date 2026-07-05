@@ -49,16 +49,29 @@ user:
 spring:
   # SMTP 邮件配置；真实值通过环境变量提供
   mail:
+    # SMTP 服务地址，例如 Resend 使用 smtp.resend.com
     host: ${CUPID_SMTP_HOST:localhost}
+    # SMTP 服务端口；587 通常配合 STARTTLS
     port: ${CUPID_SMTP_PORT:587}
+    # SMTP 登录用户名，例如 Resend 固定使用 resend
     username: ${CUPID_SMTP_USERNAME:}
+    # SMTP 登录密码或供应商 API Key，仅通过环境变量提供
     password: ${CUPID_SMTP_PASSWORD:}
     properties:
       mail:
         smtp:
+          # 是否启用 SMTP 身份认证
           auth: true
           starttls:
+            # 是否通过 STARTTLS 加密 SMTP 连接
             enable: true
+          # 防止外部 SMTP 异常时长期占用验证码投递线程
+          # 建立 SMTP 连接的最长等待时间，单位：毫秒
+          connectiontimeout: 30000
+          # 等待 SMTP 服务端响应的最长时间，单位：毫秒
+          timeout: 30000
+          # 写入邮件内容的最长等待时间，单位：毫秒
+          writetimeout: 30000
   # 资源信息
   messages:
     # 国际化资源文件路径
@@ -118,23 +131,30 @@ token:
 cupid:
   auth:
     # 开发环境验证码调试开关，开启后只输出日志，不调用 Email 或 SMS
-    verification-code-log-enabled: true
+    verification-code-log-enabled: false
     verification-delivery:
       email:
-        # sys_config 无对应值时使用的启动兜底
+        # Email 验证码发送开关的启动兜底；sys_config 对应值可热覆盖
         enabled: false
-        # 发件地址，真实值通过环境变量提供
+        # 发件地址，必须属于邮件供应商允许或已验证的域名
         from: ${CUPID_MAIL_FROM:}
       sms:
-        # sys_config 无对应值时使用的启动兜底
+        # SMS 验证码发送开关的启动兜底；sys_config 对应值可热覆盖
         enabled: false
         # 以下敏感参数仅通过环境变量提供
+        # 短信供应商标识，供具体 CupidSmsGateway 实现选择或校验
         provider: ${CUPID_SMS_PROVIDER:}
+        # 短信供应商访问凭据
         access-key: ${CUPID_SMS_ACCESS_KEY:}
+        # 短信供应商密钥
         secret-key: ${CUPID_SMS_SECRET_KEY:}
+        # 已在短信供应商审核通过的短信签名
         sign-name: ${CUPID_SMS_SIGN_NAME:}
+        # 用户注册场景的验证码模板 ID
         registration-template-id: ${CUPID_SMS_REGISTRATION_TEMPLATE_ID:}
+        # 密码重置场景的验证码模板 ID
         password-reset-template-id: ${CUPID_SMS_PASSWORD_RESET_TEMPLATE_ID:}
+        # 其他验证码场景使用的通用模板 ID
         general-template-id: ${CUPID_SMS_GENERAL_TEMPLATE_ID:}
   # 翻译配置
   translation:

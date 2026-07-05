@@ -8,6 +8,8 @@ import java.util.concurrent.TimeUnit;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.core.task.TaskExecutor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
@@ -44,6 +46,10 @@ public class CupidVerificationCodeService
     @Autowired
     private CupidVerificationCodeDeliveryService deliveryService;
 
+    @Autowired
+    @Qualifier("verificationDeliveryTaskExecutor")
+    private TaskExecutor verificationDeliveryTaskExecutor;
+
     /**
      * 创建并缓存一次性验证码
      *
@@ -54,11 +60,14 @@ public class CupidVerificationCodeService
      */
     public Map<String, Object> create(String purpose, String provider, String identifier)
     {
+        deliveryService.validate(provider);
+
         int codeTtlMinutes = runtimeConfigService.getVerificationCodeTtlMinutes();
         int resendIntervalSeconds = runtimeConfigService.getVerificationResendIntervalSeconds();
         String key = getKey(purpose, provider, identifier);
         String cooldownKey = getCooldownKey(purpose, provider, identifier);
-        if (!redisCache.setCacheObjectIfAbsent(cooldownKey, "1",
+        String entryId = IdUtils.fastUUID();
+        if (!redisCache.setCacheObjectIfAbsent(cooldownKey, entryId,
                 resendIntervalSeconds, TimeUnit.SECONDS))
         {
             throw new CupidApiException(HttpStatus.TOO_MANY_REQUESTS, "verification_code_too_frequent");
@@ -68,7 +77,7 @@ public class CupidVerificationCodeService
         long expiresAt = System.currentTimeMillis() + TimeUnit.MINUTES.toMillis(codeTtlMinutes);
 
         CupidVerificationCode entry = new CupidVerificationCode();
-        entry.setId(IdUtils.fastUUID());
+        entry.setId(entryId);
         entry.setPurpose(purpose);
         entry.setProvider(provider);
         entry.setIdentifier(identifier);
@@ -87,15 +96,17 @@ public class CupidVerificationCodeService
 
         try
         {
-            deliveryService.deliver(purpose, provider, identifier, code, codeTtlMinutes);
+            verificationDeliveryTaskExecutor.execute(() ->
+                    deliverAndCleanupOnFailure(entryId, key, cooldownKey, purpose,
+                            provider, identifier, code, codeTtlMinutes));
         }
         catch (RuntimeException e)
         {
             redisCache.deleteObject(key);
             redisCache.deleteObject(cooldownKey);
-            log.warn("Cupid verification delivery failed: purpose={}, provider={}",
+            log.warn("Cupid verification delivery task rejected: purpose={}, provider={}",
                     purpose, provider, e);
-            throw e;
+            throw new CupidApiException(HttpStatus.ERROR, "verification_delivery_unavailable");
         }
 
         Map<String, Object> result = new LinkedHashMap<>();
@@ -105,6 +116,30 @@ public class CupidVerificationCodeService
                 Instant.ofEpochMilli(System.currentTimeMillis()
                         + TimeUnit.SECONDS.toMillis(resendIntervalSeconds)).toString());
         return result;
+    }
+
+    private void deliverAndCleanupOnFailure(String entryId, String key, String cooldownKey,
+            String purpose, String provider, String identifier, String code, int codeTtlMinutes)
+    {
+        try
+        {
+            deliveryService.deliver(purpose, provider, identifier, code, codeTtlMinutes);
+        }
+        catch (RuntimeException e)
+        {
+            CupidVerificationCode currentEntry = redisCache.getCacheObject(key);
+            if (currentEntry != null && entryId.equals(currentEntry.getId()))
+            {
+                redisCache.deleteObject(key);
+            }
+            String currentCooldown = redisCache.getCacheObject(cooldownKey);
+            if (entryId.equals(currentCooldown))
+            {
+                redisCache.deleteObject(cooldownKey);
+            }
+            log.warn("Cupid verification delivery failed asynchronously: purpose={}, provider={}",
+                    purpose, provider, e);
+        }
     }
 
     /**
