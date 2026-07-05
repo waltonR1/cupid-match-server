@@ -300,6 +300,8 @@ insert into sys_config values(12, 'Cupid-私人介绍有效期（天）',    'cu
 insert into sys_config values(13, 'Cupid-私人介绍冷却期（天）',    'cupid.introduction.cooldownDays',                '90', 'Y', 'admin', sysdate(), '', null, '允许范围7-365，仅影响新冷却记录，非法值自动回退为90');
 insert into sys_config values(14, 'Cupid-定时维护批量大小',        'cupid.scheduler.batchSize',                      '500', 'Y', 'admin', sysdate(), '', null, '允许范围50-2000，非法值自动回退为500');
 insert into sys_config values(15, 'Cupid-机器翻译开关', 'cupid.translation.enabled', 'false', 'Y', 'admin', sysdate(), '', null, '修改后立即生效');
+insert into sys_config values(16, 'Cupid-邮箱验证码发送开关', 'cupid.verification.email.enabled', 'false', 'Y', 'admin', sysdate(), '', null, '修改后立即生效；SMTP 参数仍由启动配置提供');
+insert into sys_config values(17, 'Cupid-短信验证码发送开关', 'cupid.verification.sms.enabled', 'false', 'Y', 'admin', sysdate(), '', null, '修改后立即生效；短信服务商参数仍由启动配置提供');
 
 -- Cupid common options (dynamic groups)
 insert into cm_option_groups (id, group_key, group_name, group_scope, manage_status, sort_order, status) values

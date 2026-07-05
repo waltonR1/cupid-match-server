@@ -9,6 +9,10 @@ public interface ICupidRuntimeConfigService
 
     int getVerificationResendIntervalSeconds();
 
+    boolean isVerificationEmailEnabled();
+
+    boolean isVerificationSmsEnabled();
+
     int getIntroductionExpiryDays();
 
     int getIntroductionCooldownDays();

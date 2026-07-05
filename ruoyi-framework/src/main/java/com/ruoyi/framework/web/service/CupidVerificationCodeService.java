@@ -8,7 +8,6 @@ import java.util.concurrent.TimeUnit;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
@@ -42,8 +41,8 @@ public class CupidVerificationCodeService
     @Autowired
     private ICupidRuntimeConfigService runtimeConfigService;
 
-    @Value("${cupid.auth.verification-code-log-enabled:false}")
-    private boolean verificationCodeLogEnabled;
+    @Autowired
+    private CupidVerificationCodeDeliveryService deliveryService;
 
     /**
      * 创建并缓存一次性验证码
@@ -86,11 +85,17 @@ public class CupidVerificationCodeService
             throw e;
         }
 
-        // Phase-one delivery adapter: never returned by the product API and explicitly disabled in production.
-        if (verificationCodeLogEnabled)
+        try
         {
-            log.info("Cupid verification code purpose={}, provider={}, identifier={}, code={}",
-                    purpose, provider, identifier, code);
+            deliveryService.deliver(purpose, provider, identifier, code, codeTtlMinutes);
+        }
+        catch (RuntimeException e)
+        {
+            redisCache.deleteObject(key);
+            redisCache.deleteObject(cooldownKey);
+            log.warn("Cupid verification delivery failed: purpose={}, provider={}",
+                    purpose, provider, e);
+            throw e;
         }
 
         Map<String, Object> result = new LinkedHashMap<>();

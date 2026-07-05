@@ -23,6 +23,10 @@ public class CupidRuntimeConfigServiceImpl implements ICupidRuntimeConfigService
             "cupid.auth.verification.codeTtlMinutes";
     private static final String KEY_VERIFICATION_RESEND_INTERVAL_SECONDS =
             "cupid.auth.verification.resendIntervalSeconds";
+    private static final String KEY_VERIFICATION_EMAIL_ENABLED =
+            "cupid.verification.email.enabled";
+    private static final String KEY_VERIFICATION_SMS_ENABLED =
+            "cupid.verification.sms.enabled";
     private static final String KEY_INTRODUCTION_EXPIRY_DAYS =
             "cupid.introduction.expiryDays";
     private static final String KEY_INTRODUCTION_COOLDOWN_DAYS =
@@ -57,6 +61,12 @@ public class CupidRuntimeConfigServiceImpl implements ICupidRuntimeConfigService
     @Value("${cupid.translation.enabled:false}")
     private boolean defaultTranslationEnabled;
 
+    @Value("${cupid.auth.verification-delivery.email.enabled:false}")
+    private boolean defaultVerificationEmailEnabled;
+
+    @Value("${cupid.auth.verification-delivery.sms.enabled:false}")
+    private boolean defaultVerificationSmsEnabled;
+
     @Value("${cupid.translation.api-url:http://localhost:5000}")
     private String defaultTranslationApiUrl;
 
@@ -90,6 +100,18 @@ public class CupidRuntimeConfigServiceImpl implements ICupidRuntimeConfigService
     }
 
     @Override
+    public boolean isVerificationEmailEnabled()
+    {
+        return readBoolean(KEY_VERIFICATION_EMAIL_ENABLED, defaultVerificationEmailEnabled);
+    }
+
+    @Override
+    public boolean isVerificationSmsEnabled()
+    {
+        return readBoolean(KEY_VERIFICATION_SMS_ENABLED, defaultVerificationSmsEnabled);
+    }
+
+    @Override
     public int getIntroductionExpiryDays()
     {
         return readBoundedInt(KEY_INTRODUCTION_EXPIRY_DAYS, DEFAULT_INTRODUCTION_EXPIRY_DAYS,
@@ -115,10 +137,7 @@ public class CupidRuntimeConfigServiceImpl implements ICupidRuntimeConfigService
     @Override
     public boolean isTranslationEnabled()
     {
-        String value = configService.selectConfigByKey(KEY_TRANSLATION_ENABLED);
-        return StringUtils.hasText(value)
-                ? Boolean.parseBoolean(value.trim())
-                : defaultTranslationEnabled;
+        return readBoolean(KEY_TRANSLATION_ENABLED, defaultTranslationEnabled);
     }
 
     @Override
@@ -179,5 +198,13 @@ public class CupidRuntimeConfigServiceImpl implements ICupidRuntimeConfigService
         log.warn("Invalid Cupid runtime config: key={}, value={}, fallback={}",
                 key, configuredValue, defaultValue);
         return defaultValue;
+    }
+
+    private boolean readBoolean(String key, boolean defaultValue)
+    {
+        String value = configService.selectConfigByKey(key);
+        return StringUtils.hasText(value)
+                ? Boolean.parseBoolean(value.trim())
+                : defaultValue;
     }
 }

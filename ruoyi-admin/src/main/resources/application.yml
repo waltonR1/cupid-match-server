@@ -47,6 +47,18 @@ user:
 
 # Spring配置
 spring:
+  # SMTP 邮件配置；真实值通过环境变量提供
+  mail:
+    host: ${CUPID_SMTP_HOST:localhost}
+    port: ${CUPID_SMTP_PORT:587}
+    username: ${CUPID_SMTP_USERNAME:}
+    password: ${CUPID_SMTP_PASSWORD:}
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
   # 资源信息
   messages:
     # 国际化资源文件路径
@@ -105,8 +117,25 @@ token:
 
 cupid:
   auth:
-    # 开发环境验证码调试开关，开启后会将验证码输出到日志，生产环境必须关闭
+    # 开发环境验证码调试开关，开启后只输出日志，不调用 Email 或 SMS
     verification-code-log-enabled: true
+    verification-delivery:
+      email:
+        # sys_config 无对应值时使用的启动兜底
+        enabled: false
+        # 发件地址，真实值通过环境变量提供
+        from: ${CUPID_MAIL_FROM:}
+      sms:
+        # sys_config 无对应值时使用的启动兜底
+        enabled: false
+        # 以下敏感参数仅通过环境变量提供
+        provider: ${CUPID_SMS_PROVIDER:}
+        access-key: ${CUPID_SMS_ACCESS_KEY:}
+        secret-key: ${CUPID_SMS_SECRET_KEY:}
+        sign-name: ${CUPID_SMS_SIGN_NAME:}
+        registration-template-id: ${CUPID_SMS_REGISTRATION_TEMPLATE_ID:}
+        password-reset-template-id: ${CUPID_SMS_PASSWORD_RESET_TEMPLATE_ID:}
+        general-template-id: ${CUPID_SMS_GENERAL_TEMPLATE_ID:}
   # 翻译配置
   translation:
     # 部署级参数；仅 enabled 可由 sys_config 热配置覆盖
