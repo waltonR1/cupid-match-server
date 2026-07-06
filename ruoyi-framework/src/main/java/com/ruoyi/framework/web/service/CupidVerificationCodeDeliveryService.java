@@ -9,8 +9,10 @@ import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
+import java.util.Map;
 import com.ruoyi.common.constant.HttpStatus;
 import com.ruoyi.common.exception.cupid.CupidApiException;
+import com.ruoyi.cupid.mapper.CupidInboxTemplateMapper;
 import com.ruoyi.cupid.service.ICupidRuntimeConfigService;
 
 /**
@@ -30,6 +32,9 @@ public class CupidVerificationCodeDeliveryService
 
     @Autowired
     private ICupidRuntimeConfigService runtimeConfigService;
+
+    @Autowired
+    private CupidInboxTemplateMapper templateMapper;
 
     @Value("${cupid.auth.verification-code-log-enabled:false}")
     private boolean logEnabled;
@@ -66,7 +71,7 @@ public class CupidVerificationCodeDeliveryService
     }
 
     public void deliver(String purpose, String provider, String identifier,
-            String code, int ttlMinutes)
+            String code, int ttlMinutes, String locale)
     {
         if (logEnabled)
         {
@@ -76,7 +81,7 @@ public class CupidVerificationCodeDeliveryService
         }
         if ("email".equals(provider))
         {
-            sendEmail(purpose, identifier, code, ttlMinutes);
+            sendEmail(purpose, identifier, code, ttlMinutes, locale);
         }
         else if ("phone".equals(provider))
         {
@@ -90,7 +95,7 @@ public class CupidVerificationCodeDeliveryService
                 purpose, provider, mask(identifier));
     }
 
-    private void sendEmail(String purpose, String email, String code, int ttlMinutes)
+    private void sendEmail(String purpose, String email, String code, int ttlMinutes, String locale)
     {
         JavaMailSender mailSender = runtimeConfigService.isVerificationEmailEnabled()
                 ? mailSenderProvider.getIfAvailable() : null;
@@ -101,9 +106,44 @@ public class CupidVerificationCodeDeliveryService
         SimpleMailMessage message = new SimpleMailMessage();
         message.setFrom(emailFrom);
         message.setTo(email);
-        message.setSubject("Cupid Match verification code");
-        message.setText(buildEmailBody(purpose, code, ttlMinutes));
+        Map<String, Object> template = resolveEmailTemplate(purpose, locale);
+        if (template == null)
+        {
+            throw unavailable();
+        }
+        message.setSubject(render(String.valueOf(template.get("name")), purpose, code, ttlMinutes));
+        message.setText(render(String.valueOf(template.get("body")), purpose, code, ttlMinutes));
         mailSender.send(message);
+    }
+
+    private Map<String, Object> resolveEmailTemplate(String purpose, String locale)
+    {
+        if (!"registration".equals(purpose) && !"password_reset".equals(purpose)
+                && !"identity_bind".equals(purpose) && !"mfa".equals(purpose))
+        {
+            return null;
+        }
+        String templateCode = "verification_" + purpose;
+        Map<String, Object> template = templateMapper.selectTemplateByCode(templateCode);
+        if (template == null || !"enabled".equals(String.valueOf(template.get("status"))))
+        {
+            return null;
+        }
+        if (!"zh".equals(locale) && !"fr".equals(locale) && !"en".equals(locale))
+        {
+            locale = "en";
+        }
+        Map<String, Object> localized = templateMapper.selectLocalizedField(
+                String.valueOf(template.get("id")), locale);
+        return localized != null ? localized : templateMapper.selectLocalizedField(
+                String.valueOf(template.get("id")), "en");
+    }
+
+    private String render(String value, String purpose, String code, int ttlMinutes)
+    {
+        return value.replace("{{code}}", code)
+                .replace("{{ttlMinutes}}", String.valueOf(ttlMinutes))
+                .replace("{{purpose}}", purpose);
     }
 
     private void sendSms(String purpose, String phone, String code, int ttlMinutes)
@@ -115,17 +155,6 @@ public class CupidVerificationCodeDeliveryService
             throw unavailable();
         }
         gateway.sendVerificationCode(phone, purpose, code, ttlMinutes);
-    }
-
-    private String buildEmailBody(String purpose, String code, int ttlMinutes)
-    {
-        return "Cupid Match\n\n"
-                + "验证码 / Code de vérification / Verification code: " + code + "\n"
-                + "用途 / Objet / Purpose: " + purpose + "\n"
-                + "有效期 / Validité / Valid for: " + ttlMinutes + " minutes\n\n"
-                + "如果不是您本人操作，请忽略此邮件。\n"
-                + "Si vous n'êtes pas à l'origine de cette demande, ignorez cet e-mail.\n"
-                + "If you did not request this code, ignore this email.";
     }
 
     private CupidApiException unavailable()

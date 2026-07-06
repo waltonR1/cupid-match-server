@@ -10,6 +10,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.core.task.TaskExecutor;
+import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
@@ -96,9 +97,10 @@ public class CupidVerificationCodeService
 
         try
         {
+            String locale = LocaleContextHolder.getLocale().getLanguage();
             verificationDeliveryTaskExecutor.execute(() ->
                     deliverAndCleanupOnFailure(entryId, key, cooldownKey, purpose,
-                            provider, identifier, code, codeTtlMinutes));
+                            provider, identifier, code, codeTtlMinutes, locale));
         }
         catch (RuntimeException e)
         {
@@ -119,11 +121,12 @@ public class CupidVerificationCodeService
     }
 
     private void deliverAndCleanupOnFailure(String entryId, String key, String cooldownKey,
-            String purpose, String provider, String identifier, String code, int codeTtlMinutes)
+            String purpose, String provider, String identifier, String code, int codeTtlMinutes,
+            String locale)
     {
         try
         {
-            deliveryService.deliver(purpose, provider, identifier, code, codeTtlMinutes);
+            deliveryService.deliver(purpose, provider, identifier, code, codeTtlMinutes, locale);
         }
         catch (RuntimeException e)
         {

@@ -1792,6 +1792,27 @@ insert into cm_payments (id, order_id, provider, provider_payment_id, status, am
   ('d9100000-0000-4000-8000-000000000002', 'd9000000-0000-4000-8000-000000000002', 'stripe', 'pi_3NxK8qMNOPQRSTUVWX', 'succeeded', 6500, 'EUR', '2026-01-01 00:00:00', '2026-01-01 00:00:00', '2026-01-01 00:00:00'),
   ('d9100000-0000-4000-8000-000000000003', 'd9000000-0000-4000-8000-000000000002', 'stripe', 're_3NxK8qYZABCDEFGHIJ', 'refunded', 6500, 'EUR', '2026-03-01 00:00:00', '2026-03-01 00:00:00', '2026-03-01 00:00:00');
 
+-- 5J3. Verification Email templates
+insert into cm_inbox_templates (id, template_code, message_type, status) values
+  ('e9300000-0000-4000-8000-000000000001', 'verification_registration', 'text', 'enabled'),
+  ('e9300000-0000-4000-8000-000000000002', 'verification_password_reset', 'text', 'enabled'),
+  ('e9300000-0000-4000-8000-000000000003', 'verification_identity_bind', 'text', 'enabled'),
+  ('e9300000-0000-4000-8000-000000000004', 'verification_mfa', 'text', 'enabled');
+
+insert into cm_inbox_template_localized_fields (id, template_id, locale, name, body) values
+  ('e9310000-0000-4000-8000-000000000001','e9300000-0000-4000-8000-000000000001','zh','Cupid Match 注册验证码','您的验证码是 {{code}}，{{ttlMinutes}} 分钟内有效。'),
+  ('e9310000-0000-4000-8000-000000000002','e9300000-0000-4000-8000-000000000001','fr','Code de vérification Cupid Match','Votre code est {{code}}. Il est valable pendant {{ttlMinutes}} minutes.'),
+  ('e9310000-0000-4000-8000-000000000003','e9300000-0000-4000-8000-000000000001','en','Cupid Match registration code','Your code is {{code}}. It is valid for {{ttlMinutes}} minutes.'),
+  ('e9310000-0000-4000-8000-000000000004','e9300000-0000-4000-8000-000000000002','zh','Cupid Match 密码重置验证码','您的密码重置验证码是 {{code}}，{{ttlMinutes}} 分钟内有效。'),
+  ('e9310000-0000-4000-8000-000000000005','e9300000-0000-4000-8000-000000000002','fr','Code de réinitialisation Cupid Match','Votre code de réinitialisation est {{code}}. Il est valable pendant {{ttlMinutes}} minutes.'),
+  ('e9310000-0000-4000-8000-000000000006','e9300000-0000-4000-8000-000000000002','en','Cupid Match password reset code','Your password reset code is {{code}}. It is valid for {{ttlMinutes}} minutes.'),
+  ('e9310000-0000-4000-8000-000000000007','e9300000-0000-4000-8000-000000000003','zh','Cupid Match 身份绑定验证码','您的身份绑定验证码是 {{code}}，{{ttlMinutes}} 分钟内有效。'),
+  ('e9310000-0000-4000-8000-000000000008','e9300000-0000-4000-8000-000000000003','fr','Code de liaison Cupid Match','Votre code de liaison est {{code}}. Il est valable pendant {{ttlMinutes}} minutes.'),
+  ('e9310000-0000-4000-8000-000000000009','e9300000-0000-4000-8000-000000000003','en','Cupid Match identity binding code','Your identity binding code is {{code}}. It is valid for {{ttlMinutes}} minutes.'),
+  ('e9310000-0000-4000-8000-000000000010','e9300000-0000-4000-8000-000000000004','zh','Cupid Match MFA 验证码','您的 MFA 验证码是 {{code}}，{{ttlMinutes}} 分钟内有效。'),
+  ('e9310000-0000-4000-8000-000000000011','e9300000-0000-4000-8000-000000000004','fr','Code MFA Cupid Match','Votre code MFA est {{code}}. Il est valable pendant {{ttlMinutes}} minutes.'),
+  ('e9310000-0000-4000-8000-000000000012','e9300000-0000-4000-8000-000000000004','en','Cupid Match MFA code','Your MFA code is {{code}}. It is valid for {{ttlMinutes}} minutes.');
+
 -- 5K. Audit logs
 insert into cm_audit_logs (id, actor_type, actor_user_id, subject_type, subject_id, action, before_data, after_data, reason, created_at) values
   ('da000000-0000-4000-8000-000000000001', 'staff', '1', 'profile', '11111111-1111-4111-8111-111111111111', 'profile_review_approved', null, '{"profile_status":"open"}', '资料信息真实完整，审核通过。', '2026-06-15 10:00:00'),

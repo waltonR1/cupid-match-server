@@ -20,6 +20,11 @@
 
 ## 2. Email 配置
 
+注册与密码重置邮件复用后台“用户服务 → 通知模板”管理能力，固定模板代码分别为
+`verification_registration` 和 `verification_password_reset`。后台必须维护中、法、英三语主题与正文；
+系统根据 C 端请求语言发送单语邮件，语言无效或对应内容缺失时回退英文。可用变量为
+`{{code}}`、`{{ttlMinutes}}` 和 `{{purpose}}`。模板缺失、停用或缺少英文内容时投递失败。
+
 ### 2.1 环境变量
 
 `application.yml` 通过以下环境变量读取 SMTP 配置：
@@ -82,6 +87,8 @@ cupid:
 ```text
 com.ruoyi.framework.web.service.CupidSmsGateway
 ```
+
+当前尚未实现任何具体短信供应商适配器，SMS 实际发送未完成。
 
 短信供应商确定后，需要：
 

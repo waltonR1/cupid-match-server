@@ -28,7 +28,8 @@ public class CupidInboxTemplateServiceImpl implements ICupidInboxTemplateService
     private static final Set<String> SUBJECT_TYPES = Set.of("profile", "event", "private_introduction_request", "membership");
     private static final Set<String> STATUSES = Set.of("enabled", "disabled");
     private static final Set<String> ACTION_TYPES = Set.of("view_profile", "view_event", "view_introduction", "view_membership");
-    private static final Set<String> VARIABLES = Set.of("profileName", "eventTitle", "status", "reason", "verificationType", "accountName");
+    private static final Set<String> VARIABLES = Set.of("profileName", "eventTitle", "status",
+            "reason", "verificationType", "accountName", "code", "ttlMinutes", "purpose");
     private static final Pattern VARIABLE_PATTERN = Pattern.compile("\\{\\{([A-Za-z][A-Za-z0-9]*)}}"
     );
 
