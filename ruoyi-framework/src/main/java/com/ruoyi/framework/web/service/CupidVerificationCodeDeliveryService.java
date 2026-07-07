@@ -42,6 +42,9 @@ public class CupidVerificationCodeDeliveryService
     @Value("${cupid.auth.verification-delivery.email.from:}")
     private String emailFrom;
 
+    @Value("${cupid.auth.verification-delivery.sms.provider:}")
+    private String smsProvider;
+
     public void validate(String provider)
     {
         if (logEnabled)
@@ -61,7 +64,7 @@ public class CupidVerificationCodeDeliveryService
         if ("phone".equals(provider))
         {
             if (!runtimeConfigService.isVerificationSmsEnabled()
-                    || smsGatewayProvider.getIfAvailable() == null)
+                    || resolveSmsGateway() == null)
             {
                 throw unavailable();
             }
@@ -85,7 +88,7 @@ public class CupidVerificationCodeDeliveryService
         }
         else if ("phone".equals(provider))
         {
-            sendSms(purpose, identifier, code, ttlMinutes);
+            sendSms(purpose, identifier, code, ttlMinutes, locale);
         }
         else
         {
@@ -146,15 +149,27 @@ public class CupidVerificationCodeDeliveryService
                 .replace("{{purpose}}", purpose);
     }
 
-    private void sendSms(String purpose, String phone, String code, int ttlMinutes)
+    private void sendSms(String purpose, String phone, String code, int ttlMinutes, String locale)
     {
         CupidSmsGateway gateway = runtimeConfigService.isVerificationSmsEnabled()
-                ? smsGatewayProvider.getIfAvailable() : null;
+                ? resolveSmsGateway() : null;
         if (gateway == null)
         {
             throw unavailable();
         }
-        gateway.sendVerificationCode(phone, purpose, code, ttlMinutes);
+        gateway.sendVerificationCode(phone, purpose, code, ttlMinutes, locale);
+    }
+
+    private CupidSmsGateway resolveSmsGateway()
+    {
+        if (!StringUtils.hasText(smsProvider))
+        {
+            return null;
+        }
+        return smsGatewayProvider.stream()
+                .filter(gateway -> smsProvider.equalsIgnoreCase(gateway.getProvider()))
+                .findFirst()
+                .orElse(null);
     }
 
     private CupidApiException unavailable()

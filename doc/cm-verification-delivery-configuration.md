@@ -88,33 +88,29 @@ cupid:
 com.ruoyi.framework.web.service.CupidSmsGateway
 ```
 
-当前尚未实现任何具体短信供应商适配器，SMS 实际发送未完成。
+当前已经实现 Twilio 网关。设置 `CUPID_SMS_PROVIDER=twilio` 后，系统按条件注册
+`TwilioCupidSmsGateway`，使用 Twilio Messages API 和 Messaging Service 发送短信。
+未配置供应商、凭据不完整或找不到对应网关时，短信渠道不可用。
 
-短信供应商确定后，需要：
-
-1. 引入供应商 SDK 或 HTTP 客户端。
-2. 实现 `CupidSmsGateway`。
-3. 将实现类注册为 Spring Bean。
-4. 根据 `purpose` 选择注册、重置密码或通用模板。
-5. 将供应商异常转换为项目统一的投递失败。
-
-在没有 `CupidSmsGateway` Bean 时，即使打开 SMS 热开关，短信也不会发送，接口将返回 `verification_delivery_unavailable`。
-
-### 3.2 预留环境变量
+### 3.2 Twilio 预留环境变量
 
 `application.yml` 已预留以下短信参数：
 
 | 环境变量 | 说明 |
 | --- | --- |
-| `CUPID_SMS_PROVIDER` | 短信供应商标识 |
-| `CUPID_SMS_ACCESS_KEY` | 供应商访问凭据 |
-| `CUPID_SMS_SECRET_KEY` | 供应商密钥 |
-| `CUPID_SMS_SIGN_NAME` | 短信签名 |
-| `CUPID_SMS_REGISTRATION_TEMPLATE_ID` | 注册验证码模板 ID |
-| `CUPID_SMS_PASSWORD_RESET_TEMPLATE_ID` | 密码重置验证码模板 ID |
-| `CUPID_SMS_GENERAL_TEMPLATE_ID` | 通用验证码模板 ID |
+| `CUPID_SMS_PROVIDER` | 当前短信供应商标识；Twilio 使用 `twilio` |
+| `CUPID_TWILIO_ACCOUNT_SID` | Twilio Account SID，以 `AC` 开头 |
+| `CUPID_TWILIO_AUTH_TOKEN` | 本地联调使用的 Auth Token |
+| `CUPID_TWILIO_API_KEY` | 生产环境 API Key SID，以 `SK` 开头 |
+| `CUPID_TWILIO_API_SECRET` | 生产环境 API Key Secret |
+| `CUPID_TWILIO_MESSAGING_SERVICE_SID` | Messaging Service SID，以 `MG` 开头 |
 
-这些变量是供应商适配器的配置入口。当前未接入具体供应商时，配置这些变量不会单独产生发送能力。
+本地联调使用 `Account SID + Auth Token`；生产环境建议使用
+`Account SID + API Key + API Secret`。两种方式均需要 Messaging Service SID。
+本地联调配置 Account SID、Auth Token 和 Messaging Service SID。生产环境配置 Account SID、
+API Key、API Secret 和 Messaging Service SID；存在 API Key 时优先使用 API Key 认证。
+未来增加其他供应商时，保留通用的 `CUPID_SMS_PROVIDER` 选择器，并为该供应商增加独立配置块和
+`CupidSmsGateway` 实现，不复用含义不同的凭据字段。
 
 ### 3.3 SMS 开关
 
@@ -194,3 +190,6 @@ cupid:
 6. 检查供应商发送记录和手机收件情况。
 7. 分别验证注册、密码重置和通用场景的模板映射。
 8. 模拟供应商失败，确认验证码和冷却记录正确回滚。
+
+Twilio 联调前还需要在控制台完成测试收件号码验证、Messaging Service Sender Pool 和目标国家
+Geo Permissions 配置。Trial 账号只能向 Twilio 允许的已验证号码发送。

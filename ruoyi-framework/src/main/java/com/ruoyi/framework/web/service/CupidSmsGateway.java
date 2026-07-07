@@ -8,6 +8,13 @@ package com.ruoyi.framework.web.service;
 public interface CupidSmsGateway
 {
     /**
+     * 返回网关对应的稳定供应商标识，例如 twilio。
+     *
+     * @return 供应商标识
+     */
+    String getProvider();
+
+    /**
      * 发送验证码短信。
      *
      * @param phone 手机号
@@ -15,5 +22,6 @@ public interface CupidSmsGateway
      * @param code 验证码
      * @param ttlMinutes 有效期（分钟）
      */
-    void sendVerificationCode(String phone, String purpose, String code, int ttlMinutes);
+    void sendVerificationCode(String phone, String purpose, String code, int ttlMinutes,
+            String locale);
 }

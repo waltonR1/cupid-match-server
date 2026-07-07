@@ -141,21 +141,19 @@ cupid:
       sms:
         # SMS 验证码发送开关的启动兜底；sys_config 对应值可热覆盖
         enabled: false
-        # 以下敏感参数仅通过环境变量提供
-        # 短信供应商标识，供具体 CupidSmsGateway 实现选择或校验
+        # 当前短信供应商标识；例如 twilio，后续可切换其他 CupidSmsGateway 实现
         provider: ${CUPID_SMS_PROVIDER:}
-        # 短信供应商访问凭据
-        access-key: ${CUPID_SMS_ACCESS_KEY:}
-        # 短信供应商密钥
-        secret-key: ${CUPID_SMS_SECRET_KEY:}
-        # 已在短信供应商审核通过的短信签名
-        sign-name: ${CUPID_SMS_SIGN_NAME:}
-        # 用户注册场景的验证码模板 ID
-        registration-template-id: ${CUPID_SMS_REGISTRATION_TEMPLATE_ID:}
-        # 密码重置场景的验证码模板 ID
-        password-reset-template-id: ${CUPID_SMS_PASSWORD_RESET_TEMPLATE_ID:}
-        # 其他验证码场景使用的通用模板 ID
-        general-template-id: ${CUPID_SMS_GENERAL_TEMPLATE_ID:}
+        twilio:
+          # Twilio 主账号 SID，以 AC 开头
+          account-sid: ${CUPID_TWILIO_ACCOUNT_SID:}
+          # 本地联调使用；生产环境建议改用 API Key
+          auth-token: ${CUPID_TWILIO_AUTH_TOKEN:}
+          # 生产环境 API Key SID，以 SK 开头
+          api-key: ${CUPID_TWILIO_API_KEY:}
+          # 生产环境 API Key Secret
+          api-secret: ${CUPID_TWILIO_API_SECRET:}
+          # Messaging Service SID，以 MG 开头
+          messaging-service-sid: ${CUPID_TWILIO_MESSAGING_SERVICE_SID:}
   # 翻译配置
   translation:
     # 部署级参数；仅 enabled 可由 sys_config 热配置覆盖
