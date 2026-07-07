@@ -22,7 +22,7 @@
 
 注册与密码重置邮件复用后台“用户服务 → 通知模板”管理能力，固定模板代码分别为
 `verification_registration` 和 `verification_password_reset`。后台必须维护中、法、英三语主题与正文；
-系统根据 C 端请求语言发送单语邮件，语言无效或对应内容缺失时回退英文。可用变量为
+系统根据 C 端请求语言发送单语邮件，语言无效或对应内容缺失时回退英文。真实 SMTP 发送已经完成验证。可用变量为
 `{{code}}`、`{{ttlMinutes}}` 和 `{{purpose}}`。模板缺失、停用或缺少英文内容时投递失败。
 
 ### 2.1 环境变量
@@ -92,9 +92,9 @@ com.ruoyi.framework.web.service.CupidSmsGateway
 `TwilioCupidSmsGateway`，使用 Twilio Messages API 和 Messaging Service 发送短信。
 未配置供应商、凭据不完整或找不到对应网关时，短信渠道不可用。
 
-### 3.2 Twilio 预留环境变量
+### 3.2 Twilio 环境变量
 
-`application.yml` 已预留以下短信参数：
+`application.yml` 使用以下短信参数：
 
 | 环境变量 | 说明 |
 | --- | --- |
@@ -182,8 +182,8 @@ cupid:
 
 ## 7. SMS 联调清单
 
-1. 完成并注册 `CupidSmsGateway` 供应商实现。
-2. 配置供应商凭据、签名和模板环境变量。
+1. 设置 `CUPID_SMS_PROVIDER=twilio`。
+2. 配置 Twilio Account SID、Auth Token 或 API Key、Messaging Service SID 等环境变量。
 3. 将 `verification-code-log-enabled` 设置为 `false`。
 4. 将 `cupid.verification.sms.enabled` 设置为 `true`。
 5. 使用有效手机号请求验证码。
@@ -193,3 +193,6 @@ cupid:
 
 Twilio 联调前还需要在控制台完成测试收件号码验证、Messaging Service Sender Pool 和目标国家
 Geo Permissions 配置。Trial 账号只能向 Twilio 允许的已验证号码发送。
+
+当前 Twilio 真机短信收取已经完成验证；后续若切换供应商，应保留 `CupidSmsGateway` 通用层，
+并为新供应商增加独立实现和独立配置块。

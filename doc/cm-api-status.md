@@ -152,7 +152,8 @@
 | `GET /api/account/export/download` | 下载账户数据导出 | 完成 | 已使用 | `use-account-settings.ts` |
 | `POST /api/account/deactivate` | 停用当前账户 | 完成 | 已使用 | `use-account-settings.ts` |
 
-当前验证码由开发实现生成并写入日志；真实 Email/SMS 发送通道属于生产化阶段。
+当前验证码由 Java 后端生成、写入 Redis 并一次性消费。真实 Email SMTP 与 Twilio SMS
+投递通道已接入；开发日志模式仅用于本地调试，联调和生产环境应关闭日志模式并使用真实投递。
 
 ## 13. Membership Catalog And Upload
 
@@ -201,5 +202,5 @@ Mock Server 还存在 `POST /api/debug/identities/:id/verify`。前端没有封�
 - User 状态管理和 Staff tasks。
 - 正式支付、订单和会员确认。
 - 完整业务审计日志。
-- Email/SMS 真实验证码通道。
+- 短信或邮件供应商的生产账号、域名信誉和发送额度运营。
 - 对象存储、限流、防爆破、部署健康检查和自动化集成测试。
