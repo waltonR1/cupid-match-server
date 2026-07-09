@@ -7,6 +7,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import com.ruoyi.common.utils.uuid.IdUtils;
 import com.ruoyi.cupid.domain.CupidEvent;
 import com.ruoyi.cupid.domain.CupidEventRegistration;
 import com.ruoyi.cupid.domain.CupidUserMembership;
@@ -103,9 +104,20 @@ public class CupidScheduledMaintenanceServiceImpl
     @Transactional
     public int expireMemberships()
     {
-        int processed = membershipMapper.expireMemberships(
-                runtimeConfigService.getScheduledMaintenanceBatchSize());
-        log.info("Cupid 会员到期状态同步完成，本次处理 {} 条", processed);
+        int batchSize = runtimeConfigService.getScheduledMaintenanceBatchSize();
+        int processed = membershipMapper.expireMemberships(batchSize);
+        processed += membershipMapper.expireLowerPriorityActiveMemberships(batchSize);
+        List<String> userIds = membershipMapper.selectUsersWithoutActiveMembership(batchSize);
+        for (String userId : userIds)
+        {
+            int restored = membershipMapper.reactivateFreeMembership(userId);
+            if (restored == 0)
+            {
+                restored = membershipMapper.insertFreeMembership(IdUtils.fastUUID(), userId);
+            }
+            processed += restored;
+        }
+        log.info("Cupid 会员状态归一化完成，本次处理 {} 条", processed);
         return processed;
     }
 

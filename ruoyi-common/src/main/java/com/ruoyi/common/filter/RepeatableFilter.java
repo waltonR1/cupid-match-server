@@ -30,6 +30,12 @@ public class RepeatableFilter implements Filter
     {
         ServletRequest requestWrapper = null;
         if (request instanceof HttpServletRequest
+                && "/api/payment/stripe/webhook".equals(((HttpServletRequest) request).getRequestURI()))
+        {
+            chain.doFilter(request, response);
+            return;
+        }
+        if (request instanceof HttpServletRequest
                 && StringUtils.startsWithIgnoreCase(request.getContentType(), MediaType.APPLICATION_JSON_VALUE))
         {
             requestWrapper = new RepeatedlyRequestWrapper((HttpServletRequest) request, response);

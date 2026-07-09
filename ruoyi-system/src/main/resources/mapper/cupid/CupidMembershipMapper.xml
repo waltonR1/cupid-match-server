@@ -97,4 +97,92 @@
         limit #{batchSize}
     </update>
 
+    <update id="expireLowerPriorityActiveMemberships">
+        update cm_user_memberships
+        set status = 'expired',
+            expires_at = coalesce(expires_at, now()),
+            updated_at = now()
+        where id in (
+            select id from (
+                select m.id
+                from cm_user_memberships m
+                where m.status = 'active'
+                  and (m.expires_at is null or m.expires_at &gt; now())
+                  and exists (
+                      select 1
+                      from cm_user_memberships better
+                      where better.user_id = m.user_id
+                        and better.status = 'active'
+                        and (better.expires_at is null or better.expires_at &gt; now())
+                        and (
+                            case better.tier when 'diamond' then 4 when 'gold' then 3 when 'silver' then 2 when 'free' then 1 else 0 end
+                            &gt;
+                            case m.tier when 'diamond' then 4 when 'gold' then 3 when 'silver' then 2 when 'free' then 1 else 0 end
+                            or (
+                                case better.tier when 'diamond' then 4 when 'gold' then 3 when 'silver' then 2 when 'free' then 1 else 0 end
+                                =
+                                case m.tier when 'diamond' then 4 when 'gold' then 3 when 'silver' then 2 when 'free' then 1 else 0 end
+                                and better.started_at &gt; m.started_at
+                            )
+                            or (
+                                case better.tier when 'diamond' then 4 when 'gold' then 3 when 'silver' then 2 when 'free' then 1 else 0 end
+                                =
+                                case m.tier when 'diamond' then 4 when 'gold' then 3 when 'silver' then 2 when 'free' then 1 else 0 end
+                                and better.started_at = m.started_at
+                                and better.created_at &gt; m.created_at
+                            )
+                            or (
+                                case better.tier when 'diamond' then 4 when 'gold' then 3 when 'silver' then 2 when 'free' then 1 else 0 end
+                                =
+                                case m.tier when 'diamond' then 4 when 'gold' then 3 when 'silver' then 2 when 'free' then 1 else 0 end
+                                and better.started_at = m.started_at
+                                and better.created_at = m.created_at
+                                and better.id &gt; m.id
+                            )
+                        )
+                  )
+                order by m.user_id, m.started_at
+                limit #{batchSize}
+            ) t
+        )
+    </update>
+
+    <select id="selectUsersWithoutActiveMembership" resultType="string">
+        select u.id
+        from cm_users u
+        where u.status = 'active'
+          and not exists (
+              select 1
+              from cm_user_memberships m
+              where m.user_id = u.id
+                and m.status = 'active'
+                and (m.expires_at is null or m.expires_at &gt; now())
+          )
+        order by u.created_at, u.id
+        limit #{batchSize}
+    </select>
+
+    <update id="reactivateFreeMembership">
+        update cm_user_memberships
+        set status = 'active',
+            started_at = now(),
+            expires_at = null,
+            updated_at = now()
+        where user_id = #{userId}
+          and tier = 'free'
+        order by created_at desc
+        limit 1
+    </update>
+
+    <insert id="insertFreeMembership">
+        insert into cm_user_memberships
+            (id, user_id, plan_id, tier, status, started_at)
+        select
+            #{id}, #{userId}, id, tier, 'active', now()
+        from cm_membership_plans
+        where tier = 'free'
+          and is_active = 1
+        limit 1
+    </insert>
+
 </mapper>

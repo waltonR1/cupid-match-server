@@ -28,8 +28,11 @@
             select um.id from cm_user_memberships um
             where um.user_id = u.id
             order by case when um.status = 'active' and (um.expires_at is null or um.expires_at > now()) then 0 else 1 end,
-                     coalesce(um.expires_at, '9999-12-31 23:59:59') desc,
-                     um.created_at desc
+                     case when um.tier != 'free' then 0 else 1 end,
+                     case um.tier when 'diamond' then 0 when 'gold' then 1 when 'silver' then 2 when 'free' then 3 else 4 end,
+                     um.started_at desc,
+                     um.created_at desc,
+                     um.id desc
             limit 1
         )
         <where>
@@ -119,8 +122,11 @@
             select um.id from cm_user_memberships um
             where um.user_id = u.id
             order by case when um.status = 'active' and (um.expires_at is null or um.expires_at > now()) then 0 else 1 end,
-                     coalesce(um.expires_at, '9999-12-31 23:59:59') desc,
-                     um.created_at desc
+                     case when um.tier != 'free' then 0 else 1 end,
+                     case um.tier when 'diamond' then 0 when 'gold' then 1 when 'silver' then 2 when 'free' then 3 else 4 end,
+                     um.started_at desc,
+                     um.created_at desc,
+                     um.id desc
             limit 1
         )
         left join cm_user_security_settings s on s.user_id = u.id

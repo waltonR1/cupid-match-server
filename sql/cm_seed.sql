@@ -591,7 +591,7 @@ insert into sys_job values(2, '系统默认（有参）', 'DEFAULT', 'ryTask.ryP
 insert into sys_job values(3, '系统默认（多参）', 'DEFAULT', 'ryTask.ryMultipleParams(\'ry\', true, 2000L, 316.50D, 100)',  '0/20 * * * * ?', '3', '1', '1', 'admin', sysdate(), '', null, '');
 insert into sys_job values(4, '私人介绍过期补偿', 'CUPID', 'cupidTask.expireIntroductionRequests', '0 */10 * * * ?', '3', '1', '0', 'admin', sysdate(), '', null, '处理过期私人介绍申请并返还权益');
 insert into sys_job values(5, '安全挑战过期清理', 'CUPID', 'cupidTask.expireSecurityChallenges', '30 */10 * * * ?', '3', '1', '0', 'admin', sysdate(), '', null, '标记已过期的安全挑战');
-insert into sys_job values(6, '会员到期状态同步', 'CUPID', 'cupidTask.expireMemberships', '0 5 * * * ?', '3', '1', '0', 'admin', sysdate(), '', null, '将超过有效期的有效会员同步为已过期');
+insert into sys_job values(6, '会员状态归一化', 'CUPID', 'cupidTask.expireMemberships', '0 5 0 * * ?', '3', '1', '0', 'admin', sysdate(), '', null, '过期失效会员、清理多条当前会员，并为无当前会员用户恢复免费会员');
 insert into sys_job values(7, '活动站内提醒', 'CUPID', 'cupidTask.sendEventReminders', '0 */10 * * * ?', '3', '1', '0', 'admin', sysdate(), '', null, '向24小时内开始的活动确认用户发送站内提醒');
 insert into sys_job values(8, '跟进事项逾期提醒', 'CUPID', 'cupidTask.sendOverdueStaffTaskReminders', '30 */10 * * * ?', '3', '1', '0', 'admin', sysdate(), '', null, '向逾期跟进事项负责人发送后台通知');
 insert into sys_job values(9, '翻译失败重试', 'CUPID', 'cupidTask.retryFailedTranslations', '0 */5 * * * ?', '3', '1', '0', 'admin', sysdate(), '', null, '按指数退避重试机器翻译失败任务');
@@ -726,9 +726,12 @@ insert into sys_menu values('2106', '安全事件', '2099', '3', 'security-event
 insert into sys_menu values('2107', '安全事件查询', '2106', '1', '', '', '', '', 1, 0, 'F', '0', '0', 'cupid:security:event:query', '#', 'admin', sysdate(), '', null, '');
 insert into sys_menu values('2108', '安全事件导出', '2106', '2', '', '', '', '', 1, 0, 'F', '0', '0', 'cupid:security:event:export', '#', 'admin', sysdate(), '', null, '');
 insert into sys_menu values('2109', '业务监控', '2099', '4', 'monitor', 'cupid/monitor/index', '', 'CupidBusinessMonitor', 1, 0, 'C', '0', '0', 'cupid:monitor:list', 'monitor', 'admin', sysdate(), '', null, 'Cupid 业务专项只读监控');
+insert into sys_menu values('2110', '支付订阅', '2080', '5', 'payment', 'cupid/payment/index', '', 'CupidPayment', 1, 0, 'C', '0', '0', 'cupid:payment:list', 'money', 'admin', sysdate(), '', null, 'Cupid 支付订阅与支付回调日志查询');
+insert into sys_menu values('2111', '支付订单查询', '2110', '1', '', '', '', '', 1, 0, 'F', '0', '0', 'cupid:payment:list', '#', 'admin', sysdate(), '', null, '');
+insert into sys_menu values('2112', '回调日志查询', '2110', '2', '', '', '', '', 1, 0, 'F', '0', '0', 'cupid:payment:webhook:list', '#', 'admin', sysdate(), '', null, '');
 
 insert into sys_role_menu (role_id, menu_id)
-select r.role_id, m.menu_id from sys_role r join sys_menu m on m.menu_id between 2000 and 2109
+select r.role_id, m.menu_id from sys_role r join sys_menu m on m.menu_id between 2000 and 2112
 where r.role_key = 'cupid_admin' and r.del_flag = '0';
 
 insert into sys_role_menu (role_id, menu_id)
@@ -1224,9 +1227,15 @@ insert into cm_profile_privacy_preferences (id, profile_id, hide_marital_status,
 -- 3A.16 cm_membership_plans
 insert into cm_membership_plans (id, tier, price_cents, currency, cny_price_cents, billing_type, billing_period, validity_months, private_introduction_quota, private_introduction_period, event_quota, event_priority_enabled, staff_review_enabled, profile_detail_access_level, staff_support_level, concierge_priority, featured, sort_order, is_active, created_at, updated_at) values
   ('f04881cf-b31f-50c5-8e73-c5f861d0bd7f', 'free', 0, 'EUR', 0, 'free', null, null, 0, 'monthly', 0, 0, 0, 'registered', 'none', 0, 0, 1, 1, '2026-01-01 00:00:00', '2026-01-01 00:00:00'),
-  ('f2886d5f-1d2a-5fed-9b4f-8b23f2067f06', 'silver', 6500, 'EUR', 49900, 'one_time', null, 12, 5, 'monthly', 12, 0, 1, 'registered', 'standard', 0, 0, 2, 1, '2026-01-01 00:00:00', '2026-01-01 00:00:00'),
-  ('eaf73332-f7d1-5f4b-82ba-11368eac30b6', 'gold', 10000, 'EUR', 77000, 'one_time', null, 6, 15, 'monthly', 20, 1, 1, 'premium', 'priority', 1, 1, 3, 1, '2026-01-01 00:00:00', '2026-01-01 00:00:00'),
-  ('9fb53b84-a341-5b63-b6e8-35a474540a4c', 'diamond', 15000, 'EUR', 115500, 'one_time', null, 12, 30, 'monthly', 24, 1, 1, 'premium', 'concierge', 1, 0, 4, 1, '2026-01-01 00:00:00', '2026-01-01 00:00:00');
+  ('f2886d5f-1d2a-5fed-9b4f-8b23f2067f06', 'silver', 6500, 'EUR', 49900, 'recurring', 'monthly', null, 5, 'monthly', 12, 0, 1, 'registered', 'standard', 0, 0, 2, 1, '2026-01-01 00:00:00', '2026-01-01 00:00:00'),
+  ('eaf73332-f7d1-5f4b-82ba-11368eac30b6', 'gold', 10000, 'EUR', 77000, 'recurring', 'monthly', null, 15, 'monthly', 20, 1, 1, 'premium', 'priority', 1, 1, 3, 1, '2026-01-01 00:00:00', '2026-01-01 00:00:00'),
+  ('9fb53b84-a341-5b63-b6e8-35a474540a4c', 'diamond', 15000, 'EUR', 115500, 'recurring', 'monthly', null, 30, 'monthly', 24, 1, 1, 'premium', 'concierge', 1, 0, 4, 1, '2026-01-01 00:00:00', '2026-01-01 00:00:00');
+
+-- Stripe Price 占位数据默认 inactive；填入真实 price_xxx 后再改为 active。
+insert into cm_membership_plan_payment_prices (id, plan_id, provider, environment, mode, provider_product_id, provider_price_id, currency, billing_period, status, created_at, updated_at) values
+  ('fa100000-0000-4000-8000-000000000001', 'f2886d5f-1d2a-5fed-9b4f-8b23f2067f06', 'stripe', 'test', 'subscription', null, 'price_replace_me_silver_monthly', 'EUR', 'monthly', 'inactive', now(), now()),
+  ('fa100000-0000-4000-8000-000000000002', 'eaf73332-f7d1-5f4b-82ba-11368eac30b6', 'stripe', 'test', 'subscription', null, 'price_replace_me_gold_monthly', 'EUR', 'monthly', 'inactive', now(), now()),
+  ('fa100000-0000-4000-8000-000000000003', '9fb53b84-a341-5b63-b6e8-35a474540a4c', 'stripe', 'test', 'subscription', null, 'price_replace_me_diamond_monthly', 'EUR', 'monthly', 'inactive', now(), now());
 
 -- 3A.17 cm_membership_plan_localized_fields
 insert into cm_membership_plan_localized_fields (id, plan_id, field_name, locale, value, source, provider, status, created_at, updated_at) values
@@ -1782,15 +1791,15 @@ insert into cm_staff_task_localized_fields (id, staff_task_id, field_name, local
   ('d8100000-0000-4000-8000-000000000003', 'd8000000-0000-4000-8000-000000000003', 'note', 'zh', '用户 E 暂停原因待确认，暂时延后处理。', 'manual', 'human', 'ready', now(), now());
 
 -- 5J. Orders and payments
-insert into cm_orders (id, user_id, plan_id, status, amount_cents, currency, created_at, updated_at) values
-  ('d9000000-0000-4000-8000-000000000001', 'efdca298-c977-5502-ad2e-8ba480ca1ea3', 'eaf73332-f7d1-5f4b-82ba-11368eac30b6', 'paid', 10000, 'EUR', '2026-01-18 00:00:00', '2026-01-18 00:00:00'),
-  ('d9000000-0000-4000-8000-000000000002', 'd0000000-0000-4000-8000-000000000004', 'f2886d5f-1d2a-5fed-9b4f-8b23f2067f06', 'refunded', 6500, 'EUR', '2026-01-01 00:00:00', '2026-03-01 00:00:00');
+insert into cm_orders (id, user_id, plan_id, order_type, provider, environment, status, amount_cents, currency, paid_at, created_at, updated_at) values
+  ('d9000000-0000-4000-8000-000000000001', 'efdca298-c977-5502-ad2e-8ba480ca1ea3', 'eaf73332-f7d1-5f4b-82ba-11368eac30b6', 'membership_subscription', 'stripe', 'test', 'paid', 10000, 'EUR', '2026-01-18 00:00:00', '2026-01-18 00:00:00', '2026-01-18 00:00:00'),
+  ('d9000000-0000-4000-8000-000000000002', 'd0000000-0000-4000-8000-000000000004', 'f2886d5f-1d2a-5fed-9b4f-8b23f2067f06', 'membership_subscription', 'stripe', 'test', 'refunded', 6500, 'EUR', '2026-01-01 00:00:00', '2026-01-01 00:00:00', '2026-03-01 00:00:00');
 
 -- 5J2. Payment records
-insert into cm_payments (id, order_id, provider, provider_payment_id, status, amount_cents, currency, paid_at, created_at, updated_at) values
-  ('d9100000-0000-4000-8000-000000000001', 'd9000000-0000-4000-8000-000000000001', 'stripe', 'pi_3NxK8qABCDEFGHIJKL', 'succeeded', 10000, 'EUR', '2026-01-18 00:00:00', '2026-01-18 00:00:00', '2026-01-18 00:00:00'),
-  ('d9100000-0000-4000-8000-000000000002', 'd9000000-0000-4000-8000-000000000002', 'stripe', 'pi_3NxK8qMNOPQRSTUVWX', 'succeeded', 6500, 'EUR', '2026-01-01 00:00:00', '2026-01-01 00:00:00', '2026-01-01 00:00:00'),
-  ('d9100000-0000-4000-8000-000000000003', 'd9000000-0000-4000-8000-000000000002', 'stripe', 're_3NxK8qYZABCDEFGHIJ', 'refunded', 6500, 'EUR', '2026-03-01 00:00:00', '2026-03-01 00:00:00', '2026-03-01 00:00:00');
+insert into cm_payments (id, order_id, provider, environment, provider_payment_id, status, raw_status, amount_cents, currency, paid_at, created_at, updated_at) values
+  ('d9100000-0000-4000-8000-000000000001', 'd9000000-0000-4000-8000-000000000001', 'stripe', 'test', 'pi_3NxK8qABCDEFGHIJKL', 'succeeded', 'succeeded', 10000, 'EUR', '2026-01-18 00:00:00', '2026-01-18 00:00:00', '2026-01-18 00:00:00'),
+  ('d9100000-0000-4000-8000-000000000002', 'd9000000-0000-4000-8000-000000000002', 'stripe', 'test', 'pi_3NxK8qMNOPQRSTUVWX', 'succeeded', 'succeeded', 6500, 'EUR', '2026-01-01 00:00:00', '2026-01-01 00:00:00', '2026-01-01 00:00:00'),
+  ('d9100000-0000-4000-8000-000000000003', 'd9000000-0000-4000-8000-000000000002', 'stripe', 'test', 're_3NxK8qYZABCDEFGHIJ', 'refunded', 'refunded', 6500, 'EUR', '2026-03-01 00:00:00', '2026-03-01 00:00:00', '2026-03-01 00:00:00');
 
 -- 5J3. Verification Email templates
 insert into cm_inbox_templates (id, template_code, message_type, status) values

@@ -4,6 +4,7 @@ import java.util.Map;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -12,6 +13,7 @@ import org.springframework.web.bind.annotation.RestController;
 import com.ruoyi.common.core.domain.AjaxResult;
 import com.ruoyi.common.core.domain.model.CupidLoginUser;
 import com.ruoyi.cupid.service.ICupidMembershipService;
+import com.ruoyi.cupid.service.ICupidPaymentService;
 
 /**
  * Cupid Match 会员接口
@@ -22,6 +24,9 @@ public class CupidMembershipController
 {
     @Autowired
     private ICupidMembershipService membershipService;
+
+    @Autowired
+    private ICupidPaymentService paymentService;
 
     /**
      * 公共会员套餐目录（无需登录）
@@ -53,4 +58,12 @@ public class CupidMembershipController
         return AjaxResult.success(
                 membershipService.requestUpgrade(principal.getUserId(), body.get("tier")));
     }
+
+    @GetMapping("/account/membership/orders/{orderId}")
+    public AjaxResult order(@PathVariable String orderId,
+            @AuthenticationPrincipal CupidLoginUser principal)
+    {
+        return AjaxResult.success(paymentService.selectAccountOrder(principal.getUserId(), orderId));
+    }
+
 }

@@ -15,6 +15,7 @@ import com.ruoyi.cupid.domain.CupidUserMembership;
 import com.ruoyi.cupid.mapper.CupidAuthMapper;
 import com.ruoyi.cupid.mapper.CupidMembershipMapper;
 import com.ruoyi.cupid.service.ICupidMembershipService;
+import com.ruoyi.cupid.service.ICupidPaymentService;
 
 /**
  * Cupid Match 会员服务实现
@@ -27,6 +28,9 @@ public class CupidMembershipServiceImpl implements ICupidMembershipService
 
     @Autowired
     private CupidAuthMapper authMapper;
+
+    @Autowired
+    private ICupidPaymentService paymentService;
 
     @Override
     public Map<String, Object> getCatalog(String locale)
@@ -131,10 +135,7 @@ public class CupidMembershipServiceImpl implements ICupidMembershipService
         {
             throw new CupidApiException(HttpStatus.BAD_REQUEST, "invalid_tier");
         }
-        Map<String, Object> result = new LinkedHashMap<>();
-        result.put("status", "pending_external_flow");
-        result.put("requestedTier", tier);
-        return result;
+        return paymentService.createMembershipSubscriptionCheckout(userId, tier);
     }
 
     private List<Map<String, Object>> buildPlanDtos(List<CupidMembershipPlan> plans, String locale)

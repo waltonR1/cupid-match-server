@@ -154,6 +154,20 @@ cupid:
           api-secret: ${CUPID_TWILIO_API_SECRET:}
           # Messaging Service SID，以 MG 开头
           messaging-service-sid: ${CUPID_TWILIO_MESSAGING_SERVICE_SID:}
+  payment:
+    stripe:
+      # Stripe 支付总开关；关闭时不会创建 Checkout Session
+      enabled: ${CUPID_STRIPE_ENABLED:false}
+      # Stripe 环境标识；test / live，用于区分 Price、Customer、Subscription 映射
+      environment: ${CUPID_STRIPE_ENVIRONMENT:test}
+      # Stripe Secret Key；仅从环境变量读取
+      secret-key: ${CUPID_STRIPE_SECRET_KEY:}
+      # Stripe Webhook Signing Secret；仅从环境变量读取
+      webhook-secret: ${CUPID_STRIPE_WEBHOOK_SECRET:}
+      # Checkout 成功返回地址，可包含 {CHECKOUT_SESSION_ID} 与 {ORDER_ID}
+      success-url: ${CUPID_STRIPE_SUCCESS_URL:}
+      # Checkout 取消返回地址，可包含 {ORDER_ID}
+      cancel-url: ${CUPID_STRIPE_CANCEL_URL:}
   # 翻译配置
   translation:
     # 部署级参数；仅 enabled 可由 sys_config 热配置覆盖

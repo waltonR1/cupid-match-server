@@ -1,0 +1,298 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.cupid.mapper.CupidPaymentMapper">
+
+    <select id="selectPlanByTier" resultType="map">
+        select id, tier, price_cents as priceCents, currency, billing_type as billingType,
+               billing_period as billingPeriod, validity_months as validityMonths,
+               private_introduction_quota as privateIntroductionQuota,
+               private_introduction_period as privateIntroductionPeriod,
+               event_quota as eventQuota, staff_review_enabled as staffReviewEnabled,
+               event_priority_enabled as eventPriorityEnabled,
+               profile_detail_access_level as profileDetailAccessLevel,
+               staff_support_level as staffSupportLevel,
+               concierge_priority as conciergePriority
+        from cm_membership_plans
+        where tier = #{tier}
+          and is_active = 1
+        limit 1
+    </select>
+
+    <select id="selectPlanById" resultType="map">
+        select id, tier, price_cents as priceCents, currency, billing_type as billingType,
+               billing_period as billingPeriod, validity_months as validityMonths,
+               private_introduction_quota as privateIntroductionQuota,
+               private_introduction_period as privateIntroductionPeriod,
+               event_quota as eventQuota, staff_review_enabled as staffReviewEnabled,
+               event_priority_enabled as eventPriorityEnabled,
+               profile_detail_access_level as profileDetailAccessLevel,
+               staff_support_level as staffSupportLevel,
+               concierge_priority as conciergePriority
+        from cm_membership_plans
+        where id = #{planId}
+        limit 1
+    </select>
+
+    <select id="selectActiveStripePrice" resultType="map">
+        select id, plan_id as planId, provider_product_id as providerProductId,
+               provider_price_id as providerPriceId, currency, billing_period as billingPeriod
+        from cm_membership_plan_payment_prices
+        where plan_id = #{planId}
+          and provider = 'stripe'
+          and environment = #{environment}
+          and mode = 'subscription'
+          and currency = #{currency}
+          and billing_period = #{billingPeriod}
+          and status = 'active'
+        limit 1
+    </select>
+
+    <select id="selectPaymentCustomer" resultType="map">
+        select id, user_id as userId, provider, environment,
+               provider_customer_id as providerCustomerId
+        from cm_payment_customers
+        where user_id = #{userId}
+          and provider = #{provider}
+          and environment = #{environment}
+        limit 1
+    </select>
+
+    <insert id="insertPaymentCustomer">
+        insert into cm_payment_customers
+            (id, user_id, provider, environment, provider_customer_id)
+        values
+            (#{id}, #{userId}, #{provider}, #{environment}, #{providerCustomerId})
+    </insert>
+
+    <insert id="insertOrder">
+        insert into cm_orders
+            (id, user_id, plan_id, order_type, provider, environment, status, amount_cents, currency)
+        values
+            (#{id}, #{userId}, #{planId}, 'membership_subscription',
+             #{provider}, #{environment}, #{status}, #{amountCents}, #{currency})
+    </insert>
+
+    <update id="updateOrderCheckoutCreated">
+        update cm_orders
+        set status = 'checkout_created',
+            provider_checkout_session_id = #{checkoutSessionId},
+            provider_subscription_id = #{subscriptionId},
+            provider_customer_id = #{customerId},
+            expires_at = #{expiresAt},
+            updated_at = now()
+        where id = #{id}
+    </update>
+
+    <select id="selectOrderById" resultType="map">
+        select id, user_id as userId, plan_id as planId, order_type as orderType,
+               provider, environment, provider_checkout_session_id as providerCheckoutSessionId,
+               provider_subscription_id as providerSubscriptionId,
+               provider_customer_id as providerCustomerId,
+               status, amount_cents as amountCents, currency,
+               expires_at as expiresAt, paid_at as paidAt, cancelled_at as cancelledAt,
+               failure_reason as failureReason, created_at as createdAt, updated_at as updatedAt
+        from cm_orders
+        where id = #{id}
+        limit 1
+    </select>
+
+    <select id="selectOrderBySessionId" resultType="map">
+        select id, user_id as userId, plan_id as planId, order_type as orderType,
+               provider, environment, provider_checkout_session_id as providerCheckoutSessionId,
+               provider_subscription_id as providerSubscriptionId,
+               provider_customer_id as providerCustomerId,
+               status, amount_cents as amountCents, currency,
+               expires_at as expiresAt, paid_at as paidAt, cancelled_at as cancelledAt,
+               failure_reason as failureReason, created_at as createdAt, updated_at as updatedAt
+        from cm_orders
+        where provider = #{provider}
+          and environment = #{environment}
+          and provider_checkout_session_id = #{checkoutSessionId}
+        limit 1
+    </select>
+
+    <select id="selectOrderBySubscriptionId" resultType="map">
+        select id, user_id as userId, plan_id as planId, order_type as orderType,
+               provider, environment, provider_checkout_session_id as providerCheckoutSessionId,
+               provider_subscription_id as providerSubscriptionId,
+               provider_customer_id as providerCustomerId,
+               status, amount_cents as amountCents, currency,
+               expires_at as expiresAt, paid_at as paidAt, cancelled_at as cancelledAt,
+               failure_reason as failureReason, created_at as createdAt, updated_at as updatedAt
+        from cm_orders
+        where provider = #{provider}
+          and environment = #{environment}
+          and provider_subscription_id = #{subscriptionId}
+        order by created_at desc
+        limit 1
+    </select>
+
+    <select id="selectAccountOrder" resultType="map">
+        select o.id as orderId, o.status, o.provider, o.environment,
+               o.provider_checkout_session_id as checkoutSessionId,
+               o.provider_subscription_id as subscriptionId,
+               o.amount_cents as amountCents, o.currency,
+               o.created_at as createdAt, o.updated_at as updatedAt,
+               m.status as membershipStatus
+        from cm_orders o
+        left join cm_subscriptions s on s.provider = o.provider
+             and s.environment = o.environment
+             and s.provider_subscription_id = o.provider_subscription_id
+        left join cm_user_memberships m on m.id = s.membership_id
+        where o.user_id = #{userId}
+          and o.id = #{orderId}
+        limit 1
+    </select>
+
+    <update id="updateOrderStatus">
+        update cm_orders
+        set status = #{status},
+            paid_at = #{paidAt},
+            cancelled_at = #{cancelledAt},
+            failure_reason = #{failureReason},
+            updated_at = now()
+        where id = #{id}
+    </update>
+
+    <update id="updateOrderSubscription">
+        update cm_orders
+        set provider_subscription_id = #{subscriptionId},
+            provider_customer_id = #{customerId},
+            updated_at = now()
+        where id = #{id}
+    </update>
+
+    <insert id="insertWebhookEvent">
+        insert ignore into cm_payment_webhook_events
+            (id, provider, environment, event_id, event_type, payload_json, process_status)
+        values
+            (#{id}, #{provider}, #{environment}, #{eventId}, #{eventType},
+             cast(#{payloadJson} as json), 'received')
+    </insert>
+
+    <update id="updateWebhookEventStatus">
+        update cm_payment_webhook_events
+        set process_status = #{processStatus},
+            process_message = #{processMessage},
+            processed_at = now(),
+            updated_at = now()
+        where provider = #{provider}
+          and environment = #{environment}
+          and event_id = #{eventId}
+    </update>
+
+    <select id="selectSubscriptionByProviderId" resultType="map">
+        select id, user_id as userId, plan_id as planId, membership_id as membershipId,
+               provider, environment, provider_customer_id as providerCustomerId,
+               provider_subscription_id as providerSubscriptionId,
+               provider_price_id as providerPriceId,
+               status, current_period_started_at as currentPeriodStartedAt,
+               current_period_ends_at as currentPeriodEndsAt,
+               cancel_at_period_end as cancelAtPeriodEnd,
+               cancelled_at as cancelledAt
+        from cm_subscriptions
+        where provider = #{provider}
+          and environment = #{environment}
+          and provider_subscription_id = #{subscriptionId}
+        limit 1
+    </select>
+
+    <insert id="insertSubscription">
+        insert into cm_subscriptions
+            (id, user_id, plan_id, membership_id, provider, environment,
+             provider_customer_id, provider_subscription_id, provider_price_id,
+             status, current_period_started_at, current_period_ends_at,
+             cancel_at_period_end, cancelled_at)
+        values
+            (#{id}, #{userId}, #{planId}, #{membershipId}, #{provider}, #{environment},
+             #{customerId}, #{subscriptionId}, #{priceId},
+             #{status}, #{periodStart}, #{periodEnd},
+             #{cancelAtPeriodEnd}, #{cancelledAt})
+    </insert>
+
+    <update id="updateSubscription">
+        update cm_subscriptions
+        set membership_id = #{membershipId},
+            plan_id = #{planId},
+            provider_price_id = #{priceId},
+            status = #{status},
+            current_period_started_at = #{periodStart},
+            current_period_ends_at = #{periodEnd},
+            cancel_at_period_end = #{cancelAtPeriodEnd},
+            cancelled_at = #{cancelledAt},
+            updated_at = now()
+        where id = #{id}
+    </update>
+
+    <update id="expireActiveMemberships">
+        update cm_user_memberships
+        set status = 'expired',
+            expires_at = coalesce(expires_at, now()),
+            updated_at = now()
+        where user_id = #{userId}
+          and status = 'active'
+    </update>
+
+    <insert id="insertUserMembership">
+        insert into cm_user_memberships
+            (id, user_id, plan_id, tier, status, started_at, expires_at)
+        values
+            (#{id}, #{userId}, #{planId}, #{tier}, #{status}, #{startedAt}, #{expiresAt})
+    </insert>
+
+    <insert id="insertEntitlementBalance">
+        insert ignore into cm_user_entitlement_balances
+            (id, user_id, membership_id, entitlement_code,
+             period_started_at, period_ends_at, quota_total, quota_used, quota_remaining)
+        values
+            (#{id}, #{userId}, #{membershipId}, #{entitlementCode},
+             #{periodStartedAt}, #{periodEndsAt}, #{quotaTotal}, 0, #{quotaTotal})
+    </insert>
+
+    <insert id="insertPaymentIfAbsent">
+        insert ignore into cm_payments
+            (id, order_id, provider, environment, provider_payment_id, provider_invoice_id,
+             provider_subscription_id, provider_charge_id, provider_checkout_session_id,
+             status, raw_status, amount_cents, currency, failure_reason, paid_at)
+        select #{id}, #{orderId}, #{provider}, #{environment}, #{paymentId}, #{invoiceId},
+               #{subscriptionId}, #{chargeId}, #{checkoutSessionId},
+               #{status}, #{rawStatus}, #{amountCents}, #{currency}, #{failureReason}, #{paidAt}
+        from dual
+        where not exists (
+            select 1 from cm_payments
+            where provider = #{provider}
+              and environment = #{environment}
+              and provider_invoice_id = #{invoiceId}
+        )
+    </insert>
+
+    <select id="selectAdminOrders" resultType="map">
+        select o.id, o.user_id as userId, u.account_name as accountName,
+               p.tier, o.status, o.provider, o.environment,
+               o.provider_checkout_session_id as checkoutSessionId,
+               o.provider_subscription_id as subscriptionId,
+               o.amount_cents as amountCents, o.currency,
+               o.paid_at as paidAt, o.created_at as createdAt, o.updated_at as updatedAt
+        from cm_orders o
+        left join cm_users u on u.id = o.user_id
+        left join cm_membership_plans p on p.id = o.plan_id
+        where (#{keyword} is null or o.id = #{keyword} or o.user_id = #{keyword}
+               or u.account_name like concat('%', #{keyword}, '%')
+               or o.provider_checkout_session_id = #{keyword}
+               or o.provider_subscription_id = #{keyword})
+          and (#{status} is null or o.status = #{status})
+          and (#{tier} is null or p.tier = #{tier})
+        order by o.created_at desc
+    </select>
+
+    <select id="selectAdminWebhookEvents" resultType="map">
+        select id, provider, environment, event_id as eventId, event_type as eventType,
+               process_status as processStatus, process_message as processMessage,
+               received_at as receivedAt, processed_at as processedAt,
+               created_at as createdAt, updated_at as updatedAt
+        from cm_payment_webhook_events
+        where (#{eventType} is null or event_type like concat('%', #{eventType}, '%'))
+          and (#{processStatus} is null or process_status = #{processStatus})
+        order by received_at desc
+    </select>
+</mapper>

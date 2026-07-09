@@ -43,4 +43,12 @@ public interface CupidMembershipMapper
      */
     int expireMemberships(@Param("batchSize") int batchSize);
 
+    int expireLowerPriorityActiveMemberships(@Param("batchSize") int batchSize);
+
+    List<String> selectUsersWithoutActiveMembership(@Param("batchSize") int batchSize);
+
+    int reactivateFreeMembership(@Param("userId") String userId);
+
+    int insertFreeMembership(@Param("id") String id, @Param("userId") String userId);
+
 }

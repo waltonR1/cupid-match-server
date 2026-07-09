@@ -17,8 +17,13 @@
 -- ----------------------------
 
 -- Cupid Match 业务表
+drop table if exists cm_payment_webhook_events;
+drop table if exists cm_translation_retries;
 drop table if exists cm_payments;
+drop table if exists cm_subscriptions;
 drop table if exists cm_orders;
+drop table if exists cm_payment_customers;
+drop table if exists cm_membership_plan_payment_prices;
 drop table if exists cm_audit_logs;
 drop table if exists cm_staff_task_localized_fields;
 drop table if exists cm_staff_tasks;
@@ -1446,35 +1451,129 @@ create table cm_audit_logs (
   key idx_cm_audit_created (created_at)
 ) engine=innodb comment='业务审计日志';
 
-create table cm_orders (
-  id                 varchar(36) not null comment '订单ID',
-  user_id            varchar(36) not null comment '用户ID，关联 cm_users.id',
-  plan_id            varchar(36) not null comment '会员套餐ID，关联 cm_membership_plans.id',
-  status             varchar(20) not null comment '订单状态；可选值：pending, paid, cancelled, refunded, failed',
-  amount_cents       int         not null comment '金额（分）',
-  currency           varchar(3)  not null comment '币种；可选值：EUR, USD, CNY',
-  created_at         datetime    not null default current_timestamp comment '创建时间',
-  updated_at         datetime    not null default current_timestamp on update current_timestamp comment '更新时间',
-  primary key (id),
-  key idx_cm_orders_user_status (user_id, status),
-  key idx_cm_orders_plan (plan_id)
-) engine=innodb comment='订单';
-
-create table cm_payments (
-  id                   varchar(36)  not null comment '支付记录ID',
-  order_id             varchar(36)  not null comment '订单ID，关联 cm_orders.id',
-  provider             varchar(30)  not null comment '支付提供方；可选值：stripe, manual',
-  provider_payment_id  varchar(191) default null comment '支付服务商交易ID',
-  status               varchar(20)  not null comment '支付记录状态；可选值：pending, succeeded, failed, refunded',
-  amount_cents         int          not null comment '金额（分）',
+create table cm_membership_plan_payment_prices (
+  id                   varchar(36)  not null comment '套餐支付价格映射ID',
+  plan_id              varchar(36)  not null comment '会员套餐ID，关联 cm_membership_plans.id',
+  provider             varchar(30)  not null comment '支付服务商；可选值：stripe',
+  environment          varchar(10)  not null comment '支付环境；可选值：test, live',
+  mode                 varchar(30)  not null comment '支付模式；可选值：subscription',
+  provider_product_id  varchar(191) default null comment '服务商商品ID',
+  provider_price_id    varchar(191) not null comment '服务商价格ID',
   currency             varchar(3)   not null comment '币种；可选值：EUR, USD, CNY',
-  paid_at              datetime     default null comment '支付时间',
+  billing_period       varchar(20)  not null comment '计费周期；可选值：monthly, quarterly, yearly',
+  status               varchar(20)  not null default 'active' comment '状态；可选值：active, inactive',
   created_at           datetime     not null default current_timestamp comment '创建时间',
   updated_at           datetime     not null default current_timestamp on update current_timestamp comment '更新时间',
   primary key (id),
+  unique key uk_cm_plan_payment_price_scope (plan_id, provider, environment, mode, currency, billing_period),
+  unique key uk_cm_plan_payment_provider_price (provider, environment, provider_price_id),
+  key idx_cm_plan_payment_price_plan (plan_id)
+) engine=innodb comment='会员套餐支付价格映射';
+
+create table cm_payment_customers (
+  id                   varchar(36)  not null comment '支付客户映射ID',
+  user_id              varchar(36)  not null comment '用户ID，关联 cm_users.id',
+  provider             varchar(30)  not null comment '支付服务商；可选值：stripe',
+  environment          varchar(10)  not null comment '支付环境；可选值：test, live',
+  provider_customer_id varchar(191) not null comment '服务商客户ID',
+  created_at           datetime     not null default current_timestamp comment '创建时间',
+  updated_at           datetime     not null default current_timestamp on update current_timestamp comment '更新时间',
+  primary key (id),
+  unique key uk_cm_payment_customer_user (user_id, provider, environment),
+  unique key uk_cm_payment_customer_provider (provider, environment, provider_customer_id)
+) engine=innodb comment='支付客户映射';
+
+create table cm_orders (
+  id                           varchar(36)  not null comment '订单ID',
+  user_id                      varchar(36)  not null comment '用户ID，关联 cm_users.id',
+  plan_id                      varchar(36)  not null comment '会员套餐ID，关联 cm_membership_plans.id',
+  order_type                   varchar(40)  not null default 'membership_subscription' comment '订单类型；可选值：membership_subscription',
+  provider                     varchar(30)  default null comment '支付提供方；可选值：stripe, manual',
+  environment                  varchar(10)  default null comment '支付环境；可选值：test, live',
+  provider_checkout_session_id varchar(191) default null comment '服务商 Checkout Session ID',
+  provider_subscription_id     varchar(191) default null comment '服务商订阅ID',
+  provider_customer_id         varchar(191) default null comment '服务商客户ID',
+  status                       varchar(20)  not null comment '订单状态；可选值：pending, checkout_created, paid, cancelled, expired, refunded, failed',
+  amount_cents                 int          not null comment '金额（分）',
+  currency                     varchar(3)   not null comment '币种；可选值：EUR, USD, CNY',
+  expires_at                   datetime     default null comment '订单或 Checkout 过期时间',
+  paid_at                      datetime     default null comment '支付时间',
+  cancelled_at                 datetime     default null comment '取消时间',
+  failure_reason               varchar(500) default null comment '失败原因',
+  created_at                   datetime     not null default current_timestamp comment '创建时间',
+  updated_at                   datetime     not null default current_timestamp on update current_timestamp comment '更新时间',
+  primary key (id),
+  key idx_cm_orders_user_status (user_id, status),
+  key idx_cm_orders_plan (plan_id),
+  key idx_cm_orders_provider_session (provider, environment, provider_checkout_session_id),
+  key idx_cm_orders_provider_subscription (provider, environment, provider_subscription_id)
+) engine=innodb comment='订单';
+
+create table cm_subscriptions (
+  id                           varchar(36)  not null comment '订阅ID',
+  user_id                      varchar(36)  not null comment '用户ID，关联 cm_users.id',
+  plan_id                      varchar(36)  not null comment '会员套餐ID，关联 cm_membership_plans.id',
+  membership_id                varchar(36)  default null comment '用户会员ID，关联 cm_user_memberships.id',
+  provider                     varchar(30)  not null comment '支付服务商；可选值：stripe',
+  environment                  varchar(10)  not null comment '支付环境；可选值：test, live',
+  provider_customer_id         varchar(191) not null comment '服务商客户ID',
+  provider_subscription_id     varchar(191) not null comment '服务商订阅ID',
+  provider_price_id            varchar(191) not null comment '服务商价格ID',
+  status                       varchar(30)  not null comment '订阅状态',
+  current_period_started_at    datetime     default null comment '当前周期开始时间',
+  current_period_ends_at       datetime     default null comment '当前周期结束时间',
+  cancel_at_period_end         tinyint(1)   not null default 0 comment '是否周期结束后取消',
+  cancelled_at                 datetime     default null comment '取消时间',
+  created_at                   datetime     not null default current_timestamp comment '创建时间',
+  updated_at                   datetime     not null default current_timestamp on update current_timestamp comment '更新时间',
+  primary key (id),
+  unique key uk_cm_subscription_provider (provider, environment, provider_subscription_id),
+  key idx_cm_subscription_user_status (user_id, status),
+  key idx_cm_subscription_membership (membership_id)
+) engine=innodb comment='支付订阅';
+
+create table cm_payments (
+  id                           varchar(36)  not null comment '支付记录ID',
+  order_id                     varchar(36)  not null comment '订单ID，关联 cm_orders.id',
+  provider                     varchar(30)  not null comment '支付提供方；可选值：stripe, manual',
+  environment                  varchar(10)  default null comment '支付环境；可选值：test, live',
+  provider_payment_id          varchar(191) default null comment '支付服务商交易ID',
+  provider_invoice_id          varchar(191) default null comment '服务商发票ID',
+  provider_subscription_id     varchar(191) default null comment '服务商订阅ID',
+  provider_charge_id           varchar(191) default null comment '服务商扣款ID',
+  provider_checkout_session_id varchar(191) default null comment '服务商 Checkout Session ID',
+  status                       varchar(20)  not null comment '支付记录状态；可选值：pending, succeeded, failed, refunded',
+  raw_status                   varchar(50)  default null comment '服务商原始状态',
+  amount_cents                 int          not null comment '金额（分）',
+  currency                     varchar(3)   not null comment '币种；可选值：EUR, USD, CNY',
+  failure_reason               varchar(500) default null comment '失败原因',
+  paid_at                      datetime     default null comment '支付时间',
+  created_at                   datetime     not null default current_timestamp comment '创建时间',
+  updated_at                   datetime     not null default current_timestamp on update current_timestamp comment '更新时间',
+  primary key (id),
   key idx_cm_payments_order (order_id),
-  key idx_cm_payments_provider_payment (provider, provider_payment_id)
+  key idx_cm_payments_provider_payment (provider, provider_payment_id),
+  unique key uk_cm_payments_provider_invoice (provider, environment, provider_invoice_id),
+  key idx_cm_payments_provider_subscription (provider, environment, provider_subscription_id)
 ) engine=innodb comment='支付记录';
+
+create table cm_payment_webhook_events (
+  id              varchar(36)  not null comment '支付 Webhook 事件ID',
+  provider        varchar(30)  not null comment '支付服务商；可选值：stripe',
+  environment     varchar(10)  not null comment '支付环境；可选值：test, live',
+  event_id        varchar(191) not null comment '服务商事件ID',
+  event_type      varchar(100) not null comment '事件类型',
+  payload_json    json         not null comment '原始事件快照',
+  process_status  varchar(20)  not null comment '处理状态；可选值：received, processed, failed, ignored',
+  process_message varchar(500) default null comment '处理消息',
+  received_at     datetime     not null default current_timestamp comment '接收时间',
+  processed_at    datetime     default null comment '处理时间',
+  created_at      datetime     not null default current_timestamp comment '创建时间',
+  updated_at      datetime     not null default current_timestamp on update current_timestamp comment '更新时间',
+  primary key (id),
+  unique key uk_cm_payment_webhook_provider_event (provider, environment, event_id),
+  key idx_cm_payment_webhook_status (process_status, received_at)
+) engine=innodb comment='支付 Webhook 事件';
 
 create table cm_translation_retries (
   id varchar(36) not null,

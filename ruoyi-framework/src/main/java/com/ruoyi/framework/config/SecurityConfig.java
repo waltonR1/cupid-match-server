@@ -106,6 +106,7 @@ public class SecurityConfig
                 // 对于登录login 注册register 验证码captchaImage 允许匿名访问
                 requests.requestMatchers("/login", "/register", "/captchaImage").permitAll()
                     .requestMatchers("/api/auth/logout").authenticated()
+                    .requestMatchers(HttpMethod.POST, "/api/payment/stripe/webhook").permitAll()
                     .requestMatchers("/api/auth/**", "/api/legal/**").permitAll()
                     .requestMatchers(HttpMethod.GET, "/api/profiles/featured", "/api/profiles/self/**", "/api/profiles/family/**", "/api/membership/catalog", "/api/events", "/api/events/**").permitAll()
                     // 静态资源，可匿名访问
