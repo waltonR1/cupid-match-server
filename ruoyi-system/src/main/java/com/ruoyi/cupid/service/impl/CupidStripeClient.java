@@ -64,6 +64,13 @@ public class CupidStripeClient
         return post("/v1/checkout/sessions", params);
     }
 
+    public JSONObject cancelSubscriptionAtPeriodEnd(String subscriptionId)
+    {
+        Map<String, String> params = new LinkedHashMap<>();
+        params.put("cancel_at_period_end", "true");
+        return post("/v1/subscriptions/" + subscriptionId, params);
+    }
+
     public void verifyWebhookSignature(String payload, String header)
     {
         String webhookSecret = StringUtils.trimWhitespace(properties.getWebhookSecret());

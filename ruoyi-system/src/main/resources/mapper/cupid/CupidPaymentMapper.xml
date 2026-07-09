@@ -197,6 +197,25 @@
         limit 1
     </select>
 
+    <select id="selectActiveSubscriptionByUserId" resultType="map">
+        select s.id, s.user_id as userId, s.plan_id as planId, s.membership_id as membershipId,
+               s.provider, s.environment, s.provider_customer_id as providerCustomerId,
+               s.provider_subscription_id as providerSubscriptionId,
+               s.provider_price_id as providerPriceId,
+               s.status, s.current_period_started_at as currentPeriodStartedAt,
+               s.current_period_ends_at as currentPeriodEndsAt,
+               s.cancel_at_period_end as cancelAtPeriodEnd,
+               s.cancelled_at as cancelledAt
+        from cm_subscriptions s
+        where s.user_id = #{userId}
+          and s.provider = #{provider}
+          and s.environment = #{environment}
+          and s.provider_subscription_id is not null
+          and s.status in ('active', 'trialing', 'past_due', 'incomplete')
+        order by s.current_period_ends_at desc, s.updated_at desc
+        limit 1
+    </select>
+
     <insert id="insertSubscription">
         insert into cm_subscriptions
             (id, user_id, plan_id, membership_id, provider, environment,

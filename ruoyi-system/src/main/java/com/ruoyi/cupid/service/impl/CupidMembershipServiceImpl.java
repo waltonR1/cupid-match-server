@@ -8,12 +8,14 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import com.ruoyi.common.constant.HttpStatus;
 import com.ruoyi.common.exception.cupid.CupidApiException;
+import com.ruoyi.cupid.config.CupidStripeProperties;
 import com.ruoyi.cupid.domain.CupidMembershipPlan;
 import com.ruoyi.cupid.domain.CupidUser;
 import com.ruoyi.cupid.domain.CupidUserEntitlementBalance;
 import com.ruoyi.cupid.domain.CupidUserMembership;
 import com.ruoyi.cupid.mapper.CupidAuthMapper;
 import com.ruoyi.cupid.mapper.CupidMembershipMapper;
+import com.ruoyi.cupid.mapper.CupidPaymentMapper;
 import com.ruoyi.cupid.service.ICupidMembershipService;
 import com.ruoyi.cupid.service.ICupidPaymentService;
 
@@ -28,6 +30,12 @@ public class CupidMembershipServiceImpl implements ICupidMembershipService
 
     @Autowired
     private CupidAuthMapper authMapper;
+
+    @Autowired
+    private CupidPaymentMapper paymentMapper;
+
+    @Autowired
+    private CupidStripeProperties stripeProperties;
 
     @Autowired
     private ICupidPaymentService paymentService;
@@ -81,6 +89,14 @@ public class CupidMembershipServiceImpl implements ICupidMembershipService
         membershipDto.put("expiresAt", displayedMembership != null ? displayedMembership.getExpiresAt() : null);
         membershipDto.put("staffSupportLevel", currentPlan.getStaffSupportLevel());
         membershipDto.put("conciergePriority", currentPlan.isConciergePriority());
+        Map<String, Object> subscription = paymentMapper.selectActiveSubscriptionByUserId(
+                userId, "stripe", stripeEnvironment());
+        boolean cancelAtPeriodEnd = subscription != null && truthy(subscription.get("cancelAtPeriodEnd"));
+        membershipDto.put("subscriptionProvider", subscription == null ? null : subscription.get("provider"));
+        membershipDto.put("subscriptionStatus", subscription == null ? null : subscription.get("status"));
+        membershipDto.put("cancelAtPeriodEnd", cancelAtPeriodEnd);
+        membershipDto.put("renewalStatus", cancelAtPeriodEnd ? "cancel_at_period_end"
+                : subscription != null ? "renewing" : "none");
 
         List<CupidUserEntitlementBalance> balances = activeMembership == null
                 ? new ArrayList<>()
@@ -205,5 +221,24 @@ public class CupidMembershipServiceImpl implements ICupidMembershipService
             return "expired";
         }
         return membership.getStatus();
+    }
+
+    private boolean truthy(Object value)
+    {
+        if (value instanceof Boolean)
+        {
+            return (Boolean) value;
+        }
+        if (value instanceof Number)
+        {
+            return ((Number) value).intValue() != 0;
+        }
+        return "true".equalsIgnoreCase(String.valueOf(value)) || "1".equals(String.valueOf(value));
+    }
+
+    private String stripeEnvironment()
+    {
+        return org.springframework.util.StringUtils.hasText(stripeProperties.getEnvironment())
+                ? stripeProperties.getEnvironment() : "test";
     }
 }

@@ -59,6 +59,13 @@ public class CupidMembershipController
                 membershipService.requestUpgrade(principal.getUserId(), body.get("tier")));
     }
 
+    @PostMapping("/account/membership/cancel-renewal")
+    public AjaxResult cancelRenewal(@AuthenticationPrincipal CupidLoginUser principal)
+    {
+        return AjaxResult.success(
+                paymentService.cancelAccountMembershipRenewal(principal.getUserId()));
+    }
+
     @GetMapping("/account/membership/orders/{orderId}")
     public AjaxResult order(@PathVariable String orderId,
             @AuthenticationPrincipal CupidLoginUser principal)

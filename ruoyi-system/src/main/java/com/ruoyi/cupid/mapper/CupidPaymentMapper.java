@@ -81,6 +81,10 @@ public interface CupidPaymentMapper
             @Param("environment") String environment,
             @Param("subscriptionId") String subscriptionId);
 
+    Map<String, Object> selectActiveSubscriptionByUserId(@Param("userId") String userId,
+            @Param("provider") String provider,
+            @Param("environment") String environment);
+
     int insertSubscription(@Param("id") String id,
             @Param("userId") String userId,
             @Param("planId") String planId,

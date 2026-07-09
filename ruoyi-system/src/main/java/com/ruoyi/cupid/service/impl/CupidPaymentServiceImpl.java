@@ -105,6 +105,43 @@ public class CupidPaymentServiceImpl implements ICupidPaymentService
 
     @Override
     @Transactional
+    public Map<String, Object> cancelAccountMembershipRenewal(String userId)
+    {
+        if (!stripeProperties.isEnabled())
+        {
+            throw new CupidApiException(HttpStatus.ERROR, "stripe_disabled");
+        }
+        Map<String, Object> subscription = paymentMapper.selectActiveSubscriptionByUserId(
+                userId, PROVIDER_STRIPE, environment());
+        if (subscription == null)
+        {
+            throw new CupidApiException(HttpStatus.NOT_FOUND, "subscription_not_found");
+        }
+
+        String subscriptionId = text(subscription.get("providerSubscriptionId"));
+        if (!StringUtils.hasText(subscriptionId))
+        {
+            throw new CupidApiException(HttpStatus.NOT_FOUND, "subscription_not_found");
+        }
+
+        if (!truthy(subscription.get("cancelAtPeriodEnd")))
+        {
+            JSONObject stripeSubscription = stripeClient.cancelSubscriptionAtPeriodEnd(subscriptionId);
+            updateLocalSubscription(subscription, stripeSubscription);
+            subscription = paymentMapper.selectSubscriptionByProviderId(
+                    PROVIDER_STRIPE, environment(), subscriptionId);
+        }
+
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("status", "renewal_cancelled");
+        result.put("subscriptionId", subscriptionId);
+        result.put("cancelAtPeriodEnd", true);
+        result.put("currentPeriodEndsAt", subscription.get("currentPeriodEndsAt"));
+        return result;
+    }
+
+    @Override
+    @Transactional
     public void handleStripeWebhook(String payload, String signatureHeader)
     {
         stripeClient.verifyWebhookSignature(payload, signatureHeader);
@@ -320,6 +357,11 @@ public class CupidPaymentServiceImpl implements ICupidPaymentService
             }
             return;
         }
+        updateLocalSubscription(subscription, stripeSubscription);
+    }
+
+    private void updateLocalSubscription(Map<String, Object> subscription, JSONObject stripeSubscription)
+    {
         paymentMapper.updateSubscription(text(subscription.get("id")),
                 text(subscription.get("membershipId")),
                 text(subscription.get("planId")),
