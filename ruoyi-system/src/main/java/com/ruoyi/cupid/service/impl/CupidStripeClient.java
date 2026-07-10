@@ -71,6 +71,24 @@ public class CupidStripeClient
         return post("/v1/subscriptions/" + subscriptionId, params);
     }
 
+    public JSONObject createRefund(String chargeId, String paymentIntentId)
+    {
+        Map<String, String> params = new LinkedHashMap<>();
+        if (StringUtils.hasText(chargeId))
+        {
+            params.put("charge", chargeId);
+        }
+        else if (StringUtils.hasText(paymentIntentId))
+        {
+            params.put("payment_intent", paymentIntentId);
+        }
+        else
+        {
+            throw new IllegalStateException("Stripe refund target is missing");
+        }
+        return post("/v1/refunds", params);
+    }
+
     public void verifyWebhookSignature(String payload, String header)
     {
         String webhookSecret = StringUtils.trimWhitespace(properties.getWebhookSecret());

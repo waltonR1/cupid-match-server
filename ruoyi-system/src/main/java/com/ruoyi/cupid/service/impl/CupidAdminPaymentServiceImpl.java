@@ -1,12 +1,16 @@
 package com.ruoyi.cupid.service.impl;
 
-import java.util.ArrayList;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
+import com.alibaba.fastjson2.JSONObject;
+import com.ruoyi.common.constant.HttpStatus;
+import com.ruoyi.common.exception.cupid.CupidApiException;
 import com.ruoyi.cupid.mapper.CupidPaymentMapper;
 import com.ruoyi.cupid.service.ICupidAdminPaymentService;
 
@@ -14,10 +18,12 @@ import com.ruoyi.cupid.service.ICupidAdminPaymentService;
 public class CupidAdminPaymentServiceImpl implements ICupidAdminPaymentService
 {
     private final CupidPaymentMapper paymentMapper;
+    private final CupidStripeClient stripeClient;
 
-    public CupidAdminPaymentServiceImpl(CupidPaymentMapper paymentMapper)
+    public CupidAdminPaymentServiceImpl(CupidPaymentMapper paymentMapper, CupidStripeClient stripeClient)
     {
         this.paymentMapper = paymentMapper;
+        this.stripeClient = stripeClient;
     }
 
     @Override
@@ -42,45 +48,64 @@ public class CupidAdminPaymentServiceImpl implements ICupidAdminPaymentService
     }
 
     @Override
-    public Map<String, Object> selectAdminOrderStripeLinks(String id)
+    @Transactional
+    public Map<String, Object> cancelAdminOrderRenewal(String id)
     {
-        Map<String, Object> detail = selectAdminOrderDetail(id);
-        Map<String, Object> result = new LinkedHashMap<>();
-        List<Map<String, String>> links = new ArrayList<>();
+        Map<String, Object> detail = paymentMapper.selectAdminOrderDetail(id);
         if (detail == null)
         {
-            result.put("links", links);
-            return result;
+            throw new CupidApiException(HttpStatus.NOT_FOUND, "order_not_found");
         }
 
-        String baseUrl = stripeDashboardBaseUrl(trim(detail.get("environment")));
-        addStripeLink(links, "customer", "查看 Stripe Customer",
-                baseUrl, "customers", trim(detail.get("customerId")));
-        addStripeLink(links, "subscription", "查看/取消 Stripe Subscription",
-                baseUrl, "subscriptions", trim(detail.get("subscriptionId")));
-        addStripeLink(links, "checkout_session", "查看 Checkout Session",
-                baseUrl, "checkout/sessions", trim(detail.get("checkoutSessionId")));
-        addStripeLink(links, "price", "查看 Stripe Price",
-                baseUrl, "prices", trim(detail.get("priceId")));
-
-        Object paymentsValue = detail.get("payments");
-        if (paymentsValue instanceof List<?>)
+        String subscriptionId = trim(detail.get("subscriptionId"));
+        String localSubscriptionId = trim(detail.get("localSubscriptionId"));
+        if (!StringUtils.hasText(subscriptionId) || !StringUtils.hasText(localSubscriptionId))
         {
-            for (Object item : (List<?>) paymentsValue)
-            {
-                if (item instanceof Map<?, ?>)
-                {
-                    Map<?, ?> payment = (Map<?, ?>) item;
-                    addStripeLink(links, "payment", "查看/退款 Stripe Payment",
-                            baseUrl, "payments", trim(payment.get("paymentId")));
-                    addStripeLink(links, "invoice", "查看 Stripe Invoice",
-                            baseUrl, "invoices", trim(payment.get("invoiceId")));
-                    addStripeLink(links, "charge", "查看/退款 Stripe Charge",
-                            baseUrl, "payments", trim(payment.get("chargeId")));
-                }
-            }
+            throw new CupidApiException(HttpStatus.BAD_REQUEST, "subscription_not_found");
         }
-        result.put("links", links);
+
+        JSONObject stripeSubscription = stripeClient.cancelSubscriptionAtPeriodEnd(subscriptionId);
+        updateLocalSubscription(detail, stripeSubscription);
+
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("status", "renewal_cancelled");
+        result.put("orderId", id);
+        result.put("subscriptionId", subscriptionId);
+        result.put("cancelAtPeriodEnd", true);
+        return result;
+    }
+
+    @Override
+    @Transactional
+    public Map<String, Object> refundAdminOrder(String id)
+    {
+        Map<String, Object> detail = selectAdminOrderDetail(id);
+        if (detail == null)
+        {
+            throw new CupidApiException(HttpStatus.NOT_FOUND, "order_not_found");
+        }
+        if ("refunded".equals(trim(detail.get("status"))))
+        {
+            throw new CupidApiException(HttpStatus.BAD_REQUEST, "order_already_refunded");
+        }
+
+        Map<String, Object> payment = firstRefundablePayment(detail);
+        if (payment == null)
+        {
+            throw new CupidApiException(HttpStatus.BAD_REQUEST, "payment_not_refundable");
+        }
+
+        String chargeId = trim(payment.get("chargeId"));
+        String paymentId = trim(payment.get("paymentId"));
+        JSONObject refund = stripeClient.createRefund(chargeId, paymentId);
+        paymentMapper.updatePaymentRefunded(trim(payment.get("provider")), trim(payment.get("environment")),
+                paymentId, chargeId, refund.getString("status"));
+        paymentMapper.updateOrderStatus(id, "refunded", (Date) detail.get("paidAt"), null, null);
+
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("status", "refunded");
+        result.put("orderId", id);
+        result.put("refundId", refund.getString("id"));
         return result;
     }
 
@@ -109,32 +134,104 @@ public class CupidAdminPaymentServiceImpl implements ICupidAdminPaymentService
         return StringUtils.hasText(text) ? text : null;
     }
 
-    private String stripeDashboardBaseUrl(String environment)
+    private Map<String, Object> firstRefundablePayment(Map<String, Object> detail)
     {
-        return "live".equals(environment)
-                ? "https://dashboard.stripe.com"
-                : "https://dashboard.stripe.com/test";
-    }
-
-    private void addStripeLink(List<Map<String, String>> links, String type, String label,
-            String baseUrl, String path, String id)
-    {
-        if (!StringUtils.hasText(id))
+        Object paymentsValue = detail.get("payments");
+        if (!(paymentsValue instanceof List<?>))
         {
-            return;
+            return null;
         }
-        for (Map<String, String> existing : links)
+        for (Object item : (List<?>) paymentsValue)
         {
-            if (id.equals(existing.get("externalId")))
+            if (!(item instanceof Map<?, ?>))
             {
-                return;
+                continue;
+            }
+            Map<?, ?> payment = (Map<?, ?>) item;
+            if (!"succeeded".equals(trim(payment.get("status"))))
+            {
+                continue;
+            }
+            if (StringUtils.hasText(trim(payment.get("chargeId")))
+                    || StringUtils.hasText(trim(payment.get("paymentId"))))
+            {
+                Map<String, Object> result = new LinkedHashMap<>();
+                for (Map.Entry<?, ?> entry : payment.entrySet())
+                {
+                    if (entry.getKey() != null)
+                    {
+                        result.put(String.valueOf(entry.getKey()), entry.getValue());
+                    }
+                }
+                return result;
             }
         }
-        Map<String, String> link = new LinkedHashMap<>();
-        link.put("type", type);
-        link.put("label", label);
-        link.put("externalId", id);
-        link.put("url", baseUrl + "/" + path + "/" + id);
-        links.add(link);
+        return null;
+    }
+
+    private void updateLocalSubscription(Map<String, Object> detail, JSONObject stripeSubscription)
+    {
+        String status = stripeSubscription.getString("status");
+        Date periodStart = epoch(stripeSubscription.getLong("current_period_start"));
+        Date periodEnd = epoch(stripeSubscription.getLong("current_period_end"));
+        boolean cancelAtPeriodEnd = stripeSubscription.getBooleanValue("cancel_at_period_end");
+        Date cancelledAt = epoch(stripeSubscription.getLong("canceled_at"));
+        paymentMapper.updateSubscription(trim(detail.get("localSubscriptionId")),
+                trim(detail.get("membershipId")),
+                trim(detail.get("planId")),
+                trim(detail.get("priceId")),
+                status, periodStart, periodEnd, cancelAtPeriodEnd, cancelledAt);
+        if (StringUtils.hasText(trim(detail.get("membershipId"))))
+        {
+            paymentMapper.updateMembershipLifecycle(trim(detail.get("membershipId")),
+                    membershipStatusForSubscription(status, periodEnd, cancelAtPeriodEnd),
+                    membershipExpiresAtForSubscription(status, periodEnd, cancelledAt, cancelAtPeriodEnd));
+        }
+    }
+
+    private String membershipStatusForSubscription(String stripeStatus, Date periodEnd,
+            boolean cancelAtPeriodEnd)
+    {
+        if ("active".equals(stripeStatus) || "trialing".equals(stripeStatus))
+        {
+            return "active";
+        }
+        if ("past_due".equals(stripeStatus) || "incomplete".equals(stripeStatus))
+        {
+            return periodEnd != null && periodEnd.after(new Date()) ? "active" : "paused";
+        }
+        if ("canceled".equals(stripeStatus) && cancelAtPeriodEnd
+                && periodEnd != null && periodEnd.after(new Date()))
+        {
+            return "active";
+        }
+        if ("canceled".equals(stripeStatus) || "cancelled".equals(stripeStatus))
+        {
+            return "cancelled";
+        }
+        if ("unpaid".equals(stripeStatus) || "incomplete_expired".equals(stripeStatus))
+        {
+            return periodEnd != null && periodEnd.after(new Date()) ? "active" : "expired";
+        }
+        return "paused";
+    }
+
+    private Date membershipExpiresAtForSubscription(String stripeStatus, Date periodEnd,
+            Date cancelledAt, boolean cancelAtPeriodEnd)
+    {
+        if ("canceled".equals(stripeStatus) || "cancelled".equals(stripeStatus))
+        {
+            if (cancelAtPeriodEnd && periodEnd != null && periodEnd.after(new Date()))
+            {
+                return periodEnd;
+            }
+            return cancelledAt != null ? cancelledAt : new Date();
+        }
+        return periodEnd;
+    }
+
+    private Date epoch(Long seconds)
+    {
+        return seconds == null ? null : new Date(seconds * 1000L);
     }
 }

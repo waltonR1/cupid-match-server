@@ -5,6 +5,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -35,11 +36,18 @@ public class CupidPaymentAdminController extends BaseController
         return success(adminPaymentService.selectAdminOrderDetail(id));
     }
 
-    @PreAuthorize("@ss.hasPermi('cupid:payment:stripe:open')")
-    @GetMapping("/orders/{id}/stripe-links")
-    public AjaxResult orderStripeLinks(@PathVariable String id)
+    @PreAuthorize("@ss.hasPermi('cupid:payment:subscription:cancel')")
+    @PostMapping("/orders/{id}/cancel-renewal")
+    public AjaxResult cancelOrderRenewal(@PathVariable String id)
     {
-        return success(adminPaymentService.selectAdminOrderStripeLinks(id));
+        return success(adminPaymentService.cancelAdminOrderRenewal(id));
+    }
+
+    @PreAuthorize("@ss.hasPermi('cupid:payment:refund')")
+    @PostMapping("/orders/{id}/refund")
+    public AjaxResult refundOrder(@PathVariable String id)
+    {
+        return success(adminPaymentService.refundAdminOrder(id));
     }
 
     @PreAuthorize("@ss.hasPermi('cupid:payment:webhook:list')")
