@@ -175,6 +175,10 @@ public class CupidPaymentServiceImpl implements ICupidPaymentService
             {
                 handleInvoicePaymentFailed(object);
             }
+            else if ("charge.refunded".equals(eventType))
+            {
+                handleChargeRefunded(object);
+            }
             else if ("customer.subscription.created".equals(eventType)
                     || "customer.subscription.updated".equals(eventType)
                     || "customer.subscription.deleted".equals(eventType))
@@ -319,7 +323,8 @@ public class CupidPaymentServiceImpl implements ICupidPaymentService
 
     private void handleInvoicePaymentFailed(JSONObject invoice)
     {
-        String subscriptionId = invoice.getString("subscription");
+        String subscriptionId = firstText(invoice.get("subscription"),
+                nestedString(invoice, "parent", "subscription_details", "subscription"));
         Map<String, Object> order = paymentMapper.selectOrderBySubscriptionId(PROVIDER_STRIPE,
                 environment(), subscriptionId);
         if (order != null)
@@ -332,6 +337,39 @@ public class CupidPaymentServiceImpl implements ICupidPaymentService
                     text(order.get("providerCheckoutSessionId")), "failed",
                     invoice.getString("status"), integer(invoice.get("amount_due")),
                     upper(invoice.getString("currency")), "invoice_payment_failed", null);
+        }
+        Map<String, Object> subscription = paymentMapper.selectSubscriptionByProviderId(
+                PROVIDER_STRIPE, environment(), subscriptionId);
+        if (subscription != null)
+        {
+            paymentMapper.updateSubscription(text(subscription.get("id")),
+                    text(subscription.get("membershipId")),
+                    text(subscription.get("planId")),
+                    text(subscription.get("providerPriceId")),
+                    "past_due",
+                    (Date) subscription.get("currentPeriodStartedAt"),
+                    (Date) subscription.get("currentPeriodEndsAt"),
+                    truthy(subscription.get("cancelAtPeriodEnd")),
+                    (Date) subscription.get("cancelledAt"));
+            syncMembershipLifecycle(subscription, "past_due",
+                    (Date) subscription.get("currentPeriodEndsAt"),
+                    truthy(subscription.get("cancelAtPeriodEnd")),
+                    (Date) subscription.get("cancelledAt"));
+        }
+    }
+
+    private void handleChargeRefunded(JSONObject charge)
+    {
+        String chargeId = charge.getString("id");
+        String paymentId = charge.getString("payment_intent");
+        paymentMapper.updatePaymentRefunded(PROVIDER_STRIPE, environment(), paymentId, chargeId,
+                charge.getString("status"));
+        Map<String, Object> order = paymentMapper.selectOrderByPaymentReference(PROVIDER_STRIPE,
+                environment(), paymentId, chargeId);
+        if (order != null)
+        {
+            paymentMapper.updateOrderStatus(text(order.get("id")), "refunded",
+                    (Date) order.get("paidAt"), null, null);
         }
     }
 
@@ -362,15 +400,79 @@ public class CupidPaymentServiceImpl implements ICupidPaymentService
 
     private void updateLocalSubscription(Map<String, Object> subscription, JSONObject stripeSubscription)
     {
+        String status = stripeSubscription.getString("status");
+        Date periodStart = epoch(stripeSubscription.getLong("current_period_start"));
+        Date periodEnd = epoch(stripeSubscription.getLong("current_period_end"));
+        boolean cancelAtPeriodEnd = stripeSubscription.getBooleanValue("cancel_at_period_end");
+        Date cancelledAt = epoch(stripeSubscription.getLong("canceled_at"));
         paymentMapper.updateSubscription(text(subscription.get("id")),
                 text(subscription.get("membershipId")),
                 text(subscription.get("planId")),
                 text(subscription.get("providerPriceId")),
-                stripeSubscription.getString("status"),
-                epoch(stripeSubscription.getLong("current_period_start")),
-                epoch(stripeSubscription.getLong("current_period_end")),
-                stripeSubscription.getBooleanValue("cancel_at_period_end"),
-                epoch(stripeSubscription.getLong("canceled_at")));
+                status,
+                periodStart,
+                periodEnd,
+                cancelAtPeriodEnd,
+                cancelledAt);
+        syncMembershipLifecycle(subscription, status, periodEnd, cancelAtPeriodEnd, cancelledAt);
+    }
+
+    private void syncMembershipLifecycle(Map<String, Object> subscription, String stripeStatus,
+            Date periodEnd, boolean cancelAtPeriodEnd, Date cancelledAt)
+    {
+        String membershipId = text(subscription.get("membershipId"));
+        if (!StringUtils.hasText(membershipId))
+        {
+            return;
+        }
+
+        String membershipStatus = membershipStatusForSubscription(stripeStatus, periodEnd,
+                cancelAtPeriodEnd);
+        Date membershipExpiresAt = membershipExpiresAtForSubscription(stripeStatus, periodEnd,
+                cancelledAt, cancelAtPeriodEnd);
+        paymentMapper.updateMembershipLifecycle(membershipId, membershipStatus,
+                membershipExpiresAt);
+    }
+
+    private String membershipStatusForSubscription(String stripeStatus, Date periodEnd,
+            boolean cancelAtPeriodEnd)
+    {
+        if ("active".equals(stripeStatus) || "trialing".equals(stripeStatus))
+        {
+            return "active";
+        }
+        if ("past_due".equals(stripeStatus) || "incomplete".equals(stripeStatus))
+        {
+            return periodEnd != null && periodEnd.after(new Date()) ? "active" : "paused";
+        }
+        if ("canceled".equals(stripeStatus) && cancelAtPeriodEnd
+                && periodEnd != null && periodEnd.after(new Date()))
+        {
+            return "active";
+        }
+        if ("canceled".equals(stripeStatus) || "cancelled".equals(stripeStatus))
+        {
+            return "cancelled";
+        }
+        if ("unpaid".equals(stripeStatus) || "incomplete_expired".equals(stripeStatus))
+        {
+            return periodEnd != null && periodEnd.after(new Date()) ? "active" : "expired";
+        }
+        return "paused";
+    }
+
+    private Date membershipExpiresAtForSubscription(String stripeStatus, Date periodEnd,
+            Date cancelledAt, boolean cancelAtPeriodEnd)
+    {
+        if ("canceled".equals(stripeStatus) || "cancelled".equals(stripeStatus))
+        {
+            if (cancelAtPeriodEnd && periodEnd != null && periodEnd.after(new Date()))
+            {
+                return periodEnd;
+            }
+            return cancelledAt != null ? cancelledAt : new Date();
+        }
+        return periodEnd;
     }
 
     private Map<String, Object> ensureSubscriptionFromOrder(Map<String, Object> order,

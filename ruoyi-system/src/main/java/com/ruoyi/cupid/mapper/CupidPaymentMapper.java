@@ -110,6 +110,10 @@ public interface CupidPaymentMapper
             @Param("cancelAtPeriodEnd") boolean cancelAtPeriodEnd,
             @Param("cancelledAt") Date cancelledAt);
 
+    int updateMembershipLifecycle(@Param("id") String id,
+            @Param("status") String status,
+            @Param("expiresAt") Date expiresAt);
+
     int expireActiveMemberships(@Param("userId") String userId);
 
     int insertUserMembership(@Param("id") String id,
@@ -144,7 +148,24 @@ public interface CupidPaymentMapper
             @Param("failureReason") String failureReason,
             @Param("paidAt") Date paidAt);
 
+    Map<String, Object> selectOrderByPaymentReference(@Param("provider") String provider,
+            @Param("environment") String environment,
+            @Param("paymentId") String paymentId,
+            @Param("chargeId") String chargeId);
+
+    int updatePaymentRefunded(@Param("provider") String provider,
+            @Param("environment") String environment,
+            @Param("paymentId") String paymentId,
+            @Param("chargeId") String chargeId,
+            @Param("rawStatus") String rawStatus);
+
     List<Map<String, Object>> selectAdminOrders(Map<String, Object> params);
 
+    Map<String, Object> selectAdminOrderDetail(@Param("id") String id);
+
+    List<Map<String, Object>> selectAdminPaymentsByOrderId(@Param("orderId") String orderId);
+
     List<Map<String, Object>> selectAdminWebhookEvents(Map<String, Object> params);
+
+    Map<String, Object> selectAdminWebhookEventDetail(@Param("id") String id);
 }

@@ -729,9 +729,10 @@ insert into sys_menu values('2109', '业务监控', '2099', '4', 'monitor', 'cup
 insert into sys_menu values('2110', '支付订阅', '2080', '5', 'payment', 'cupid/payment/index', '', 'CupidPayment', 1, 0, 'C', '0', '0', 'cupid:payment:list', 'money', 'admin', sysdate(), '', null, 'Cupid 支付订阅与支付回调日志查询');
 insert into sys_menu values('2111', '支付订单查询', '2110', '1', '', '', '', '', 1, 0, 'F', '0', '0', 'cupid:payment:list', '#', 'admin', sysdate(), '', null, '');
 insert into sys_menu values('2112', '回调日志查询', '2110', '2', '', '', '', '', 1, 0, 'F', '0', '0', 'cupid:payment:webhook:list', '#', 'admin', sysdate(), '', null, '');
+insert into sys_menu values('2113', '打开 Stripe 后台', '2110', '3', '', '', '', '', 1, 0, 'F', '0', '0', 'cupid:payment:stripe:open', '#', 'admin', sysdate(), '', null, '');
 
 insert into sys_role_menu (role_id, menu_id)
-select r.role_id, m.menu_id from sys_role r join sys_menu m on m.menu_id between 2000 and 2112
+select r.role_id, m.menu_id from sys_role r join sys_menu m on m.menu_id between 2000 and 2113
 where r.role_key = 'cupid_admin' and r.del_flag = '0';
 
 insert into sys_role_menu (role_id, menu_id)

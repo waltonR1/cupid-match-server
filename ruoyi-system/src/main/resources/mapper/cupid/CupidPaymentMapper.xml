@@ -243,6 +243,14 @@
         where id = #{id}
     </update>
 
+    <update id="updateMembershipLifecycle">
+        update cm_user_memberships
+        set status = #{status},
+            expires_at = #{expiresAt},
+            updated_at = now()
+        where id = #{id}
+    </update>
+
     <update id="expireActiveMemberships">
         update cm_user_memberships
         set status = 'expired',
@@ -285,6 +293,39 @@
         )
     </insert>
 
+    <select id="selectOrderByPaymentReference" resultType="map">
+        select o.id, o.user_id as userId, o.plan_id as planId, o.order_type as orderType,
+               o.provider, o.environment, o.provider_checkout_session_id as providerCheckoutSessionId,
+               o.provider_subscription_id as providerSubscriptionId,
+               o.provider_customer_id as providerCustomerId,
+               o.status, o.amount_cents as amountCents, o.currency,
+               o.expires_at as expiresAt, o.paid_at as paidAt, o.cancelled_at as cancelledAt,
+               o.failure_reason as failureReason, o.created_at as createdAt, o.updated_at as updatedAt
+        from cm_payments p
+        inner join cm_orders o on o.id = p.order_id
+        where p.provider = #{provider}
+          and p.environment = #{environment}
+          and (
+              (#{paymentId} is not null and p.provider_payment_id = #{paymentId})
+              or (#{chargeId} is not null and p.provider_charge_id = #{chargeId})
+          )
+        order by p.created_at desc
+        limit 1
+    </select>
+
+    <update id="updatePaymentRefunded">
+        update cm_payments
+        set status = 'refunded',
+            raw_status = #{rawStatus},
+            updated_at = now()
+        where provider = #{provider}
+          and environment = #{environment}
+          and (
+              (#{paymentId} is not null and provider_payment_id = #{paymentId})
+              or (#{chargeId} is not null and provider_charge_id = #{chargeId})
+          )
+    </update>
+
     <select id="selectAdminOrders" resultType="map">
         select o.id, o.user_id as userId, u.account_name as accountName,
                p.tier, o.status, o.provider, o.environment,
@@ -304,6 +345,51 @@
         order by o.created_at desc
     </select>
 
+    <select id="selectAdminOrderDetail" resultType="map">
+        select o.id, o.user_id as userId, u.account_name as accountName,
+               o.plan_id as planId, mp.tier, o.order_type as orderType,
+               o.provider, o.environment, o.provider_checkout_session_id as checkoutSessionId,
+               o.provider_subscription_id as subscriptionId,
+               o.provider_customer_id as customerId,
+               o.status, o.amount_cents as amountCents, o.currency,
+               o.expires_at as expiresAt, o.paid_at as paidAt,
+               o.cancelled_at as cancelledAt, o.failure_reason as failureReason,
+               s.id as localSubscriptionId, s.status as subscriptionStatus,
+               s.provider_price_id as priceId,
+               s.current_period_started_at as currentPeriodStartedAt,
+               s.current_period_ends_at as currentPeriodEndsAt,
+               s.cancel_at_period_end as cancelAtPeriodEnd,
+               s.cancelled_at as subscriptionCancelledAt,
+               m.id as membershipId, m.status as membershipStatus,
+               m.started_at as membershipStartedAt, m.expires_at as membershipExpiresAt,
+               o.created_at as createdAt, o.updated_at as updatedAt
+        from cm_orders o
+        left join cm_users u on u.id = o.user_id
+        left join cm_membership_plans mp on mp.id = o.plan_id
+        left join cm_subscriptions s on s.provider = o.provider
+             and s.environment = o.environment
+             and s.provider_subscription_id = o.provider_subscription_id
+        left join cm_user_memberships m on m.id = s.membership_id
+        where o.id = #{id}
+        limit 1
+    </select>
+
+    <select id="selectAdminPaymentsByOrderId" resultType="map">
+        select id, order_id as orderId, provider, environment,
+               provider_payment_id as paymentId,
+               provider_invoice_id as invoiceId,
+               provider_subscription_id as subscriptionId,
+               provider_charge_id as chargeId,
+               provider_checkout_session_id as checkoutSessionId,
+               status, raw_status as rawStatus,
+               amount_cents as amountCents, currency,
+               failure_reason as failureReason, paid_at as paidAt,
+               created_at as createdAt, updated_at as updatedAt
+        from cm_payments
+        where order_id = #{orderId}
+        order by created_at desc
+    </select>
+
     <select id="selectAdminWebhookEvents" resultType="map">
         select id, provider, environment, event_id as eventId, event_type as eventType,
                process_status as processStatus, process_message as processMessage,
@@ -313,5 +399,16 @@
         where (#{eventType} is null or event_type like concat('%', #{eventType}, '%'))
           and (#{processStatus} is null or process_status = #{processStatus})
         order by received_at desc
+    </select>
+
+    <select id="selectAdminWebhookEventDetail" resultType="map">
+        select id, provider, environment, event_id as eventId, event_type as eventType,
+               process_status as processStatus, process_message as processMessage,
+               cast(payload_json as char) as payloadJson,
+               received_at as receivedAt, processed_at as processedAt,
+               created_at as createdAt, updated_at as updatedAt
+        from cm_payment_webhook_events
+        where id = #{id}
+        limit 1
     </select>
 </mapper>
