@@ -38,6 +38,10 @@ nbdist/
 
 ######################################################################
 # Others
+.env
+.env.*
+!.env.example
+
 *.log
 *.xml.versionsBackup
 *.swp

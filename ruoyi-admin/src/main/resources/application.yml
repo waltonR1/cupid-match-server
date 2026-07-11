@@ -47,6 +47,10 @@ user:
 
 # Spring配置
 spring:
+  config:
+    import:
+      - optional:file:.env[.properties]
+      - optional:file:../.env[.properties]
   # SMTP 邮件配置；真实值通过环境变量提供
   mail:
     # SMTP 服务地址，例如 Resend 使用 smtp.resend.com
