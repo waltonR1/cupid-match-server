@@ -197,13 +197,7 @@ Cupid 后台可建立 `cupid_admin`、`cupid_operator`、`cupid_reviewer`、`cup
 
 ## 数据库重建顺序
 
-当 mock 样例数据或 ID 映射规则变化时：
-
-```powershell
-node .\scripts\generate-cm-seed.js
-```
-
-然后在目标数据库依次完整执行：
+当样例数据或 ID 映射规则变化时，直接维护 `sql/cm_seed.sql`，然后在目标数据库依次完整执行：
 
 ```text
 sql/cm_schema.sql
@@ -219,7 +213,6 @@ sql/ry_20260417.sql
 sql/quartz.sql
 sql/cm_schema.sql
 sql/cm_seed.sql
-sql/cm_admin_menu.sql
 ```
 
-具体环境限制和 Phase 8 增量规则统一以 `doc/cm-database-initialization.md` 为准。
+具体环境限制统一以 `doc/cm-database-initialization.md` 为准。

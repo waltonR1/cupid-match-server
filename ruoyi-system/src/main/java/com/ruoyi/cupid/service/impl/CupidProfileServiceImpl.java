@@ -43,6 +43,7 @@ import com.ruoyi.cupid.mapper.CupidProfileMapper;
 import com.ruoyi.cupid.service.ICupidCommonOptionService;
 import com.ruoyi.cupid.service.ICupidProfileService;
 import com.ruoyi.cupid.service.ICupidRuntimeConfigService;
+import com.ruoyi.cupid.support.CupidProfileDisplayNameHelper;
 import com.ruoyi.cupid.service.ICupidTranslationService;
 import com.ruoyi.cupid.service.ICupidUserService;
 
@@ -830,7 +831,7 @@ public class CupidProfileServiceImpl implements ICupidProfileService
 
             Map<String, String> fields =
                     localizedByProfile.getOrDefault(profile.getId(), new LinkedHashMap<>());
-            profile.setDisplayName(deriveDisplayName(profile.getId()));
+            profile.setDisplayName(deriveDisplayName(profile, locale));
             profile.setCity(commonOptionService.label("city", profile.getCityCode(), locale));
             profile.setEducation(commonOptionService.label("education", profile.getEducationCode(), locale));
             profile.setIndustry(commonOptionService.label("industry", profile.getIndustryCode(), locale));
@@ -870,7 +871,7 @@ public class CupidProfileServiceImpl implements ICupidProfileService
                 buildPrivateIntroduction(userId, profile.getId(), viewerRole);
         Map<String, Object> detail = new LinkedHashMap<>();
         detail.put("id", profile.getId());
-        detail.put("displayName", deriveDisplayName(profile.getId()));
+        detail.put("displayName", deriveDisplayName(profile, locale));
         detail.put("avatarUrl", findPrimaryPhotoUrl(photos));
         detail.put("photos", mask(buildPhotoList(photos),
                 "photos", viewerRole, privacy, selfProfile));
@@ -1735,21 +1736,12 @@ public class CupidProfileServiceImpl implements ICupidProfileService
     }
 
     /**
-     * 根据资料 ID 生成匿名展示名（CM-XXXXXX）
+     * 根据资料 ID 生成匿名展示名。
      */
-    private String deriveDisplayName(String profileId)
+    private String deriveDisplayName(CupidProfile profile, String locale)
     {
-        int hash = 0;
-        for (int i = 0; i < profileId.length(); i++)
-        {
-            hash = (hash << 5) - hash + profileId.charAt(i);
-        }
-        String suffix = Integer.toString(Math.abs(hash), 36).toUpperCase();
-        while (suffix.length() < 6)
-        {
-            suffix = "0" + suffix;
-        }
-        return "CM-" + suffix.substring(0, 6);
+        return CupidProfileDisplayNameHelper.displayName(
+                profile.getOwnerAliasWordCode(), profile.getOwnerAliasTag(), normalizeLocale(locale));
     }
 
     /**

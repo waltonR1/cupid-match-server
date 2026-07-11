@@ -32,6 +32,7 @@ import com.ruoyi.cupid.mapper.CupidProfileMapper;
 import com.ruoyi.cupid.service.ICupidCommonOptionService;
 import com.ruoyi.cupid.service.ICupidRelationshipService;
 import com.ruoyi.cupid.service.ICupidRuntimeConfigService;
+import com.ruoyi.cupid.support.CupidProfileDisplayNameHelper;
 
 /**
  * Cupid Match 收藏与私人介绍服务实现。
@@ -117,7 +118,7 @@ public class CupidRelationshipServiceImpl implements ICupidRelationshipService
             item.put("favoriteId", favorite.getId());
             item.put("profileId", profile.getId());
             item.put("profileType", profile.getProfileType());
-            item.put("displayName", deriveDisplayName(profile.getId()));
+            item.put("displayName", deriveDisplayName(profile, locale));
             item.put("avatarUrl", photos.getOrDefault(profile.getId(), ""));
             item.put("age", Math.max(0, Year.now().getValue() - profile.getBirthYear()));
             String loc = normalizeLocale(locale);
@@ -212,6 +213,7 @@ public class CupidRelationshipServiceImpl implements ICupidRelationshipService
         }
         List<String> profileIds = requests.stream()
                 .map(CupidPrivateIntroductionRequest::getTargetProfileId).distinct().toList();
+        Map<String, CupidProfile> profiles = indexProfiles(profileMapper.selectProfilesByIds(profileIds));
         Map<String, String> photos = primaryPhotos(profileMapper.selectApprovedPhotosByProfileIds(profileIds));
         Date now = new Date();
         List<Map<String, Object>> result = new ArrayList<>();
@@ -220,7 +222,8 @@ public class CupidRelationshipServiceImpl implements ICupidRelationshipService
             Map<String, Object> item = new LinkedHashMap<>();
             item.put("requestId", request.getId());
             item.put("targetProfileId", request.getTargetProfileId());
-            item.put("targetDisplayName", deriveDisplayName(request.getTargetProfileId()));
+            CupidProfile profile = profiles.get(request.getTargetProfileId());
+            item.put("targetDisplayName", profile == null ? "" : deriveDisplayName(profile, locale));
             item.put("targetAvatarUrl", photos.getOrDefault(request.getTargetProfileId(), ""));
             item.put("status", effectiveStatus(request, now));
             item.put("requestedAt", request.getRequestedAt());
@@ -403,19 +406,10 @@ public class CupidRelationshipServiceImpl implements ICupidRelationshipService
         return result;
     }
 
-    private String deriveDisplayName(String profileId)
+    private String deriveDisplayName(CupidProfile profile, String locale)
     {
-        int hash = 0;
-        for (int i = 0; i < profileId.length(); i++)
-        {
-            hash = (hash << 5) - hash + profileId.charAt(i);
-        }
-        String suffix = Integer.toString(Math.abs(hash), 36).toUpperCase();
-        while (suffix.length() < 6)
-        {
-            suffix = "0" + suffix;
-        }
-        return "CM-" + suffix.substring(0, 6);
+        return CupidProfileDisplayNameHelper.displayName(
+                profile.getOwnerAliasWordCode(), profile.getOwnerAliasTag(), normalizeLocale(locale));
     }
 
     private String normalizeLocale(String locale)

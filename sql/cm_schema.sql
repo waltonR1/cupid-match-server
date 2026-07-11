@@ -571,10 +571,13 @@ create table cm_users (
   account_name       varchar(100)  not null comment '账户显示名称（非唯一）',
   avatar_url         varchar(500)  default '' comment '头像地址',
   preferred_locale   varchar(8)    not null default 'zh' comment '偏好语言；可选值：zh, fr, en',
+  alias_word_code    varchar(60)   not null comment '用户假名词语代码',
+  alias_tag          varchar(8)    not null comment '用户假名唯一识别码',
   status             varchar(20)   not null default 'active' comment 'Cupid Match 用户状态；可选值：active, deactivated, suspended',
   created_at         datetime      not null default current_timestamp comment '创建时间',
   updated_at         datetime      not null default current_timestamp on update current_timestamp comment '更新时间',
   primary key (id),
+  unique key uk_cm_users_alias (alias_word_code, alias_tag),
   key idx_cm_users_status (status)
 ) engine=innodb comment='Cupid Match 用户';
 

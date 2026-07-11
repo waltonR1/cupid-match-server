@@ -43,6 +43,8 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <result property="createdAt" column="created_at"/>
         <result property="updatedAt" column="updated_at"/>
         <result property="isFeatured" column="is_featured"/>
+        <result property="ownerAliasWordCode" column="owner_alias_word_code"/>
+        <result property="ownerAliasTag" column="owner_alias_tag"/>
         <result property="count" column="cnt"/>
         <result property="city" column="city"/>
         <result property="education" column="education"/>
@@ -71,7 +73,19 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         p.relocation, p.preferred_age_min, p.preferred_age_max,
         p.preferred_location, p.smoking, p.drinking,
         p.activity_level, p.weekend_style, p.pets, p.communication_style,
-        p.archived_at, p.created_at, p.updated_at
+        p.archived_at, p.created_at, p.updated_at,
+        (select u.alias_word_code
+         from cm_profile_ownerships o
+         join cm_users u on u.id = o.user_id
+         where o.profile_id = p.id and o.status = 'active'
+         order by case when o.relationship_to_profile = 'self' then 0 else 1 end, o.created_at
+         limit 1) as owner_alias_word_code,
+        (select u.alias_tag
+         from cm_profile_ownerships o
+         join cm_users u on u.id = o.user_id
+         where o.profile_id = p.id and o.status = 'active'
+         order by case when o.relationship_to_profile = 'self' then 0 else 1 end, o.created_at
+         limit 1) as owner_alias_tag
     </sql>
     <sql id="adminProfileListWhere">
         <if test="profileId != null and profileId != ''">

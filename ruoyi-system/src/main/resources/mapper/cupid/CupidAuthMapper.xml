@@ -20,6 +20,8 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <result property="accountName" column="account_name"/>
         <result property="avatarUrl" column="avatar_url"/>
         <result property="preferredLocale" column="preferred_locale"/>
+        <result property="aliasWordCode" column="alias_word_code"/>
+        <result property="aliasTag" column="alias_tag"/>
         <result property="status" column="status"/>
         <result property="createdAt" column="created_at"/>
         <result property="updatedAt" column="updated_at"/>
@@ -51,7 +53,8 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     </select>
 
     <select id="selectUserById" resultMap="CupidUserResult">
-        select id, account_name, avatar_url, preferred_locale, status, created_at, updated_at
+        select id, account_name, avatar_url, preferred_locale, alias_word_code, alias_tag,
+               status, created_at, updated_at
         from cm_users
         where id = #{id}
         limit 1
@@ -79,9 +82,16 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     </update>
 
     <insert id="insertUser">
-        insert into cm_users (id, account_name, avatar_url, preferred_locale, status)
-        values (#{id}, #{accountName}, '', #{preferredLocale}, 'active')
+        insert into cm_users (id, account_name, avatar_url, preferred_locale, alias_word_code, alias_tag, status)
+        values (#{id}, #{accountName}, '', #{preferredLocale}, #{aliasWordCode}, #{aliasTag}, 'active')
     </insert>
+
+    <select id="countUserAlias" resultType="int">
+        select count(1)
+        from cm_users
+        where alias_word_code = #{aliasWordCode}
+          and alias_tag = #{aliasTag}
+    </select>
 
     <insert id="insertIdentity">
         insert into cm_auth_identities

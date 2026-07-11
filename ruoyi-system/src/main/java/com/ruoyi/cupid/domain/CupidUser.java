@@ -11,6 +11,8 @@ public class CupidUser
     private String accountName;
     private String avatarUrl;
     private String preferredLocale;
+    private String aliasWordCode;
+    private String aliasTag;
     private String status;
     private Date createdAt;
     private Date updatedAt;
@@ -53,6 +55,26 @@ public class CupidUser
     public void setPreferredLocale(String preferredLocale)
     {
         this.preferredLocale = preferredLocale;
+    }
+
+    public String getAliasWordCode()
+    {
+        return aliasWordCode;
+    }
+
+    public void setAliasWordCode(String aliasWordCode)
+    {
+        this.aliasWordCode = aliasWordCode;
+    }
+
+    public String getAliasTag()
+    {
+        return aliasTag;
+    }
+
+    public void setAliasTag(String aliasTag)
+    {
+        this.aliasTag = aliasTag;
     }
 
     public String getStatus()

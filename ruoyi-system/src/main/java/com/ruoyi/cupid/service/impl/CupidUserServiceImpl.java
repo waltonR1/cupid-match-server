@@ -18,6 +18,7 @@ import com.ruoyi.cupid.domain.CupidUserMembership;
 import com.ruoyi.cupid.mapper.CupidAuthMapper;
 import com.ruoyi.cupid.service.ICupidSecurityEventService;
 import com.ruoyi.cupid.service.ICupidUserService;
+import com.ruoyi.cupid.support.CupidProfileDisplayNameHelper;
 
 /**
  * Cupid Match 前台用户服务实现
@@ -63,7 +64,9 @@ public class CupidUserServiceImpl implements ICupidUserService
     public void createDefaultAccount(String userId, String identityId, String accountName, String preferredLocale,
             String provider, String identifier, String passwordHash)
     {
-        authMapper.insertUser(userId, accountName, preferredLocale);
+        Map<String, String> alias = generateUniqueAlias();
+        authMapper.insertUser(userId, accountName, preferredLocale,
+                alias.get("wordCode"), alias.get("tag"));
         authMapper.insertIdentity(identityId, userId, provider, identifier, passwordHash);
         authMapper.insertSecuritySettings(IdUtils.fastUUID(), userId);
         authMapper.insertPreferences(IdUtils.fastUUID(), userId, provider);
@@ -71,6 +74,20 @@ public class CupidUserServiceImpl implements ICupidUserService
         {
             throw new CupidApiException(HttpStatus.ERROR, "free_membership_plan_not_found");
         }
+    }
+
+    private Map<String, String> generateUniqueAlias()
+    {
+        for (int i = 0; i < 20; i++)
+        {
+            String wordCode = CupidProfileDisplayNameHelper.randomWordCode();
+            String tag = CupidProfileDisplayNameHelper.randomTag();
+            if (authMapper.countUserAlias(wordCode, tag) == 0)
+            {
+                return Map.of("wordCode", wordCode, "tag", tag);
+            }
+        }
+        throw new CupidApiException(HttpStatus.ERROR, "alias_generation_failed");
     }
 
     @Override

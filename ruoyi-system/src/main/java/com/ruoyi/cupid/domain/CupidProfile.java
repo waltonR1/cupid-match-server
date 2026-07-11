@@ -57,6 +57,8 @@ public class CupidProfile
     private String familyMode;
     private String locale;
     private String viewerUserId;
+    private String ownerAliasWordCode;
+    private String ownerAliasTag;
     private Boolean hasChildrenFilter;
     private Boolean acceptsLongDistanceFilter;
     private int pageSize;
@@ -559,6 +561,26 @@ public class CupidProfile
     public void setViewerUserId(String viewerUserId)
     {
         this.viewerUserId = viewerUserId;
+    }
+
+    public String getOwnerAliasWordCode()
+    {
+        return ownerAliasWordCode;
+    }
+
+    public void setOwnerAliasWordCode(String ownerAliasWordCode)
+    {
+        this.ownerAliasWordCode = ownerAliasWordCode;
+    }
+
+    public String getOwnerAliasTag()
+    {
+        return ownerAliasTag;
+    }
+
+    public void setOwnerAliasTag(String ownerAliasTag)
+    {
+        this.ownerAliasTag = ownerAliasTag;
     }
 
     public Boolean getHasChildrenFilter()

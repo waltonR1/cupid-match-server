@@ -36,7 +36,10 @@ public interface CupidAuthMapper
      * 新增前台用户
      */
     int insertUser(@Param("id") String id, @Param("accountName") String accountName,
-            @Param("preferredLocale") String preferredLocale);
+            @Param("preferredLocale") String preferredLocale,
+            @Param("aliasWordCode") String aliasWordCode, @Param("aliasTag") String aliasTag);
+
+    int countUserAlias(@Param("aliasWordCode") String aliasWordCode, @Param("aliasTag") String aliasTag);
 
     /**
      * 新增用户认证身份

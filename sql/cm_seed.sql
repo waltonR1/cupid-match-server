@@ -775,8 +775,8 @@ commit;
 -- ============================================================================
 
 -- 3A.1 Users
-insert into cm_users (id, account_name, avatar_url, preferred_locale, status, created_at, updated_at) values
-  ('efdca298-c977-5502-ad2e-8ba480ca1ea3', 'Lin', '', 'zh', 'active', '2026-01-18 00:00:00', '2026-05-27 18:33:11');
+insert into cm_users (id, account_name, avatar_url, preferred_locale, alias_word_code, alias_tag, status, created_at, updated_at) values
+  ('efdca298-c977-5502-ad2e-8ba480ca1ea3', 'Lin', '', 'zh', 'gentle_starlight', 'K27R', 'active', '2026-01-18 00:00:00', '2026-05-27 18:33:11');
 
 -- 3A.2 Auth identities
 insert into cm_auth_identities (id, user_id, provider, identifier, password_hash, verified_at, created_at, updated_at) values
@@ -1515,10 +1515,10 @@ insert into cm_inbox_reads (id, thread_id, user_id, last_read_at, created_at, up
 -- ============================================================================
 
 -- 4A. Test users
-insert into cm_users (id, account_name, avatar_url, preferred_locale, status, created_at, updated_at) values
-  ('90000000-0000-4000-8000-000000000001', '审核测试用户 A', '', 'zh', 'active', now(), now()),
-  ('90000000-0000-4000-8000-000000000002', '审核测试用户 B', '', 'zh', 'active', now(), now()),
-  ('90000000-0000-4000-8000-000000000003', '审核测试用户 C', '', 'zh', 'active', now(), now());
+insert into cm_users (id, account_name, avatar_url, preferred_locale, alias_word_code, alias_tag, status, created_at, updated_at) values
+  ('90000000-0000-4000-8000-000000000001', '审核测试用户 A', '', 'zh', 'quiet_breeze', 'M14Q', 'active', now(), now()),
+  ('90000000-0000-4000-8000-000000000002', '审核测试用户 B', '', 'zh', 'warm_sunrise', 'T62L', 'active', now(), now()),
+  ('90000000-0000-4000-8000-000000000003', '审核测试用户 C', '', 'zh', 'clear_moonlight', 'B08N', 'active', now(), now());
 
 -- 4B. Test profiles (Phase 8.2.4: added 5 new columns)
 insert into cm_profiles (
@@ -1682,10 +1682,10 @@ insert into cm_profile_verification_materials (
 -- ============================================================================
 
 -- 5A. Extra users (varied statuses)
-insert into cm_users (id, account_name, avatar_url, preferred_locale, status, created_at, updated_at) values
-  ('d0000000-0000-4000-8000-000000000004', '用户 D (已停用)', '', 'zh', 'deactivated', '2026-03-15 00:00:00', '2026-05-01 00:00:00'),
-  ('e0000000-0000-4000-8000-000000000005', '用户 E (暂停)', '', 'zh', 'suspended', '2026-04-01 00:00:00', '2026-06-01 00:00:00'),
-  ('f0000000-0000-4000-8000-000000000006', '用户 F (新用户)', '', 'zh', 'active', now(), now());
+insert into cm_users (id, account_name, avatar_url, preferred_locale, alias_word_code, alias_tag, status, created_at, updated_at) values
+  ('d0000000-0000-4000-8000-000000000004', '用户 D (已停用)', '', 'zh', 'blue_horizon', 'R35D', 'deactivated', '2026-03-15 00:00:00', '2026-05-01 00:00:00'),
+  ('e0000000-0000-4000-8000-000000000005', '用户 E (暂停)', '', 'zh', 'soft_rain', 'H91S', 'suspended', '2026-04-01 00:00:00', '2026-06-01 00:00:00'),
+  ('f0000000-0000-4000-8000-000000000006', '用户 F (新用户)', '', 'zh', 'forest_echo', 'P40W', 'active', now(), now());
 
 -- 5B. Extra profiles (varied statuses)
 insert into cm_profiles (
