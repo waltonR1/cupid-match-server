@@ -277,20 +277,26 @@
     </insert>
 
     <insert id="insertPaymentIfAbsent">
-        insert ignore into cm_payments
+        insert into cm_payments
             (id, order_id, provider, environment, provider_payment_id, provider_invoice_id,
              provider_subscription_id, provider_charge_id, provider_checkout_session_id,
              status, raw_status, amount_cents, currency, failure_reason, paid_at)
-        select #{id}, #{orderId}, #{provider}, #{environment}, #{paymentId}, #{invoiceId},
-               #{subscriptionId}, #{chargeId}, #{checkoutSessionId},
-               #{status}, #{rawStatus}, #{amountCents}, #{currency}, #{failureReason}, #{paidAt}
-        from dual
-        where not exists (
-            select 1 from cm_payments
-            where provider = #{provider}
-              and environment = #{environment}
-              and provider_invoice_id = #{invoiceId}
-        )
+        values
+            (#{id}, #{orderId}, #{provider}, #{environment}, #{paymentId}, #{invoiceId},
+             #{subscriptionId}, #{chargeId}, #{checkoutSessionId},
+             #{status}, #{rawStatus}, #{amountCents}, #{currency}, #{failureReason}, #{paidAt})
+        on duplicate key update
+            provider_payment_id = coalesce(values(provider_payment_id), provider_payment_id),
+            provider_subscription_id = coalesce(values(provider_subscription_id), provider_subscription_id),
+            provider_charge_id = coalesce(values(provider_charge_id), provider_charge_id),
+            provider_checkout_session_id = coalesce(values(provider_checkout_session_id), provider_checkout_session_id),
+            status = values(status),
+            raw_status = values(raw_status),
+            amount_cents = values(amount_cents),
+            currency = values(currency),
+            failure_reason = values(failure_reason),
+            paid_at = coalesce(values(paid_at), paid_at),
+            updated_at = now()
     </insert>
 
     <select id="selectOrderByPaymentReference" resultType="map">

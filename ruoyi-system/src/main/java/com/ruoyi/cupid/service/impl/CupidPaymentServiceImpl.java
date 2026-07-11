@@ -1,14 +1,20 @@
 package com.ruoyi.cupid.service.impl;
 
 import java.math.BigDecimal;
+import java.sql.Timestamp;
 import java.time.Instant;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.Date;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 import com.alibaba.fastjson2.JSON;
+import com.alibaba.fastjson2.JSONArray;
 import com.alibaba.fastjson2.JSONObject;
 import com.ruoyi.common.constant.HttpStatus;
 import com.ruoyi.common.exception.cupid.CupidApiException;
@@ -22,6 +28,7 @@ import com.ruoyi.cupid.service.ICupidPaymentService;
 @Service
 public class CupidPaymentServiceImpl implements ICupidPaymentService
 {
+    private static final Logger log = LoggerFactory.getLogger(CupidPaymentServiceImpl.class);
     private static final String PROVIDER_STRIPE = "stripe";
     private static final String MODE_SUBSCRIPTION = "subscription";
 
@@ -93,6 +100,7 @@ public class CupidPaymentServiceImpl implements ICupidPaymentService
     }
 
     @Override
+    @Transactional
     public Map<String, Object> selectAccountOrder(String userId, String orderId)
     {
         Map<String, Object> order = paymentMapper.selectAccountOrder(userId, orderId);
@@ -100,7 +108,122 @@ public class CupidPaymentServiceImpl implements ICupidPaymentService
         {
             throw new CupidApiException(HttpStatus.NOT_FOUND, "order_not_found");
         }
+        if (syncCheckoutOrderIfCompleted(userId, orderId, order))
+        {
+            order = paymentMapper.selectAccountOrder(userId, orderId);
+        }
         return order;
+    }
+
+    private boolean syncCheckoutOrderIfCompleted(String userId, String orderId,
+            Map<String, Object> accountOrder)
+    {
+        String status = text(accountOrder.get("status"));
+        if ("paid".equals(status) || "failed".equals(status) || "expired".equals(status)
+                || "cancelled".equals(status) || "refunded".equals(status))
+        {
+            return false;
+        }
+        String sessionId = text(accountOrder.get("checkoutSessionId"));
+        if (!StringUtils.hasText(sessionId) || !stripeProperties.isEnabled())
+        {
+            return false;
+        }
+
+        try
+        {
+            JSONObject session = stripeClient.retrieveCheckoutSession(sessionId);
+            if (!"complete".equals(session.getString("status"))
+                    || !"paid".equals(session.getString("payment_status")))
+            {
+                return false;
+            }
+            Map<String, Object> order = paymentMapper.selectOrderById(orderId);
+            if (order == null || !userId.equals(text(order.get("userId"))))
+            {
+                return false;
+            }
+            activatePaidCheckoutSession(order, session);
+            return true;
+        }
+        catch (RuntimeException e)
+        {
+            log.warn("Cupid Stripe checkout fallback sync failed: orderId={}, sessionId={}, message={}",
+                    orderId, sessionId, e.getMessage());
+            return false;
+        }
+    }
+
+    private void activatePaidCheckoutSession(Map<String, Object> order, JSONObject session)
+    {
+        String subscriptionId = session.getString("subscription");
+        String customerId = session.getString("customer");
+        if (!StringUtils.hasText(subscriptionId))
+        {
+            return;
+        }
+
+        JSONObject stripeSubscription = stripeClient.retrieveSubscription(subscriptionId);
+        String subscriptionStatus = StringUtils.hasText(stripeSubscription.getString("status"))
+                ? stripeSubscription.getString("status") : "active";
+        Date periodStart = epoch(stripeSubscription.getLong("current_period_start"));
+        Date periodEnd = epoch(stripeSubscription.getLong("current_period_end"));
+        boolean cancelAtPeriodEnd = stripeSubscription.getBooleanValue("cancel_at_period_end");
+        Date cancelledAt = epoch(stripeSubscription.getLong("canceled_at"));
+
+        Map<String, Object> plan = paymentMapper.selectPlanById(text(order.get("planId")));
+        if (plan == null)
+        {
+            throw new IllegalStateException("Membership plan not found");
+        }
+        if (periodStart == null)
+        {
+            periodStart = epoch(session.getLong("created"));
+        }
+        if (periodStart == null)
+        {
+            periodStart = new Date();
+        }
+        if (periodEnd == null || !periodEnd.after(periodStart))
+        {
+            periodEnd = fallbackPeriodEnd(periodStart, plan);
+        }
+
+        paymentMapper.updateOrderSubscription(text(order.get("id")), subscriptionId, customerId);
+        Map<String, Object> subscription = ensureSubscriptionFromOrder(order, subscriptionId,
+                customerId, subscriptionStatus, periodStart, periodEnd, cancelAtPeriodEnd,
+                cancelledAt);
+        paymentMapper.updateOrderStatus(text(order.get("id")), "paid",
+                epoch(session.getLong("created")), null, null);
+
+        StripePaymentReference paymentReference = paymentReferenceFromCheckout(session, stripeSubscription);
+        String invoiceId = paymentReference.invoiceId;
+        String paymentId = paymentReference.paymentId;
+        if (StringUtils.hasText(invoiceId))
+        {
+            paymentMapper.insertPaymentIfAbsent(IdUtils.fastUUID(), text(order.get("id")),
+                    PROVIDER_STRIPE, environment(), paymentId,
+                    invoiceId, subscriptionId, paymentReference.chargeId, session.getString("id"),
+                    "succeeded", "checkout_session_fallback",
+                    integer(order.get("amountCents")), upper(text(order.get("currency"))),
+                    null, epoch(session.getLong("created")));
+        }
+
+        String membershipId = text(subscription.get("membershipId"));
+        Date currentPeriodEnd = date(subscription.get("currentPeriodEndsAt"));
+        if (!StringUtils.hasText(membershipId)
+                || currentPeriodEnd == null || periodEnd.after(currentPeriodEnd))
+        {
+            paymentMapper.expireActiveMemberships(text(subscription.get("userId")));
+            membershipId = IdUtils.fastUUID();
+            paymentMapper.insertUserMembership(membershipId, text(subscription.get("userId")),
+                    text(plan.get("id")), text(plan.get("tier")), "active", periodStart, periodEnd);
+            createEntitlements(text(subscription.get("userId")), membershipId, plan,
+                    periodStart, periodEnd);
+        }
+        paymentMapper.updateSubscription(text(subscription.get("id")), membershipId,
+                text(plan.get("id")), text(subscription.get("providerPriceId")),
+                "active", periodStart, periodEnd, cancelAtPeriodEnd, cancelledAt);
     }
 
     @Override
@@ -292,9 +415,10 @@ public class CupidPaymentServiceImpl implements ICupidPaymentService
         {
             paymentMapper.updateOrderStatus(text(order.get("id")), "paid",
                     epoch(invoice.getLong("created")), null, null);
+            StripePaymentReference paymentReference = paymentReferenceFromInvoice(invoice);
             insertedPayment = paymentMapper.insertPaymentIfAbsent(IdUtils.fastUUID(), text(order.get("id")),
-                    PROVIDER_STRIPE, environment(), invoice.getString("payment_intent"),
-                    invoice.getString("id"), subscriptionId, invoice.getString("charge"),
+                    PROVIDER_STRIPE, environment(), paymentReference.paymentId,
+                    invoice.getString("id"), subscriptionId, paymentReference.chargeId,
                     text(order.get("providerCheckoutSessionId")), "succeeded",
                     invoice.getString("status"), integer(invoice.get("amount_paid")),
                     upper(invoice.getString("currency")), null, epoch(invoice.getLong("created")));
@@ -304,7 +428,7 @@ public class CupidPaymentServiceImpl implements ICupidPaymentService
             }
         }
         String membershipId = text(subscription.get("membershipId"));
-        Date currentPeriodEnd = (Date) subscription.get("currentPeriodEndsAt");
+        Date currentPeriodEnd = date(subscription.get("currentPeriodEndsAt"));
         if ((order == null || insertedPayment == 1)
                 && (!StringUtils.hasText(membershipId)
                 || currentPeriodEnd == null || periodEnd.after(currentPeriodEnd)))
@@ -329,11 +453,12 @@ public class CupidPaymentServiceImpl implements ICupidPaymentService
                 environment(), subscriptionId);
         if (order != null)
         {
+            StripePaymentReference paymentReference = paymentReferenceFromInvoice(invoice);
             paymentMapper.updateOrderStatus(text(order.get("id")), "failed",
                     null, null, "invoice_payment_failed");
             paymentMapper.insertPaymentIfAbsent(IdUtils.fastUUID(), text(order.get("id")),
-                    PROVIDER_STRIPE, environment(), invoice.getString("payment_intent"),
-                    invoice.getString("id"), subscriptionId, invoice.getString("charge"),
+                    PROVIDER_STRIPE, environment(), paymentReference.paymentId,
+                    invoice.getString("id"), subscriptionId, paymentReference.chargeId,
                     text(order.get("providerCheckoutSessionId")), "failed",
                     invoice.getString("status"), integer(invoice.get("amount_due")),
                     upper(invoice.getString("currency")), "invoice_payment_failed", null);
@@ -347,14 +472,14 @@ public class CupidPaymentServiceImpl implements ICupidPaymentService
                     text(subscription.get("planId")),
                     text(subscription.get("providerPriceId")),
                     "past_due",
-                    (Date) subscription.get("currentPeriodStartedAt"),
-                    (Date) subscription.get("currentPeriodEndsAt"),
+                    date(subscription.get("currentPeriodStartedAt")),
+                    date(subscription.get("currentPeriodEndsAt")),
                     truthy(subscription.get("cancelAtPeriodEnd")),
-                    (Date) subscription.get("cancelledAt"));
+                    date(subscription.get("cancelledAt")));
             syncMembershipLifecycle(subscription, "past_due",
-                    (Date) subscription.get("currentPeriodEndsAt"),
+                    date(subscription.get("currentPeriodEndsAt")),
                     truthy(subscription.get("cancelAtPeriodEnd")),
-                    (Date) subscription.get("cancelledAt"));
+                    date(subscription.get("cancelledAt")));
         }
     }
 
@@ -369,7 +494,7 @@ public class CupidPaymentServiceImpl implements ICupidPaymentService
         if (order != null)
         {
             paymentMapper.updateOrderStatus(text(order.get("id")), "refunded",
-                    (Date) order.get("paidAt"), null, null);
+                    date(order.get("paidAt")), null, null);
         }
     }
 
@@ -566,6 +691,104 @@ public class CupidPaymentServiceImpl implements ICupidPaymentService
                 truthy(plan.get("staffReviewEnabled")) ? 1 : 0);
     }
 
+    private StripePaymentReference paymentReferenceFromCheckout(JSONObject session,
+            JSONObject stripeSubscription)
+    {
+        String invoiceId = firstText(objectId(session.get("invoice")),
+                objectId(stripeSubscription.get("latest_invoice")));
+        JSONObject invoice = session.get("invoice") instanceof JSONObject
+                ? (JSONObject) session.get("invoice") : null;
+        if (invoice == null && stripeSubscription.get("latest_invoice") instanceof JSONObject)
+        {
+            invoice = (JSONObject) stripeSubscription.get("latest_invoice");
+        }
+        if (invoice == null && StringUtils.hasText(invoiceId))
+        {
+            invoice = stripeClient.retrieveInvoice(invoiceId);
+        }
+
+        StripePaymentReference reference = invoice == null
+                ? new StripePaymentReference() : paymentReferenceFromInvoice(invoice);
+        reference.invoiceId = firstText(reference.invoiceId, invoiceId);
+        reference.paymentId = firstText(reference.paymentId, objectId(session.get("payment_intent")));
+        if (!StringUtils.hasText(reference.chargeId)
+                && StringUtils.hasText(reference.paymentId))
+        {
+            reference.chargeId = latestChargeFromPaymentIntent(reference.paymentId);
+        }
+        return reference;
+    }
+
+    private StripePaymentReference paymentReferenceFromInvoice(JSONObject invoice)
+    {
+        StripePaymentReference reference = new StripePaymentReference();
+        reference.invoiceId = invoice.getString("id");
+        reference.paymentId = objectId(invoice.get("payment_intent"));
+        reference.chargeId = objectId(invoice.get("charge"));
+
+        JSONObject payments = invoice.getJSONObject("payments");
+        JSONArray data = payments == null ? null : payments.getJSONArray("data");
+        if (data != null)
+        {
+            for (int i = 0; i < data.size(); i++)
+            {
+                JSONObject invoicePayment = data.getJSONObject(i);
+                if (invoicePayment == null)
+                {
+                    continue;
+                }
+                if (!"paid".equals(invoicePayment.getString("status"))
+                        && StringUtils.hasText(reference.paymentId))
+                {
+                    continue;
+                }
+                JSONObject payment = invoicePayment.getJSONObject("payment");
+                if (payment == null)
+                {
+                    continue;
+                }
+                reference.paymentId = firstText(reference.paymentId,
+                        objectId(payment.get("payment_intent")));
+                reference.chargeId = firstText(reference.chargeId,
+                        objectId(payment.get("charge")));
+                if (StringUtils.hasText(reference.paymentId)
+                        || StringUtils.hasText(reference.chargeId))
+                {
+                    break;
+                }
+            }
+        }
+
+        if (!StringUtils.hasText(reference.chargeId)
+                && StringUtils.hasText(reference.paymentId))
+        {
+            reference.chargeId = latestChargeFromPaymentIntent(reference.paymentId);
+        }
+        return reference;
+    }
+
+    private String latestChargeFromPaymentIntent(String paymentIntentId)
+    {
+        try
+        {
+            JSONObject paymentIntent = stripeClient.retrievePaymentIntent(paymentIntentId);
+            return objectId(paymentIntent.get("latest_charge"));
+        }
+        catch (RuntimeException e)
+        {
+            log.warn("Cupid Stripe payment intent charge sync failed: paymentIntentId={}, message={}",
+                    paymentIntentId, e.getMessage());
+            return null;
+        }
+    }
+
+    private static class StripePaymentReference
+    {
+        private String invoiceId;
+        private String paymentId;
+        private String chargeId;
+    }
+
     private JSONObject metadata(JSONObject object)
     {
         JSONObject metadata = object.getJSONObject("metadata");
@@ -618,7 +841,7 @@ public class CupidPaymentServiceImpl implements ICupidPaymentService
             Object value = current.get(keys[i]);
             if (i == keys.length - 1)
             {
-                return value == null ? null : String.valueOf(value);
+                return objectId(value);
             }
             if (!(value instanceof JSONObject))
             {
@@ -627,6 +850,15 @@ public class CupidPaymentServiceImpl implements ICupidPaymentService
             current = (JSONObject) value;
         }
         return null;
+    }
+
+    private String objectId(Object value)
+    {
+        if (value instanceof JSONObject)
+        {
+            return ((JSONObject) value).getString("id");
+        }
+        return value == null ? null : String.valueOf(value);
     }
 
     private String firstText(Object first, String second)
@@ -657,6 +889,27 @@ public class CupidPaymentServiceImpl implements ICupidPaymentService
             return ((Number) value).intValue();
         }
         return new BigDecimal(String.valueOf(value)).intValue();
+    }
+
+    private Date date(Object value)
+    {
+        if (value == null)
+        {
+            return null;
+        }
+        if (value instanceof Date)
+        {
+            return (Date) value;
+        }
+        if (value instanceof Timestamp)
+        {
+            return new Date(((Timestamp) value).getTime());
+        }
+        if (value instanceof LocalDateTime)
+        {
+            return Date.from(((LocalDateTime) value).atZone(ZoneId.systemDefault()).toInstant());
+        }
+        throw new IllegalArgumentException("Unsupported date value: " + value.getClass().getName());
     }
 
     private boolean truthy(Object value)

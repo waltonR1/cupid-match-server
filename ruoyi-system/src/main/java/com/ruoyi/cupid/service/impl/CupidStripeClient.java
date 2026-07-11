@@ -71,6 +71,39 @@ public class CupidStripeClient
         return post("/v1/subscriptions/" + subscriptionId, params);
     }
 
+    public JSONObject retrieveCheckoutSession(String sessionId)
+    {
+        Map<String, String> params = new LinkedHashMap<>();
+        params.put("expand[0]", "payment_intent");
+        params.put("expand[1]", "invoice");
+        params.put("expand[2]", "invoice.payments");
+        return get("/v1/checkout/sessions/" + sessionId, params);
+    }
+
+    public JSONObject retrieveSubscription(String subscriptionId)
+    {
+        Map<String, String> params = new LinkedHashMap<>();
+        params.put("expand[0]", "latest_invoice");
+        params.put("expand[1]", "latest_invoice.payments");
+        return get("/v1/subscriptions/" + subscriptionId, params);
+    }
+
+    public JSONObject retrieveInvoice(String invoiceId)
+    {
+        Map<String, String> params = new LinkedHashMap<>();
+        params.put("expand[0]", "payments");
+        params.put("expand[1]", "payments.data.payment.payment_intent");
+        params.put("expand[2]", "payments.data.payment.charge");
+        return get("/v1/invoices/" + invoiceId, params);
+    }
+
+    public JSONObject retrievePaymentIntent(String paymentIntentId)
+    {
+        Map<String, String> params = new LinkedHashMap<>();
+        params.put("expand[0]", "latest_charge");
+        return get("/v1/payment_intents/" + paymentIntentId, params);
+    }
+
     public JSONObject createRefund(String chargeId, String paymentIntentId)
     {
         Map<String, String> params = new LinkedHashMap<>();
@@ -132,6 +165,45 @@ public class CupidStripeClient
                 .header("Authorization", "Basic " + basicAuth())
                 .header("Content-Type", "application/x-www-form-urlencoded")
                 .POST(HttpRequest.BodyPublishers.ofString(form(params), StandardCharsets.UTF_8))
+                .build();
+        try
+        {
+            HttpResponse<String> response = httpClient.send(request,
+                    HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
+            JSONObject body = JSON.parseObject(response.body());
+            if (response.statusCode() < 200 || response.statusCode() >= 300)
+            {
+                String message = body != null && body.getJSONObject("error") != null
+                        ? body.getJSONObject("error").getString("message")
+                        : "Stripe API rejected request";
+                throw new IllegalStateException(message);
+            }
+            return body;
+        }
+        catch (IOException e)
+        {
+            throw new IllegalStateException("Stripe API request failed", e);
+        }
+        catch (InterruptedException e)
+        {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException("Stripe API request interrupted", e);
+        }
+    }
+
+    private JSONObject get(String path)
+    {
+        return get(path, null);
+    }
+
+    private JSONObject get(String path, Map<String, String> params)
+    {
+        ensureConfigured();
+        String query = params == null || params.isEmpty() ? "" : "?" + form(params);
+        HttpRequest request = HttpRequest.newBuilder(URI.create(API_BASE + path + query))
+                .timeout(Duration.ofSeconds(30))
+                .header("Authorization", "Basic " + basicAuth())
+                .GET()
                 .build();
         try
         {

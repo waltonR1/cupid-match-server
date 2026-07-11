@@ -1235,9 +1235,9 @@ insert into cm_membership_plans (id, tier, price_cents, currency, cny_price_cent
 
 -- Stripe Price 占位数据默认 inactive；填入真实 price_xxx 后再改为 active。
 insert into cm_membership_plan_payment_prices (id, plan_id, provider, environment, mode, provider_product_id, provider_price_id, currency, billing_period, status, created_at, updated_at) values
-  ('fa100000-0000-4000-8000-000000000001', 'f2886d5f-1d2a-5fed-9b4f-8b23f2067f06', 'stripe', 'test', 'subscription', null, 'price_replace_me_silver_monthly', 'EUR', 'monthly', 'inactive', now(), now()),
-  ('fa100000-0000-4000-8000-000000000002', 'eaf73332-f7d1-5f4b-82ba-11368eac30b6', 'stripe', 'test', 'subscription', null, 'price_replace_me_gold_monthly', 'EUR', 'monthly', 'inactive', now(), now()),
-  ('fa100000-0000-4000-8000-000000000003', '9fb53b84-a341-5b63-b6e8-35a474540a4c', 'stripe', 'test', 'subscription', null, 'price_replace_me_diamond_monthly', 'EUR', 'monthly', 'inactive', now(), now());
+  ('fa100000-0000-4000-8000-000000000001', 'f2886d5f-1d2a-5fed-9b4f-8b23f2067f06', 'stripe', 'test', 'subscription', 'prod_UqeA8CRJHdNEQr', 'price_1TqwsPCsC9pa7rgAJEpWaov1', 'EUR', 'monthly', 'active', now(), now()),
+  ('fa100000-0000-4000-8000-000000000002', 'eaf73332-f7d1-5f4b-82ba-11368eac30b6', 'stripe', 'test', 'subscription', 'prod_UqeB6YvxmN1eoK', 'price_1Tqwt1CsC9pa7rgAoWnyLWo2', 'EUR', 'monthly', 'active', now(), now()),
+  ('fa100000-0000-4000-8000-000000000003', '9fb53b84-a341-5b63-b6e8-35a474540a4c', 'stripe', 'test', 'subscription', 'prod_UqeBWbAhuDjNiB', 'price_1TqwtECsC9pa7rgAlihgTqBc', 'EUR', 'monthly', 'active', now(), now());
 
 -- 3A.17 cm_membership_plan_localized_fields
 insert into cm_membership_plan_localized_fields (id, plan_id, field_name, locale, value, source, provider, status, created_at, updated_at) values
