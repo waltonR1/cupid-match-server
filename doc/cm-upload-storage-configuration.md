@@ -1,16 +1,78 @@
-# Cupid Match 上传与 CDN 接入说明
+# Cupid Match 上传与 CDN 配置
 
-本文说明当前图片和材料上传的处理方式，以及后续接入 CDN / 对象存储时应改动的位置。
+本文只说明当前已经落地的上传链路，以及部署时需要填写哪些配置。结论先放前面：当前已经分成两类文件，公开图片可以通过 CDN 回源接入；认证材料保持私有存储，不走公开 CDN。
 
-## 当前上传链路
+## 当前结论
 
-### C 端图片上传
+| 类型 | 上传接口 | 保存位置 | 返回值 | 是否走公开 CDN |
+| --- | --- | --- | --- | --- |
+| 头像、资料照片等公开图片 | `POST /api/upload` | `ruoyi.profile/upload/...` | `/profile/upload/yyyy/MM/dd/{uuid}.{ext}` | 可以 |
+| 实名、学历、收入、婚姻等认证材料 | `POST /api/account/profiles/{profileId}/verification/materials/upload` | `cupid-private/verification/...` | `private://verification/...` | 不可以 |
 
-C 端头像和资料照片调用：
+公开图片会通过 RuoYi 静态资源映射暴露为 `/profile/**`。认证材料只保存私有引用，不会拼接公开资源域名，也不会被 `/profile/**` 访问到。
+
+## 部署时需要填写什么
+
+### 后端
+
+后端只需要确认 `ruoyi.profile` 是服务器上的本地上传目录：
+
+```yaml
+ruoyi:
+  profile: /home/ruoyi/uploadPath
+```
+
+注意：这里是文件系统路径，不是 URL，也不是 CDN 域名。
+
+### C 端前端
+
+C 端通过 `VITE_ASSET_BASE_URL` 决定公开图片最终访问域名：
+
+```env
+VITE_ASSET_BASE_URL=https://cdn.example.com
+```
+
+如果暂时不接 CDN，也可以直接填后端域名：
+
+```env
+VITE_ASSET_BASE_URL=https://api.example.com
+```
+
+前端会把后端返回的 `/profile/upload/...` 拼成：
 
 ```text
-POST /api/upload
+https://cdn.example.com/profile/upload/...
 ```
+
+认证材料返回的是 `private://verification/...`，不会使用 `VITE_ASSET_BASE_URL`。
+
+### CDN
+
+如果使用 CDN 回源模式，只需要在 CDN 平台配置：
+
+```text
+CDN 域名: https://cdn.example.com
+源站: 后端服务或 Nginx
+需要可回源路径: /profile/**
+```
+
+也就是说，浏览器访问：
+
+```text
+https://cdn.example.com/profile/upload/...
+```
+
+CDN 能回源到：
+
+```text
+https://api.example.com/profile/upload/...
+```
+
+即可。
+
+## 代码位置
+
+### 公开图片上传
 
 后端入口：
 
@@ -18,34 +80,27 @@ POST /api/upload
 ruoyi-admin/src/main/java/com/ruoyi/web/controller/cupid/app/CupidUploadController.java
 ```
 
-当前实现：
-
-1. 校验文件非空。
-2. 只允许 `jpg`、`jpeg`、`png`、`webp`。
-3. 通过 `FileUploadUtils.upload(...)` 写入本地磁盘。
-4. 返回 `/profile/upload/yyyy/MM/dd/{uuid}.{ext}`。
-
-本地磁盘根目录来自：
-
-```text
-ruoyi.profile
-```
-
-当前资源访问由 RuoYi 静态资源映射提供：
+静态资源映射：
 
 ```text
 ruoyi-framework/src/main/java/com/ruoyi/framework/config/ResourcesConfig.java
 ```
 
-它把 `/profile/**` 映射到 `ruoyi.profile` 目录。
-
-### 认证材料上传
-
-C 端实名认证、学历、收入、婚姻等材料调用：
+映射关系：
 
 ```text
-POST /api/account/profiles/{profileId}/verification/materials/upload
+/profile/** -> ruoyi.profile
 ```
+
+C 端调用：
+
+```text
+cupid-match-app/src/api/upload/upload.ts
+```
+
+其中 `uploadImage(...)` 会调用 `/api/upload` 并保留后端返回的 `/profile/...` 相对路径；页面展示时再通过 `resolveAssetUrl(...)` 拼接 `VITE_ASSET_BASE_URL`。
+
+### 私有认证材料上传
 
 后端入口：
 
@@ -53,69 +108,36 @@ POST /api/account/profiles/{profileId}/verification/materials/upload
 ruoyi-admin/src/main/java/com/ruoyi/web/controller/cupid/app/CupidAccountController.java
 ```
 
-实际存储类：
+实际存储：
 
 ```text
 ruoyi-admin/src/main/java/com/ruoyi/web/controller/cupid/support/CupidVerificationMaterialStorage.java
 ```
 
-当前实现也是写本地磁盘，但材料路径与公开图片分开，避免和公开资料图片混在一起。
-
-### RuoYi 原始通用上传
-
-后台框架自带：
-
-```text
-POST /common/upload
-POST /common/uploads
-```
-
-入口：
-
-```text
-ruoyi-admin/src/main/java/com/ruoyi/web/controller/common/CommonController.java
-```
-
-这是 RuoYi 原始能力。Cupid C 端资料上传主要不走这里。
-
-## 前端调用点
-
-C 端上传封装：
+C 端调用：
 
 ```text
 cupid-match-app/src/api/upload/upload.ts
 ```
 
-其中：
+其中 `uploadVerificationMaterial(...)` 只返回后端的私有材料引用，不做 CDN 拼接。
 
-- `uploadImage(...)` 调 `/api/upload`，用于头像、资料照片。
-- `uploadVerificationMaterial(...)` 调认证材料上传接口。
+## 现在是否只需要改配置
 
-前端会通过 `resolveAssetUrl(...)` 把后端返回的相对 URL 解析为可访问资源地址。
+如果目标是“公开图片通过 CDN 加速，文件仍由后端本地磁盘保存”，是的，只需要：
 
-## 接 CDN / 对象存储时改哪里
+1. 后端部署时设置好 `ruoyi.profile`。
+2. CDN 配好 `/profile/**` 回源。
+3. C 端部署时把 `VITE_ASSET_BASE_URL` 填成 CDN 域名。
 
-推荐新增一个后端存储抽象，而不是在 Controller 里直接写 CDN SDK。
+C 端会尽量保存 `/profile/...` 相对路径，展示时再拼资源域名。这样后续更换 CDN 域名时，一般只需要改部署配置，不需要批量迁移旧图片数据。
 
-建议改动点：
+如果目标是“文件直接上传对象存储，例如 S3、OSS、COS、R2”，那不是只改配置，需要新增后端存储实现。到那一步建议再抽象统一的文件存储服务，公开图片和私有材料分别走 public/private bucket 或 key 前缀。
 
-1. 新增存储服务接口，例如 `CupidFileStorageService`。
-2. 提供两个实现：
-   - `local`：保留当前本地磁盘实现；
-   - `object-storage`：上传到 S3、OSS、COS、R2 等对象存储。
-3. `CupidUploadController` 改为调用该服务。
-4. `CupidVerificationMaterialStorage` 改为调用该服务或拆成同一套存储策略。
-5. `.env` 增加对象存储配置，例如 bucket、region、endpoint、public base URL。
-6. 数据库仍保存最终可访问 URL，不保存临时本地路径。
+## 验收方式
 
-CDN 接入后，公开图片建议返回 CDN URL；认证材料可以按权限策略选择：
-
-- 后台审核需要长期访问：保存私有对象 key，后端生成临时签名 URL；
-- 简化实现：保存受控访问 URL，但不要放到公开 CDN 路径。
-
-## 当前需要注意
-
-- 当前上传文件保存在应用服务器本地磁盘，应用迁移或多实例部署时需要同步文件。
-- 当前公开图片 URL 是 `/profile/...`，生产环境需要确保 Nginx 或 Spring 静态资源能访问该路径。
-- 接多实例部署前，建议优先切对象存储，否则不同实例之间看不到彼此上传的文件。
-
+1. 上传一张头像或资料照片。
+2. 数据库或接口返回值优先保持 `/profile/upload/...`。
+3. 页面图片应能通过 `VITE_ASSET_BASE_URL + /profile/upload/...` 访问。
+4. 上传认证材料后，返回值应为 `private://verification/...`。
+5. 认证材料不应能通过 CDN 域名或 `/profile/**` 直接访问。

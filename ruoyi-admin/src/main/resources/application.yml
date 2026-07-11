@@ -7,6 +7,7 @@ ruoyi:
   # 版权年份
   copyrightYear: 2026
   # 文件路径 示例（ Windows配置D:/ruoyi/uploadPath，Linux配置 /home/ruoyi/uploadPath）
+  # 这里只填服务器本地磁盘路径，不填 CDN URL；公开图片由 /profile/** 暴露，C 端通过 VITE_ASSET_BASE_URL 切换后端域名或 CDN 域名。
   profile: D:/ruoyi/uploadPath
   # 获取ip地址开关
   addressEnabled: false
