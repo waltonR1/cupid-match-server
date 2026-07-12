@@ -41,6 +41,33 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         order by type
     </select>
 
+    <select id="selectAdminDocuments" resultMap="CupidLegalDocumentResult">
+        select id, type, version, status, effective_at, created_at, updated_at
+        from cm_legal_documents
+        <where>
+            <if test="type != null and type != ''">
+                and type = #{type}
+            </if>
+        </where>
+        order by type, effective_at desc, updated_at desc
+    </select>
+
+    <select id="selectDocumentById" resultMap="CupidLegalDocumentResult">
+        select id, type, version, status, effective_at, created_at, updated_at
+        from cm_legal_documents
+        where id = #{id}
+        limit 1
+    </select>
+
+    <select id="selectDraftDocumentByType" resultMap="CupidLegalDocumentResult">
+        select id, type, version, status, effective_at, created_at, updated_at
+        from cm_legal_documents
+        where type = #{type}
+          and status = 'draft'
+        order by updated_at desc
+        limit 1
+    </select>
+
     <select id="selectContentByLocale" resultMap="CupidLegalDocumentContentResult">
         select id, document_id, locale, title, sections, created_at, updated_at
         from cm_legal_document_contents
@@ -56,6 +83,43 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         order by case when locale = 'zh' then 0 else 1 end, locale
         limit 1
     </select>
+
+    <update id="updateDocument" parameterType="CupidLegalDocument">
+        update cm_legal_documents
+        set version = #{version},
+            status = #{status},
+            effective_at = #{effectiveAt},
+            updated_at = now()
+        where id = #{id}
+    </update>
+
+    <insert id="insertDocument" parameterType="CupidLegalDocument">
+        insert into cm_legal_documents (
+            id, type, version, status, effective_at, created_at, updated_at
+        ) values (
+            #{id}, #{type}, #{version}, #{status}, #{effectiveAt}, now(), now()
+        )
+    </insert>
+
+    <update id="archiveActiveDocumentByType">
+        update cm_legal_documents
+        set status = 'archived',
+            updated_at = now()
+        where type = #{type}
+          and status = 'active'
+    </update>
+
+    <insert id="upsertContent" parameterType="CupidLegalDocumentContent">
+        insert into cm_legal_document_contents (
+            id, document_id, locale, title, sections, created_at, updated_at
+        ) values (
+            #{id}, #{documentId}, #{locale}, #{title}, #{sections}, now(), now()
+        )
+        on duplicate key update
+            title = values(title),
+            sections = values(sections),
+            updated_at = now()
+    </insert>
 
     <insert id="upsertAcceptance">
         insert into cm_user_agreement_acceptances (id, user_id, document_type, document_version, accepted_at)

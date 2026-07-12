@@ -734,9 +734,12 @@ insert into sys_menu values('2114', '支付订单退款', '2110', '4', '', '', '
 insert into sys_menu values('2115', '联系咨询', '2080', '6', 'contact-lead', 'cupid/contact-lead/index', '', 'CupidContactLead', 1, 0, 'C', '0', '0', 'cupid:contactLead:list', 'message', 'admin', sysdate(), '', null, 'Cupid 联系咨询线索');
 insert into sys_menu values('2116', '联系咨询查询', '2115', '1', '', '', '', '', 1, 0, 'F', '0', '0', 'cupid:contactLead:query', '#', 'admin', sysdate(), '', null, '');
 insert into sys_menu values('2117', '联系咨询处理', '2115', '2', '', '', '', '', 1, 0, 'F', '0', '0', 'cupid:contactLead:handle', '#', 'admin', sysdate(), '', null, '');
+insert into sys_menu values('2118', '法律条款', '2050', '4', 'legal', 'cupid/legal/index', '', 'CupidLegal', 1, 0, 'C', '0', '0', 'cupid:legal:list', 'documentation', 'admin', sysdate(), '', null, 'Cupid 服务条款与隐私政策管理');
+insert into sys_menu values('2119', '法律条款查询', '2118', '1', '', '', '', '', 1, 0, 'F', '0', '0', 'cupid:legal:query', '#', 'admin', sysdate(), '', null, '');
+insert into sys_menu values('2120', '法律条款编辑', '2118', '2', '', '', '', '', 1, 0, 'F', '0', '0', 'cupid:legal:edit', '#', 'admin', sysdate(), '', null, '');
 
 insert into sys_role_menu (role_id, menu_id)
-select r.role_id, m.menu_id from sys_role r join sys_menu m on m.menu_id between 2000 and 2117
+select r.role_id, m.menu_id from sys_role r join sys_menu m on m.menu_id between 2000 and 2120
 where r.role_key = 'cupid_admin' and r.del_flag = '0';
 
 insert into sys_role_menu (role_id, menu_id)
