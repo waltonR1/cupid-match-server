@@ -25,6 +25,7 @@ drop table if exists cm_orders;
 drop table if exists cm_payment_customers;
 drop table if exists cm_membership_plan_payment_prices;
 drop table if exists cm_audit_logs;
+drop table if exists cm_contact_leads;
 drop table if exists cm_staff_task_localized_fields;
 drop table if exists cm_staff_tasks;
 drop table if exists cm_staff_members;
@@ -1436,6 +1437,26 @@ create table cm_staff_task_localized_fields (
 -- ----------------------------
 -- 审计与支付
 -- ----------------------------
+
+create table cm_contact_leads (
+  id                   varchar(36)  not null comment '联系咨询线索ID',
+  source               varchar(30)  not null default 'contact_page' comment '来源；可选值：contact_page',
+  inquiry_type         varchar(40)  not null comment '咨询类型；可选值：platform, membership, event, advisor, partnership, complaint, privacy, other',
+  name                 varchar(80)  default null comment '称呼',
+  contact_channel      varchar(20)  not null comment '联系渠道；可选值：email, phone, wechat',
+  contact_value        varchar(191) not null comment '联系方式',
+  message              varchar(1000) not null comment '咨询内容',
+  status               varchar(20)  not null default 'new' comment '状态；可选值：new, processing, resolved, ignored',
+  handler_sys_user_id  bigint(20)   default null comment '处理人若依用户ID',
+  handler_note         varchar(1000) default null comment '处理备注',
+  handled_at           datetime     default null comment '处理时间',
+  created_at           datetime     not null default current_timestamp comment '创建时间',
+  updated_at           datetime     not null default current_timestamp on update current_timestamp comment '更新时间',
+  primary key (id),
+  key idx_cm_contact_leads_status_created (status, created_at),
+  key idx_cm_contact_leads_type_created (inquiry_type, created_at),
+  key idx_cm_contact_leads_handler_status (handler_sys_user_id, status)
+) engine=innodb comment='联系咨询线索';
 
 create table cm_audit_logs (
   id                 varchar(36)  not null comment '业务审计日志ID',

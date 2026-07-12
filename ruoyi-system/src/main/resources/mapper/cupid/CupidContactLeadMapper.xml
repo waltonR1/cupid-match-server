@@ -1,0 +1,91 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.cupid.mapper.CupidContactLeadMapper">
+
+    <insert id="insertContactLead">
+        insert into cm_contact_leads (
+            id, source, inquiry_type, name, contact_channel, contact_value, message,
+            status, created_at, updated_at
+        ) values (
+            #{id}, #{source}, #{inquiryType}, #{name}, #{contactChannel}, #{contactValue}, #{message},
+            'new', current_timestamp, current_timestamp
+        )
+    </insert>
+
+    <select id="selectAdminContactLeads" resultType="map">
+        select
+            l.id,
+            l.source,
+            l.inquiry_type as inquiryType,
+            l.name,
+            l.contact_channel as contactChannel,
+            l.contact_value as contactValue,
+            l.message,
+            l.status,
+            l.handler_sys_user_id as handlerSysUserId,
+            l.handler_note as handlerNote,
+            l.handled_at as handledAt,
+            l.created_at as createdAt,
+            l.updated_at as updatedAt,
+            su.user_name as handlerUserName,
+            su.nick_name as handlerNickName
+        from cm_contact_leads l
+        left join sys_user su on su.user_id = l.handler_sys_user_id
+        where 1 = 1
+        <if test="keyword != null and keyword != ''">
+            and (
+                l.id like concat('%', #{keyword}, '%')
+                or l.name like concat('%', #{keyword}, '%')
+                or l.contact_value like concat('%', #{keyword}, '%')
+                or l.message like concat('%', #{keyword}, '%')
+                or l.handler_note like concat('%', #{keyword}, '%')
+            )
+        </if>
+        <if test="inquiryType != null and inquiryType != ''">
+            and l.inquiry_type = #{inquiryType}
+        </if>
+        <if test="contactChannel != null and contactChannel != ''">
+            and l.contact_channel = #{contactChannel}
+        </if>
+        <if test="status != null and status != ''">
+            and l.status = #{status}
+        </if>
+        order by case when l.status = 'new' then 0 when l.status = 'processing' then 1 else 2 end,
+                 l.created_at desc, l.id desc
+    </select>
+
+    <select id="selectAdminContactLeadById" resultType="map">
+        select
+            l.id,
+            l.source,
+            l.inquiry_type as inquiryType,
+            l.name,
+            l.contact_channel as contactChannel,
+            l.contact_value as contactValue,
+            l.message,
+            l.status,
+            l.handler_sys_user_id as handlerSysUserId,
+            l.handler_note as handlerNote,
+            l.handled_at as handledAt,
+            l.created_at as createdAt,
+            l.updated_at as updatedAt,
+            su.user_name as handlerUserName,
+            su.nick_name as handlerNickName
+        from cm_contact_leads l
+        left join sys_user su on su.user_id = l.handler_sys_user_id
+        where l.id = #{id}
+        limit 1
+    </select>
+
+    <update id="updateAdminContactLead">
+        update cm_contact_leads
+        set status = #{status},
+            handler_sys_user_id = #{handlerSysUserId},
+            handler_note = #{handlerNote},
+            handled_at = current_timestamp,
+            updated_at = current_timestamp
+        where id = #{id}
+    </update>
+</mapper>
