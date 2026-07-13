@@ -3,7 +3,6 @@ package com.ruoyi.web.controller.cupid.admin;
 import java.io.IOException;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
 import java.util.Map;
 import jakarta.servlet.http.HttpServletResponse;
 import com.ruoyi.common.annotation.Log;
@@ -217,12 +216,18 @@ public class CupidAdminReviewController extends BaseController
         }
         try
         {
-            MaterialFile file = materialStorage.resolve(String.valueOf(detail.get("materialUrl")));
-            response.setContentType(file.contentType());
-            response.setHeader("Content-Disposition",
-                    (attachment ? "attachment" : "inline") + "; filename*=UTF-8''" + encodeFilename(file.filename()));
-            response.setHeader("Cache-Control", "no-store");
-            Files.copy(file.path(), response.getOutputStream());
+            try (MaterialFile file = materialStorage.resolve(String.valueOf(detail.get("materialUrl"))))
+            {
+                response.setContentType(file.contentType());
+                if (file.contentLength() >= 0)
+                {
+                    response.setContentLengthLong(file.contentLength());
+                }
+                response.setHeader("Content-Disposition",
+                        (attachment ? "attachment" : "inline") + "; filename*=UTF-8''" + encodeFilename(file.filename()));
+                response.setHeader("Cache-Control", "no-store");
+                file.inputStream().transferTo(response.getOutputStream());
+            }
         }
         catch (IllegalArgumentException e)
         {

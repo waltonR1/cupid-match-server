@@ -1,7 +1,12 @@
 package com.ruoyi.web.controller.cupid.app;
 
+import java.util.HashSet;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.multipart.MultipartFile;
@@ -22,6 +27,7 @@ import com.ruoyi.framework.web.service.CupidAuthService;
 import com.ruoyi.framework.web.service.CupidVerificationCodeService;
 import com.ruoyi.web.controller.cupid.support.CupidVerificationMaterialStorage;
 import com.ruoyi.web.controller.cupid.support.CupidVerificationMaterialStorage.StoredMaterial;
+import com.ruoyi.web.controller.cupid.support.CupidPublicImageStorage;
 
 /**
  * Cupid Match 前台账户接口
@@ -30,6 +36,10 @@ import com.ruoyi.web.controller.cupid.support.CupidVerificationMaterialStorage.S
 @RequestMapping("/api/account")
 public class CupidAccountController
 {
+    private static final Logger log = LoggerFactory.getLogger(CupidAccountController.class);
+
+    private static final String PUBLIC_UPLOAD_PREFIX = "/profile/upload/";
+
     @Autowired
     private CupidAuthService authService;
 
@@ -38,6 +48,9 @@ public class CupidAccountController
 
     @Autowired
     private CupidVerificationMaterialStorage materialStorage;
+
+    @Autowired
+    private CupidPublicImageStorage publicImageStorage;
 
     @Autowired
     private ICupidDashboardService dashboardService;
@@ -329,7 +342,52 @@ public class CupidAccountController
             @AuthenticationPrincipal CupidLoginUser principal,
             @RequestParam(value = "lang", defaultValue = "zh") String locale)
     {
-        return AjaxResult.success(profileService.saveProfile(principal.getUserId(), payload, locale));
+        Set<String> previousPhotoUrls = Set.of();
+        Object profileId = payload.get("profileId");
+        if (profileId instanceof String id && !id.isBlank() && payload.containsKey("photos"))
+        {
+            previousPhotoUrls = photoUrls(profileService.getOwnerProfileDetail(id, principal.getUserId(), locale));
+        }
+        Map<String, Object> saved = profileService.saveProfile(principal.getUserId(), payload, locale);
+        cleanupRemovedPhotos(previousPhotoUrls, photoUrls(saved));
+        return AjaxResult.success(saved);
+    }
+
+    private Set<String> photoUrls(Map<String, Object> detail)
+    {
+        if (detail == null || !(detail.get("photos") instanceof List<?> photos))
+        {
+            return Set.of();
+        }
+        Set<String> urls = new HashSet<>();
+        for (Object item : photos)
+        {
+            if (item instanceof Map<?, ?> photo && photo.get("url") instanceof String url
+                    && url.startsWith(PUBLIC_UPLOAD_PREFIX))
+            {
+                urls.add(url);
+            }
+        }
+        return urls;
+    }
+
+    private void cleanupRemovedPhotos(Set<String> previousPhotoUrls, Set<String> retainedPhotoUrls)
+    {
+        for (String url : previousPhotoUrls)
+        {
+            if (retainedPhotoUrls.contains(url))
+            {
+                continue;
+            }
+            try
+            {
+                publicImageStorage.delete(url.substring("/profile/".length()));
+            }
+            catch (Exception e)
+            {
+                log.warn("Failed to delete removed profile photo {}", url, e);
+            }
+        }
     }
 
     /**

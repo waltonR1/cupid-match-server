@@ -1,143 +1,102 @@
-# Cupid Match 上传与 CDN 配置
+# Cupid Match 图片存储配置
 
-本文只说明当前已经落地的上传链路，以及部署时需要填写哪些配置。结论先放前面：当前已经分成两类文件，公开图片可以通过 CDN 回源接入；认证材料保持私有存储，不走公开 CDN。
+公开资料图片使用统一存储接口，支持服务器本地磁盘、AWS S3 和兼容 S3 协议的 Cloudflare R2。前端上传接口和图片地址保持不变。
 
-## 当前结论
+## 文件分类
 
-| 类型 | 上传接口 | 保存位置 | 返回值 | 是否走公开 CDN |
-| --- | --- | --- | --- | --- |
-| 头像、资料照片等公开图片 | `POST /api/upload` | `ruoyi.profile/upload/...` | `/profile/upload/yyyy/MM/dd/{uuid}.{ext}` | 可以 |
-| 实名、学历、收入、婚姻等认证材料 | `POST /api/account/profiles/{profileId}/verification/materials/upload` | `cupid-private/verification/...` | `private://verification/...` | 不可以 |
+| 类型 | 上传接口 | 返回值 | 存储策略 |
+| --- | --- | --- | --- |
+| 头像、资料照片等公开图片 | `POST /api/upload` | `/profile/upload/yyyy/MM/dd/{uuid}.{ext}` | local 或 s3 |
+| 实名、学历、收入等认证材料 | `POST /api/account/profiles/{profileId}/verification/materials/upload` | `private://verification/...` | local 或 s3 私有空间 |
 
-公开图片会通过 RuoYi 静态资源映射暴露为 `/profile/**`。认证材料只保存私有引用，不会拼接公开资源域名，也不会被 `/profile/**` 访问到。
+认证材料仍通过后台鉴权接口预览和下载，不会被 `/profile/**` 公开访问，也不会跳转到 CDN。
 
-## 部署时需要填写什么
+## 公开图片读取
 
-### 后端
+前端始终读取后端返回的 `/profile/upload/...` 相对地址，后端根据配置选择：
 
-后端只需要确认 `ruoyi.profile` 是服务器上的本地上传目录：
+- `CUPID_STORAGE_PUBLIC_BASE_URL` 留空：后端从本地或对象存储读取并代理文件内容。
+- `CUPID_STORAGE_PUBLIC_BASE_URL` 有值：后端返回 `302`，浏览器直接访问对象公共域名或 CDN。
 
-```yaml
-ruoyi:
-  profile: /home/ruoyi/uploadPath
-```
+因此接入或更换 CDN 不需要修改数据库中的旧图片地址。
 
-注意：这里是文件系统路径，不是 URL，也不是 CDN 域名。
+资料保存时会对比旧、新照片列表；被移除的 `/profile/upload/...` 文件会在数据库保存成功后从当前存储中删除。删除存储对象失败只记录告警，不会回滚已经成功的资料保存。
 
-### C 端前端
-
-C 端通过 `VITE_ASSET_BASE_URL` 决定公开图片最终访问域名：
+## 本地模式
 
 ```env
-VITE_ASSET_BASE_URL=https://cdn.example.com
+CUPID_STORAGE_TYPE=local
+CUPID_STORAGE_LOCAL_ROOT=/var/lib/cupid-match/storage
+CUPID_STORAGE_PUBLIC_BASE_URL=
 ```
 
-如果暂时不接 CDN，也可以直接填后端域名：
+图片实际保存到：
+
+```text
+/var/lib/cupid-match/storage/upload/yyyy/MM/dd/{uuid}.{ext}
+```
+
+私有认证材料继续使用兼容旧版本的目录：
+
+```text
+/var/lib/cupid-match/cupid-private/verification/{profileId}/yyyy/MM/dd/{uuid}.{ext}
+```
+
+未设置 `CUPID_STORAGE_LOCAL_ROOT` 时，默认使用 `${user.home}/.cupid-match/storage`。
+
+## AWS S3
 
 ```env
-VITE_ASSET_BASE_URL=https://api.example.com
+CUPID_STORAGE_TYPE=s3
+CUPID_STORAGE_S3_BUCKET=cupid-match-images
+CUPID_STORAGE_S3_PRIVATE_BUCKET=cupid-match-private
+CUPID_STORAGE_S3_REGION=eu-west-3
+CUPID_STORAGE_S3_ENDPOINT=
+CUPID_STORAGE_S3_ACCESS_KEY=
+CUPID_STORAGE_S3_SECRET_KEY=
+CUPID_STORAGE_S3_PATH_STYLE_ACCESS=false
+CUPID_STORAGE_PUBLIC_BASE_URL=
 ```
 
-前端会把后端返回的 `/profile/upload/...` 拼成：
+访问密钥留空时使用 AWS SDK 默认凭据链，适合 IAM Role、ECS 或 EKS。私有桶留空时复用公开桶；即使复用，也只有公开图片会使用 `PUBLIC_BASE_URL`。`PUBLIC_BASE_URL` 留空时公开图片读取流量经过后端。
 
-```text
-https://cdn.example.com/profile/upload/...
+## Cloudflare R2
+
+```env
+CUPID_STORAGE_TYPE=s3
+CUPID_STORAGE_S3_BUCKET=cupid-match-images
+CUPID_STORAGE_S3_PRIVATE_BUCKET=cupid-match-private
+CUPID_STORAGE_S3_REGION=auto
+CUPID_STORAGE_S3_ENDPOINT=https://<ACCOUNT_ID>.r2.cloudflarestorage.com
+CUPID_STORAGE_S3_ACCESS_KEY=<R2_ACCESS_KEY_ID>
+CUPID_STORAGE_S3_SECRET_KEY=<R2_SECRET_ACCESS_KEY>
+CUPID_STORAGE_S3_PATH_STYLE_ACCESS=false
+CUPID_STORAGE_PUBLIC_BASE_URL=
 ```
 
-认证材料返回的是 `private://verification/...`，不会使用 `VITE_ASSET_BASE_URL`。
+先让 `PUBLIC_BASE_URL` 留空即可通过后端代理读取。后续绑定 R2 自定义域名或 CDN 后再设置：
 
-### CDN
-
-如果使用 CDN 回源模式，只需要在 CDN 平台配置：
-
-```text
-CDN 域名: https://cdn.example.com
-源站: 后端服务或 Nginx
-需要可回源路径: /profile/**
+```env
+CUPID_STORAGE_PUBLIC_BASE_URL=https://images.example.com
 ```
 
-也就是说，浏览器访问：
+该域名根路径需要对应同一个 bucket，对象 key 保持 `upload/yyyy/MM/dd/...`。
 
-```text
-https://cdn.example.com/profile/upload/...
-```
-
-CDN 能回源到：
-
-```text
-https://api.example.com/profile/upload/...
-```
-
-即可。
+私有材料对象 key 使用 `private/verification/...`。R2/S3 bucket 必须保持私有，后台会使用服务端凭据读取并转发文件。
 
 ## 代码位置
 
-### 公开图片上传
+- 上传入口：`ruoyi-admin/src/main/java/com/ruoyi/web/controller/cupid/app/CupidUploadController.java`
+- 读取入口：`ruoyi-admin/src/main/java/com/ruoyi/web/controller/cupid/app/CupidPublicImageController.java`
+- 存储接口：`ruoyi-admin/src/main/java/com/ruoyi/web/controller/cupid/support/CupidPublicImageStorage.java`
+- 本地实现：`LocalCupidPublicImageStorage.java`
+- S3/R2 实现：`S3CupidPublicImageStorage.java`
+- 私有认证材料：`CupidVerificationMaterialStorage.java`
 
-后端入口：
+## 验收
 
-```text
-ruoyi-admin/src/main/java/com/ruoyi/web/controller/cupid/app/CupidUploadController.java
-```
-
-静态资源映射：
-
-```text
-ruoyi-framework/src/main/java/com/ruoyi/framework/config/ResourcesConfig.java
-```
-
-映射关系：
-
-```text
-/profile/** -> ruoyi.profile
-```
-
-C 端调用：
-
-```text
-cupid-match-app/src/api/upload/upload.ts
-```
-
-其中 `uploadImage(...)` 会调用 `/api/upload` 并保留后端返回的 `/profile/...` 相对路径；页面展示时再通过 `resolveAssetUrl(...)` 拼接 `VITE_ASSET_BASE_URL`。
-
-### 私有认证材料上传
-
-后端入口：
-
-```text
-ruoyi-admin/src/main/java/com/ruoyi/web/controller/cupid/app/CupidAccountController.java
-```
-
-实际存储：
-
-```text
-ruoyi-admin/src/main/java/com/ruoyi/web/controller/cupid/support/CupidVerificationMaterialStorage.java
-```
-
-C 端调用：
-
-```text
-cupid-match-app/src/api/upload/upload.ts
-```
-
-其中 `uploadVerificationMaterial(...)` 只返回后端的私有材料引用，不做 CDN 拼接。
-
-## 现在是否只需要改配置
-
-如果目标是“公开图片通过 CDN 加速，文件仍由后端本地磁盘保存”，是的，只需要：
-
-1. 后端部署时设置好 `ruoyi.profile`。
-2. CDN 配好 `/profile/**` 回源。
-3. C 端部署时把 `VITE_ASSET_BASE_URL` 填成 CDN 域名。
-
-C 端会尽量保存 `/profile/...` 相对路径，展示时再拼资源域名。这样后续更换 CDN 域名时，一般只需要改部署配置，不需要批量迁移旧图片数据。
-
-如果目标是“文件直接上传对象存储，例如 S3、OSS、COS、R2”，那不是只改配置，需要新增后端存储实现。到那一步建议再抽象统一的文件存储服务，公开图片和私有材料分别走 public/private bucket 或 key 前缀。
-
-## 验收方式
-
-1. 上传一张头像或资料照片。
-2. 数据库或接口返回值优先保持 `/profile/upload/...`。
-3. 页面图片应能通过 `VITE_ASSET_BASE_URL + /profile/upload/...` 访问。
-4. 上传认证材料后，返回值应为 `private://verification/...`。
-5. 认证材料不应能通过 CDN 域名或 `/profile/**` 直接访问。
+1. 上传图片后确认接口仍返回 `/profile/upload/...`。
+2. 直接请求该地址，代理模式应返回图片内容。
+3. 配置 `CUPID_STORAGE_PUBLIC_BASE_URL` 后，同一地址应返回指向 CDN 的 `302`。
+4. 上传认证材料后应返回 `private://verification/...`，且不能通过 `/profile/**` 或 CDN 直接读取。
+5. 使用有审核权限的后台账号预览和下载认证材料，确认响应包含 `Cache-Control: no-store`。

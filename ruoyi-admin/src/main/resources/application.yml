@@ -6,9 +6,8 @@ ruoyi:
   version: 3.9.2
   # 版权年份
   copyrightYear: 2026
-  # 文件路径 示例（ Windows配置D:/ruoyi/uploadPath，Linux配置 /home/ruoyi/uploadPath）
-  # 这里只填服务器本地磁盘路径，不填 CDN URL；公开图片由 /profile/** 暴露，C 端通过 VITE_ASSET_BASE_URL 切换后端域名或 CDN 域名。
-  profile: D:/ruoyi/uploadPath
+  # 后台头像、认证材料以及 local 模式公开图片的本地根目录
+  profile: ${CUPID_STORAGE_LOCAL_ROOT:${user.home}/.cupid-match/storage}
   # 获取ip地址开关
   addressEnabled: false
   # 验证码类型 math 数字计算 char 字符验证
@@ -134,6 +133,21 @@ token:
   expireTime: 30
 
 cupid:
+  storage:
+    # local 或 s3；Cloudflare R2 使用 s3 模式并配置 endpoint
+    type: ${CUPID_STORAGE_TYPE:local}
+    local-root: ${CUPID_STORAGE_LOCAL_ROOT:${ruoyi.profile}}
+    # 配置后读取公开图片会 302 到该域名；留空则由后端代理文件内容
+    public-base-url: ${CUPID_STORAGE_PUBLIC_BASE_URL:}
+    s3:
+      bucket: ${CUPID_STORAGE_S3_BUCKET:}
+      # 可单独指定私有认证材料桶；留空时复用公开图片桶
+      private-bucket: ${CUPID_STORAGE_S3_PRIVATE_BUCKET:}
+      region: ${CUPID_STORAGE_S3_REGION:auto}
+      endpoint: ${CUPID_STORAGE_S3_ENDPOINT:}
+      access-key: ${CUPID_STORAGE_S3_ACCESS_KEY:}
+      secret-key: ${CUPID_STORAGE_S3_SECRET_KEY:}
+      path-style-access: ${CUPID_STORAGE_S3_PATH_STYLE_ACCESS:false}
   auth:
     # 开发环境验证码调试开关，开启后只输出日志，不调用 Email 或 SMS
     verification-code-log-enabled: false

@@ -8,6 +8,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.LocalDate;
 import java.util.Locale;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Component;
 import org.springframework.web.multipart.MultipartFile;
 import com.ruoyi.common.config.RuoYiConfig;
@@ -24,6 +25,19 @@ public class CupidVerificationMaterialStorage
     private static final String[] ALLOWED_EXTENSIONS = { "pdf", "jpg", "jpeg", "png", "webp" };
 
     private static final long MAX_SIZE = 10L * 1024L * 1024L;
+
+    private static final String S3_PREFIX = "private/verification/";
+
+    private final CupidStorageProperties storageProperties;
+
+    private final ObjectProvider<CupidS3ObjectClient> s3ClientProvider;
+
+    public CupidVerificationMaterialStorage(CupidStorageProperties storageProperties,
+            ObjectProvider<CupidS3ObjectClient> s3ClientProvider)
+    {
+        this.storageProperties = storageProperties;
+        this.s3ClientProvider = s3ClientProvider;
+    }
 
     public StoredMaterial upload(String profileId, MultipartFile file) throws IOException
     {
@@ -47,31 +61,74 @@ public class CupidVerificationMaterialStorage
                 + String.format("%02d", today.getMonthValue()) + "/"
                 + String.format("%02d", today.getDayOfMonth()) + "/"
                 + IdUtils.fastSimpleUUID() + "." + extension;
-        Path target = resolveRelative(relativePath);
-        if (!target.startsWith(baseDir()))
+        if (isS3())
         {
-            throw new IllegalArgumentException("invalid_file_path");
+            requireS3Client().put(storageProperties.getS3().getPrivateBucket(), S3_PREFIX + relativePath, file);
         }
-        Files.createDirectories(target.getParent());
-        file.transferTo(target);
+        else
+        {
+            Path target = resolveRelative(relativePath);
+            if (!target.startsWith(baseDir()))
+            {
+                throw new IllegalArgumentException("invalid_file_path");
+            }
+            Files.createDirectories(target.getParent());
+            file.transferTo(target);
+        }
         return new StoredMaterial(PRIVATE_PREFIX + relativePath.replace('\\', '/'),
                 file.getOriginalFilename(), file.getContentType(), file.getSize(),
                 "passed", scanMessage);
     }
 
-    public MaterialFile resolve(String materialUrl)
+    public MaterialFile resolve(String materialUrl) throws IOException
     {
         if (materialUrl == null || !materialUrl.startsWith(PRIVATE_PREFIX))
         {
             throw new IllegalArgumentException("invalid_material_url");
         }
         String relativePath = materialUrl.substring(PRIVATE_PREFIX.length());
+        CupidStoragePaths.requireObjectKey(relativePath);
+        if (isS3())
+        {
+            try
+            {
+                CupidStoredObject object = requireS3Client().open(
+                        storageProperties.getS3().getPrivateBucket(), S3_PREFIX + relativePath);
+                return new MaterialFile(object, filenameOf(relativePath));
+            }
+            catch (java.io.FileNotFoundException e)
+            {
+                throw new IllegalArgumentException("material_file_not_found", e);
+            }
+        }
         Path file = resolveRelative(relativePath);
         if (!file.startsWith(baseDir()) || !Files.isRegularFile(file))
         {
             throw new IllegalArgumentException("material_file_not_found");
         }
-        return new MaterialFile(file, file.getFileName().toString(), contentType(file));
+        return new MaterialFile(new CupidStoredObject(Files.newInputStream(file), contentType(file), Files.size(file)),
+                file.getFileName().toString());
+    }
+
+    private boolean isS3()
+    {
+        return "s3".equalsIgnoreCase(storageProperties.getType());
+    }
+
+    private CupidS3ObjectClient requireS3Client()
+    {
+        CupidS3ObjectClient client = s3ClientProvider.getIfAvailable();
+        if (client == null)
+        {
+            throw new IllegalStateException("S3 storage client is not available");
+        }
+        return client;
+    }
+
+    private String filenameOf(String relativePath)
+    {
+        int slash = relativePath.lastIndexOf('/');
+        return slash >= 0 ? relativePath.substring(slash + 1) : relativePath;
     }
 
     private Path resolveRelative(String relativePath)
@@ -201,7 +258,27 @@ public class CupidVerificationMaterialStorage
     {
     }
 
-    public record MaterialFile(Path path, String filename, String contentType)
+    public record MaterialFile(CupidStoredObject object, String filename) implements AutoCloseable
     {
+        public String contentType()
+        {
+            return object.contentType();
+        }
+
+        public long contentLength()
+        {
+            return object.contentLength();
+        }
+
+        public InputStream inputStream()
+        {
+            return object.inputStream();
+        }
+
+        @Override
+        public void close() throws IOException
+        {
+            object.close();
+        }
     }
 }
