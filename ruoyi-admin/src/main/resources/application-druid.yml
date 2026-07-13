@@ -6,16 +6,16 @@ spring:
         druid:
             # 主库数据源
             master:
-                url: jdbc:mysql://mysql-caf227f-walton-a467.k.aivencloud.com:22352/defaultdb?sslMode=REQUIRED
-                username: avnadmin
-                password: AVNS_fuewpWcuP0Y7HTLOH8i
+                url: ${CUPID_DB_URL:jdbc:mysql://localhost:3306/cupid_match?useUnicode=true&characterEncoding=utf8&zeroDateTimeBehavior=convertToNull&useSSL=false&serverTimezone=GMT%2B8}
+                username: ${CUPID_DB_USERNAME:root}
+                password: ${CUPID_DB_PASSWORD:}
             # 从库数据源
             slave:
                 # 从数据源开关/默认关闭
-                enabled: false
-                url: 
-                username: 
-                password: 
+                enabled: ${CUPID_DB_SLAVE_ENABLED:false}
+                url: ${CUPID_DB_SLAVE_URL:}
+                username: ${CUPID_DB_SLAVE_USERNAME:}
+                password: ${CUPID_DB_SLAVE_PASSWORD:}
             # 初始连接数
             initialSize: 5
             # 最小连接池数量
