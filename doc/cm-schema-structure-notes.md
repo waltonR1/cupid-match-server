@@ -197,22 +197,32 @@ Cupid 后台可建立 `cupid_admin`、`cupid_operator`、`cupid_reviewer`、`cup
 
 ## 数据库重建顺序
 
-当样例数据或 ID 映射规则变化时，直接维护 `sql/cm_seed.sql`，然后在目标数据库依次完整执行：
+当表结构、必需运行数据或样例数据变化时，按职责分别维护以下文件：
+
+- `sql/cm_schema.sql`：表结构。
+- `sql/cm_required_seed.sql`：后台运行必须数据。
+- `sql/cm_demo_seed.sql`：C 端和本地验收样例数据。
+
+完整开发数据库重建顺序为：
 
 ```text
 sql/cm_schema.sql
-sql/cm_seed.sql
+sql/cm_required_seed.sql
+sql/cm_demo_seed.sql
 ```
 
-`cm_schema.sql` 会删除并重建全部 `cm_*` 表，因此只适用于当前重构期或明确允许重建的环境。不要在已有正式业务数据的环境直接执行。
+`cm_schema.sql` 会删除并重建表结构，因此只适用于本地开发库或明确允许重建的测试库。不要在已有正式业务数据的环境直接执行。
 
-该流程只重建 Cupid 业务表和样例数据，不修改 RuoYi、Quartz 或 Cupid 后台菜单。完整开发数据库重建顺序为：
+如果只更新后台菜单、权限、字典、配置、定时任务、会员套餐、选项、通知模板或法律条款，只执行：
 
 ```text
-sql/ry_20260417.sql
-sql/quartz.sql
-sql/cm_schema.sql
-sql/cm_seed.sql
+sql/cm_required_seed.sql
+```
+
+如果只刷新 C 端样例数据，只执行：
+
+```text
+sql/cm_demo_seed.sql
 ```
 
 具体环境限制统一以 `doc/cm-database-initialization.md` 为准。

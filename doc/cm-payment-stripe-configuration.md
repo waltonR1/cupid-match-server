@@ -87,7 +87,7 @@ cm_membership_plan_payment_prices
 | `provider_price_id` | Stripe Price ID，格式 `price_xxx`。 |
 | `is_active` | 只有启用的映射才会被用于创建 Checkout。 |
 
-本地测试环境可以在 `sql/cm_seed.sql` 中保留测试用 `prod_xxx` 和 `price_xxx`。这些 ID 不是密钥，但生产环境的 live 映射仍建议单独管理和复核。
+本地测试环境可以在 `sql/cm_required_seed.sql` 中保留测试用 `prod_xxx` 和 `price_xxx`。这些 ID 不是密钥，但生产环境的 live 映射仍建议单独管理和复核。
 
 ## 本地联调步骤
 
@@ -145,4 +145,3 @@ cm_membership_plan_payment_prices
 ### 退款后是否需要取消自动续费
 
 需要。平台后台退款流程会同时尝试取消该订阅的后续自动续费，避免退款后下个周期继续扣款。
-
