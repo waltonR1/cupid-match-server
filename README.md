@@ -104,6 +104,7 @@ http://127.0.0.1:8080
 - [Stripe 支付配置](./doc/cm-payment-stripe-configuration.md)
 - [验证码投递配置](./doc/cm-verification-delivery-configuration.md)
 - [图片上传与 CDN](./doc/cm-upload-storage-configuration.md)
+- [Render 生产部署](./doc/cm-render-deployment.md)
 - [数据库结构说明](./doc/cm-schema-structure-notes.md)
 - [API 状态说明](./doc/cm-api-status.md)
 
