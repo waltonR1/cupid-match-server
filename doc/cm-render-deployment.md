@@ -1,6 +1,6 @@
-# Render 部署
+# Render 后端部署
 
-本文说明如何将 Java 后端部署到 Render，并与 Cloudflare Pages 上的 C 端和管理后台联调。
+本文补充 Java 后端的 Render 配置。三仓完整发布顺序、Cloudflare Pages、R2 和 Stripe 配置统一见 [Cupid Match 三仓生产部署](./cm-production-deployment.md)。
 
 ## 运行方式
 
@@ -15,7 +15,7 @@ Render Web Service 配置：
 | Branch | `master` |
 | Root Directory | 留空 |
 | Dockerfile Path | `./Dockerfile` |
-| Health Check Path | `/` |
+| Health Check Path | `/api/membership/catalog` |
 | Auto-Deploy | `On Commit` |
 
 ## 必需环境变量
@@ -83,7 +83,7 @@ sql/cm_required_seed.sql
 ## 验证
 
 1. Render 日志中出现 Spring Boot 启动成功，服务状态为 `Live`。
-2. `GET https://<render-service>/` 可访问。
+2. `GET https://<render-service>/api/membership/catalog` 返回业务 `code: 200`。
 3. C 端可登录、读取资料、上传公开图片。
 4. 管理后台可登录并读取菜单。
 5. 认证材料不能通过 R2 公开 URL 访问，只能由有权后台账号读取。
